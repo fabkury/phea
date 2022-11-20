@@ -6,8 +6,10 @@
 #' 2022-11-17 19:07 EST
 #'
 
+.pkgglobalenv <- new.env(parent=emptyenv())
 
-# OMOP source tables ----------------------------------------------------------------------------------------------
+
+# Functions -------------------------------------------------------------------------------------------------------
 # Declare function colnames_dbplyr(records).
 colnames_dbplyr <- function(records) {
   records |>
@@ -17,13 +19,23 @@ colnames_dbplyr <- function(records) {
 }
 
 #' @export
-omop <- function(table, schema = NULL) {
-  schema_name <- deparse(substitute(schema))
-  if(schema_name == 'NULL')
-    schema_name <- db$omop_schema
+setup_phea <- function(dbi_connection, schema) {
+  assign('con', dbi_connection, envir = .pkgglobalenv)
+  assign('schema', schema, envir = .pkgglobalenv)
+}
 
-  tbl(db$con, in_schema(schema_name,
-    deparse(substitute(table))))
+#' @export
+sqlt <- function(table) {
+  tbl(.pkgglobalenv$con,
+    in_schema(.pkgglobalenv$schema,
+      deparse(substitute(table))))
+}
+
+#' @export
+sql0 <- function(...) {
+  sql_txt <- paste0(...)
+  tbl(.pkgglobalenv$con,
+    sql(sql_txt))
 }
 
 #' @export

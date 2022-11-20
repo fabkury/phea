@@ -3,4 +3,6 @@
 export(calculate_formula)
 export(make_component)
 export(make_record_source)
-export(omop)
+export(setup_phea)
+export(sql0)
+export(sqlt)
