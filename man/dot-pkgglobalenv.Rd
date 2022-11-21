@@ -3,7 +3,7 @@
 \docType{data}
 \name{.pkgglobalenv}
 \alias{.pkgglobalenv}
-\title{\subsection{phe2a}{
+\title{\subsection{phea}{
 
 PHEnotyping Algebra
 By Fabrício Kury, fab at kury.dev.
@@ -16,7 +16,7 @@ An object of class \code{environment} of length 0.
 .pkgglobalenv
 }
 \description{
-\subsection{phe2a}{
+\subsection{phea}{
 
 PHEnotyping Algebra
 By Fabrício Kury, fab at kury.dev.

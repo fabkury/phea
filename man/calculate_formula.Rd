@@ -15,8 +15,7 @@ calculate_formula(
   .rec_name = NULL,
   .delay = NULL,
   .line = NULL,
-  .ordem = NULL,
-  .exclui_na = FALSE,
+  .exclude_na = FALSE,
   .require_all = FALSE,
   .lim = NA,
   .dont_require = NULL,
@@ -34,12 +33,6 @@ calculate_formula(
 }
 \value{
 Lazy table with result of formula or formulas.
-}
-\description{
-This function gathers records according to their timestamps and computes a SQL formula.
-}
-\examples{
-teste
 components is actually a lazy table. Make a component out of it. The function make_component() is also overloaded
 and will produce a record source from the lazy table.
 Filter bogus matches (eg. SQL keywords in the formula) by keeping only the variables that can possibly come from
@@ -47,9 +40,9 @@ the given combination of record sources and components.
 Select only the columns that will be needed later, according to g_vars. This requires checking all applicable
 components.
 Por algum motivo, o "lag()" não funciona com "range between window preceeding and delay preceeding", i.e. não é
-possível aplicar line *e* delay em uma só chamada à função de window. O last_value() funciona com esse "range".
-Dar a preferência ao acesso via *line*.
-Caso contrário, produzir acesso via *delay*.
+possível aplicar line \emph{e} delay em uma só chamada à função de window. O last_value() funciona com esse "range".
+Dar a preferência ao acesso via \emph{line}.
+Caso contrário, produzir acesso via \emph{delay}.
 Neste ponto o componente já foi adicionado à board de valores, porém cada componente só tem valor em sua line de
 origem. Se o PostgreSQL suportasse IGNORE NULLS no last_value(), o trabalho terminaria aqui. Como ele não
 suporta, precisamos contornar o problema.
@@ -61,8 +54,11 @@ will help the SQL query optimizer and computation engine as a whole.
 Keep only the most complete computation in each timestamp. The most recent computation is the last one in each
 timestamp. 'max(row_id) over (partition by "pid", "ts")' could find the row with the largest (most complete) row_id
 in each timestamp, but last_value() in this context gives the same result
-We also need to potentially require all fields be filled. Let's compact that into a single call to filter(), hence
+We also need to potentially require all fields be filled. Let's compact that into a single call to dplyr::filter(), hence
 a single WHERE statement.
 If .dont_require is provided, then all components, except those specified, will be required, even if .require_all
 is FALSE.
+}
+\description{
+Gathers records according to their timestamps and computes a SQL formula.
 }
