@@ -24,42 +24,39 @@ calculate_formula(
 )
 }
 \arguments{
-\item{components}{List of components,  component, record source, or lazy table.}
+\item{components}{List of components, component, record source, or lazy table.}
 
 \item{fml}{Formula or list of formulas.}
 
 \item{export}{List of additional variables to export.}
 
-\item{add_components}{Additional components to add in case components is not a list of components.}
+\item{add_components}{Additional components. Used mostly in case components is not a list of components.}
+
+\item{.ts, .pid, .rec_name, .delay, .line}{If supplied, these will overwrite those of the given component.}
+
+\item{.exclude_na}{If \code{TRUE}, returns only rows where the result of the formula is not NA.}
+
+\item{.require_all}{If \code{TRUE}, returns only rows where all components to have been found according to their
+timestamps (even if their value is NA). If \code{.dont_require} is provided, \code{.require_all} is ignored.}
+
+\item{.lim}{Maximum number of rows to return. This is imposed before the calculation of the formula.}
+
+\item{.dont_require}{If provided, causes formula to require all components (regardless of .require_all), except for
+those listed here.}
+
+\item{.cascaded}{If \code{TRUE}, each formula is computed in a separate, nested SELECT statement. This allows the result
+of the prior formula to be used in the following, at the potential cost of longer computation times.}
+
+\item{.clip_sql}{If \code{TRUE}, instead of lazy table it returns the SQL query as a SQL object (can be converted to
+character using \code{as.character()}), and also copies it to the clipboard.}
 }
 \value{
 Lazy table with result of formula or formulas.
-components is actually a lazy table. Make a component out of it. The function make_component() is also overloaded
-and will produce a record source from the lazy table.
-Filter bogus matches (eg. SQL keywords in the formula) by keeping only the variables that can possibly come from
-the given combination of record sources and components.
-Select only the columns that will be needed later, according to g_vars. This requires checking all applicable
-components.
-Por algum motivo, o "lag()" não funciona com "range between window preceeding and delay preceeding", i.e. não é
-possível aplicar line \emph{e} delay em uma só chamada à função de window. O last_value() funciona com esse "range".
-Dar a preferência ao acesso via \emph{line}.
-Caso contrário, produzir acesso via \emph{delay}.
-Neste ponto o componente já foi adicionado à board de valores, porém cada componente só tem valor em sua line de
-origem. Se o PostgreSQL suportasse IGNORE NULLS no last_value(), o trabalho terminaria aqui. Como ele não
-suporta, precisamos contornar o problema.
-The front (most recent point) of the window is column ts of the current line. The back (oldest point) is the
-smallest among the ts's of the components.
-The use of transmute + mutate + select(-...) is to keep the query "tight." By "tight" I mean no use of select *,
-that is, every step of the process passes forward only strictly what the next step needs. The hope is that this
-will help the SQL query optimizer and computation engine as a whole.
-Keep only the most complete computation in each timestamp. The most recent computation is the last one in each
-timestamp. 'max(row_id) over (partition by "pid", "ts")' could find the row with the largest (most complete) row_id
-in each timestamp, but last_value() in this context gives the same result
-We also need to potentially require all fields be filled. Let's compact that into a single call to dplyr::filter(), hence
-a single WHERE statement.
-If .dont_require is provided, then all components, except those specified, will be required, even if .require_all
-is FALSE.
 }
 \description{
-Gathers records according to their timestamps and computes a SQL formula.
+Gathers records according to timestamps and computes a SQL formula.
+}
+\details{
+This receives a list of components, and a formula in SQL language, and computes the result by gathering records
+according to their timestamps.
 }

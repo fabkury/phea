@@ -2,7 +2,7 @@
 % Please edit documentation in R/phea.R
 \name{make_record_source}
 \alias{make_record_source}
-\title{make_record_source}
+\title{Make record source}
 \usage{
 make_record_source(
   records,
@@ -14,13 +14,25 @@ make_record_source(
 )
 }
 \arguments{
-\item{records}{List of records.}
+\item{records}{Lazy table with records to use.}
 
-\item{rec_name}{Record name.}
+\item{rec_name}{Character. Record name.}
+
+\item{ts}{Unquoted string. Name of the colum in \code{records} that gives the timestamp.}
+
+\item{pid}{Unquoted string. Name of the colum in \code{records} that gives the person (patient) identifier.}
+
+\item{vars}{Character vector. Name of the colums to make available from \code{records}. If not supplied, all columns are
+used.}
+
+\item{.capture_col}{Unquoted string. Not yet implemented.}
 }
 \value{
-Record source..
+Phea record source object.
 }
 \description{
-make_record_source
+Create a Phea record source.
+}
+\details{
+Creates a record source from a lazy table.
 }
