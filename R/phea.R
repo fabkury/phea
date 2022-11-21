@@ -33,6 +33,21 @@ groupwise_row_filter <- function(lazy_tbl, val_col, partition_cols, win_fn = 'mi
 }
 
 #' @export
+headshot <- function(lazy_tbl, nrows = 10, blind = FALSE, .title = NA) {
+  if(!blind && is.na(.title))
+    varname <- deparse(substitute(lazy_tbl))
+
+  res <- lazy_tbl |>
+    head(n = nrows) |>
+    collect()
+
+  if(!blind)
+    View(res, title = ifelse(is.na(.title), paste0(varname, ' ', nrows), .title))
+
+  res
+}
+
+#' @export
 setup_phea <- function(dbi_connection, schema) {
   assign('con', dbi_connection, envir = .pkgglobalenv)
   assign('schema', schema, envir = .pkgglobalenv)
