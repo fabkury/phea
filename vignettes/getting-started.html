@@ -362,8 +362,8 @@ by functions such as <code>DBI::dbConnect()</code> or
 </div>
 <div id="intuition" class="section level2">
 <h2>Intuition</h2>
-<p>In Phea, we go over patient records in chronological order. Say we
-want to compute a formula:</p>
+<p><em>Phea goes over patient records in chronological order.</em> Say
+you want to compute a formula:</p>
 <p><code>body_mass_index = body_weight / (body_height * body_height)</code></p>
 <p>Phea will compute <code>body_mass_index</code> for each person using
 the most recently available data at each point in time. Since this
@@ -403,7 +403,8 @@ used, unless you specify otherwise when creating a component.</p>
 </div>
 <div id="how-to-set-up" class="section level2">
 <h2>How to set up</h2>
-<p>First, you need to provide Phea with your SQL connection:</p>
+<p>First, you need to provide Phea with your SQL connection.
+<strong>Presently, only PostgreSQL is supported by Phea.</strong></p>
 <div class="sourceCode" id="cb1"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(phea)</span>
 <span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="co"># kury - credenciais.R contains the cred$pg credentials.</span></span>
