@@ -51,6 +51,42 @@ headshot <- function(lazy_tbl, nrows = 10, blind = FALSE, .title = NA) {
 setup_phea <- function(dbi_connection, schema) {
   assign('con', dbi_connection, envir = .pkgglobalenv)
   assign('schema', schema, envir = .pkgglobalenv)
+
+  function_exists <- DBI::dbGetQuery(.pkgglobalenv$con,
+    'select * from
+      pg_proc p
+      join pg_namespace n
+      on p.pronamespace = n.oid
+      where proname =\'phea_coalesce_r_sfunc\';') |>
+    nrow()
+  if(function_exists != 1) {
+    message('Installing phea_coalesce_r_sfunc.')
+    DBI::dbExecute(db$con,
+      "create function phea_coalesce_r_sfunc(state anyelement, value anyelement)
+      returns anyelement
+      immutable parallel safe
+      as
+      $$
+        select coalesce(value, state);
+      $$ language sql;")
+  }
+
+  function_exists <- DBI::dbGetQuery(.pkgglobalenv$con,
+    'select * from
+      pg_proc p
+      join pg_namespace n
+      on p.pronamespace = n.oid
+      where proname =\'phea_find_last_ignore_nulls\';') |>
+    nrow()
+
+  if(function_exists != 1) {
+    message('Installing phea_find_last_ignore_nulls.')
+    DBI::dbExecute(db$con,
+      "create aggregate phea_find_last_ignore_nulls(anyelement) (
+        sfunc = phea_coalesce_r_sfunc,
+        stype = anyelement
+      );")
+  }
 }
 
 #' @export
@@ -422,8 +458,8 @@ calculate_formula <- function(components, fml = NULL, window = NA, export = NULL
   ts_variables <- purrr::map(seq(components), extract_ts_variables) |> unlist()
 
   calc_vars <- unique(c(g_vars, ts_variables))
-  sql_txts <- paste0('find_last_ignore_nulls("', calc_vars, '_', calc_suffix, '") OVER ',
-    '(PARTITION BY "pid" ORDER BY "ts" ROWS UNBOUNDED PRECEDING)')
+  sql_txts <- paste0('phea_find_last_ignore_nulls("', calc_vars, '_', calc_suffix, '") over ',
+    '(partition by "pid" order by "ts" rows unbounded preceding)')
 
   commands <- purrr::map2(calc_vars, sql_txts,
     ~rlang::exprs(!!.x := dplyr::sql(!!.y))) |>
