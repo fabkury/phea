@@ -19,7 +19,8 @@ calculate_formula(
   .require_all = FALSE,
   .lim = NA,
   .dont_require = NULL,
-  .cascaded = FALSE
+  .cascaded = FALSE,
+  .clip_sql = FALSE
 )
 }
 \arguments{

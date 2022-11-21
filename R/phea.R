@@ -175,18 +175,21 @@ make_record_source <- function(records, rec_name, ts, pid, vars = NULL, .capture
 
 #' Calculate formula
 #'
-#' Gathers records according to their timestamps and computes a SQL formula.
+#' Gathers records according to timestamps and computes a SQL formula.
+#'
+#' This receives a list of components, and a formula in SQL language, and computes the result by gathering records
+#' according to their timestamps.
 #'
 #' @export
-#' @param components List of components,  component, record source, or lazy table.
+#' @param components List of components, component, record source, or lazy table.
 #' @param fml Formula or list of formulas.
 #' @param export List of additional variables to export.
-#' @param add_components Additional components to add in case components is not a list of components.
+#' @param add_components Additional components. Used mostly in case components is not a list of components.
 #' @return Lazy table with result of formula or formulas.
 calculate_formula <- function(components, fml = NULL, window = NA, export = NULL, add_components = NULL,
   # These below are used to provide a lazy table directly, instead of components.
   .ts = NULL, .pid = NULL, .rec_name = NULL, .delay = NULL, .line = NULL,
-  .exclude_na = FALSE, .require_all = FALSE, .lim = NA, .dont_require = NULL, .cascaded = FALSE) {
+  .exclude_na = FALSE, .require_all = FALSE, .lim = NA, .dont_require = NULL, .cascaded = FALSE, .clip_sql = FALSE) {
   # Prepare ---------------------------------------------------------------------------------------------------------
   if('tbl_lazy' %in% class(components)) {
     #' components is actually a lazy table. Make a component out of it. The function make_component() is also overloaded
@@ -369,7 +372,7 @@ calculate_formula <- function(components, fml = NULL, window = NA, export = NULL
     else
       vars_sql <- paste0('case when "name" = \'', rec_name, '\' then "', vars, '" else null end')
 
-    over_clause <- paste0('partition by "pid" order by "ts"') #paste0('partition by "pid", "name" order by "ts"')
+    over_clause <- paste0('partition by "pid", "name" order by "ts"') #paste0('partition by "pid", "name" order by "ts"')
 
     #' Dar a preferência ao acesso via *line*.
     if(!is.na(line)) {
@@ -511,6 +514,12 @@ calculate_formula <- function(components, fml = NULL, window = NA, export = NULL
   # the limit". Vide https://github.com/tidyverse/dbplyr/issues/719. Obrigado, mgirlich!
   board <- dplyr::collapse(board, cte = TRUE)
 
-  board
+  if(.clip_sql) {
+    sql_txt <- dbplyr::sql_render(board)
+    writeClipboard(sql_txt)
+    return(invisible(sql_txt))
+  } else {
+    return(board)
+  }
 }
 
