@@ -77,7 +77,7 @@ First, you need to provide Phea with your SQL connection. **Presently, only Post
 library(phea)
 
 # kury - credenciais.R contains the cred$pg credentials.
-source(paste0(Sys.getenv("HOME"), '/Trabalho/comum/kury - credenciais.R'))
+source(paste0(Sys.getenv("HOME"), '/Estudo/Tecnologia/R/espinha/credenciais.R'))
 
 # Connect to SQL server
 dbcon <- DBI::dbConnect(
@@ -310,6 +310,95 @@ dplyr::collect(head(phen)) |> knitr::kable()
 As of now, `line` and `delay` **cannot** be used simultaneously in the same component (this is yet to be implemented).
 If both are provided, `line` is considered and `delay` is ignored. `delay` is only considered when `line = NA`.  
 
+
+Plot:  
+```{r}
+library(plotly)
+library(dplyr)
+library(purrr)
+phea_plot <- function(phen, pid_select) {
+  pid_select <- phen |>
+    select(pid) |>
+    head(1) |>
+    pull()
+  
+  phen_long <- phen |>
+    filter(pid %in% pid_select) |>
+    collect() |>
+    tidyr::pivot_longer(
+      cols = !c(row_id, pid, ts, window))
+
+  make_step_chart_data <- function(board_data) {
+    union_all(
+      board_data |>
+        arrange(pid, ts) |>
+        group_by(pid, name) |>
+        mutate(linha = row_number()) |>
+        ungroup(),
+      board_data |>
+        arrange(pid, ts) |>
+        group_by(pid, name) |>
+        mutate(linha = row_number()) |>
+        mutate(ts = lead(ts)) |>
+        ungroup()) |>
+      arrange(pid, ts, linha)
+      # mutate(ts = coalesce(ts, max(ts, na.rm = TRUE))) |>
+      # distinct() # Eliminates 1 row.
+  }
+
+  make_plotly_chart <- function(board_data, pid) {
+    if(all(!is.na(pid))) {
+      board_mask <- board_data$pid %in% pid
+      board_data <- board_data[board_mask,]
+    }
+
+    comp_board <- make_step_chart_data(board_data)
+
+    chart_items <- comp_board |>
+      select(name) |>
+      distinct() |>
+      pull()
+
+    plot_args <- map(chart_items, \(chart_item) {
+      res <- comp_board |>
+        filter(name == chart_item) |>
+        filter(!is.na(value))
+      if(nrow(res) > 0) {
+        res <- res |>
+          plot_ly(
+            x = ~ts,
+            y = ~value,
+            type = 'scatter',
+            mode = 'lines',
+            name = chart_item) |>
+          layout(
+            legend = list(orientation = 'h'),
+            yaxis = list(
+              range = c(
+                min(res$value, na.rm = TRUE),
+                max(res$value, na.rm = TRUE)),
+              fixedrange = TRUE))
+        return(res)
+      } else {
+        return(NULL)
+      }
+    })
+    names(plot_args) <- chart_items
+    plot_args <- plot_args |>
+      discard(is.null)
+    # mask <- unlist(lapply(plot_args, is.null))
+    # browser()
+    # plot_args <- plot_args[!mask]
+    plot_args <- c(plot_args, nrows = length(plot_args), shareX = TRUE)
+    return(
+      do.call(subplot, plot_args))
+  }
+
+  make_plotly_chart(phen_long, pid_select)
+}
+
+phea_plot(phen)
+```
 ## Author contact
 Contact Fabrício Kury at fab@kury.dev.  
 

@@ -117,6 +117,9 @@ setup_phea <- function(dbi_connection, def_schema) {
   }
 }
 
+
+# sqlt & sql0 -----------------------------------------------------------------------------------------------------
+
 #' SQL table
 #'
 #' Produces lazy table object from the name of a SQL table in the preconfigured schema.
@@ -146,6 +149,8 @@ sql0 <- function(...) {
     dplyr::sql(sql_txt))
 }
 
+
+# Make component --------------------------------------------------------------------------------------------------
 #' Make component
 #'
 #' Produce a Phea component.
@@ -216,6 +221,8 @@ make_component <- function(input_source, line = NA, delay = NA, window = Inf, re
   component
 }
 
+
+# Make record source ----------------------------------------------------------------------------------------------
 #' Make record source
 #'
 #' Create a Phea record source.
@@ -275,6 +282,7 @@ make_record_source <- function(records, rec_name, ts, pid, vars = NULL, .capture
 }
 
 
+# Calculate formula -----------------------------------------------------------------------------------------------
 #' Calculate formula
 #'
 #' Gathers records according to timestamps and computes a SQL formula.
@@ -302,8 +310,9 @@ make_record_source <- function(records, rec_name, ts, pid, vars = NULL, .capture
 calculate_formula <- function(components, fml = NULL, window = NA, export = NULL, add_components = NULL,
   .ts = NULL, .pid = NULL, .rec_name = NULL, .delay = NULL, .line = NULL,
   .exclude_na = FALSE, .require_all = FALSE, .lim = NA, .dont_require = NULL,
-  .cascaded = FALSE, .clip_sql = FALSE) {
-
+  .cascaded = FALSE, .clip_sql = FALSE,
+  .call_board = FALSE) {
+  # Prepare -------------------------------------------------------------------------------------------------------
   if('tbl_lazy' %in% class(components)) {
     # components is actually a lazy table. Make a component out of it. The function make_component() is also overloaded
     # and will produce a record source from the lazy table.
@@ -346,6 +355,7 @@ calculate_formula <- function(components, fml = NULL, window = NA, export = NULL
     names(components) <- components[[1]]$rec_source$rec_name
   }
 
+  # Read input formula or formulas.
   if(!is.null(fml)) {
     # Check if user provided names in fml.
     # If not, use default name 'value'.
@@ -384,6 +394,9 @@ calculate_formula <- function(components, fml = NULL, window = NA, export = NULL
   # calc_suffix is used for the temporary columns required to circumvent the lack of IGNORE NULLs.
   calc_suffix <- 'calc'
 
+  # Build record source - component - variable table.
+  # TODO
+
   prepare_record_source <- function(record_source) {
     ts <- record_source$ts
     rec_name <- record_source$rec_name
@@ -411,7 +424,10 @@ calculate_formula <- function(components, fml = NULL, window = NA, export = NULL
       comp_mask <- purrr::map(components, ~.$rec_source$rec_name) == rec_name
       related_components <- names(components)[comp_mask]
       pairs <- purrr::cross2(related_components, vars) # Create all combinations of components and vars.
-      pairs_mask <- purrr::map(pairs, \(x) paste0(x[[1]], '_', x[[2]]) %in% g_vars) |> unlist()
+      pairs_mask <- purrr::map(pairs, \(x) {
+        composed_name <- paste0(x[[1]], '_', x[[2]])
+        return(composed_name %in% g_vars)
+      }) |> unlist()
 
       if(any(pairs_mask)) {
         out_vars <- pairs[unlist(pairs_mask)] |>
@@ -432,7 +448,18 @@ calculate_formula <- function(components, fml = NULL, window = NA, export = NULL
   board <- purrr::map(record_sources, prepare_record_source) |>
     purrr::reduce(dplyr::union_all)
 
-  # Criar colunas dos components -----------------------------------------------------------------------------------
+  if(.call_board) {
+    board_wide <- board |>
+      tidyr::pivot_wider(
+        names_from = name,
+        values_from = c(value_as_number, provider_id),
+        id_cols = c(pid, ts)) |>
+      dbplyr::window_order(pid, ts) |>
+      fill(!c(pid, ts))
+    return(board)
+  }
+
+# Create component columns ----------------------------------------------------------------------------------------
   extract_vars <- function(comp_name, component) {
     rec_name <- component$rec_source$rec_name
     # Locate the record source, so we know what variables to extract.
@@ -517,7 +544,8 @@ calculate_formula <- function(components, fml = NULL, window = NA, export = NULL
     row_id = dplyr::sql('row_number() over ()'),
     !!!commands)
 
-  # Preencher os valores em branco. ---------------------------------------------------------------------------------
+
+# Fill-in blanks --------------------------------------------------------------------------------------------------
   # Neste ponto o componente já foi adicionado à board de valores, porém cada componente só tem valor em sua line de
   # origem. Se o PostgreSQL suportasse IGNORE NULLS no last_value(), o trabalho terminaria aqui. Como ele não
   # suporta, precisamos contornar o problema.
@@ -633,5 +661,96 @@ calculate_formula <- function(components, fml = NULL, window = NA, export = NULL
   } else {
     return(board)
   }
+}
+
+
+# Phea plot -------------------------------------------------------------------------------------------------------
+library(plotly)
+#' @export
+phea_plot <- function(phen, pids = NULL) {
+  if(!is.null(pids))
+    phen <- phen |>
+      filter(pid %in% local(pids))
+
+  phen_wide <- phen |>
+    tidyr::pivot_wider(
+      names_from = name,
+      values_from = c(value_as_number, provider_id),
+      id_cols = c(pid, ts)) |>
+    dbplyr::window_order(pid, ts) |>
+    fill(!c(pid, ts))
+
+  browser()
+  phen_long <- collect(phen) |>
+    tidyr::pivot_longer(
+      cols = !c(row_id, pid, ts, window))
+
+  make_step_chart_data <- function(board_data) {
+    union_all(
+      board_data |>
+        arrange(pid, ts) |>
+        group_by(pid, name) |>
+        mutate(linha = row_number()) |>
+        ungroup(),
+      board_data |>
+        arrange(pid, ts) |>
+        group_by(pid, name) |>
+        mutate(linha = row_number()) |>
+        mutate(ts = lead(ts)) |>
+        ungroup()) |>
+      arrange(pid, ts, linha)
+    # mutate(ts = coalesce(ts, max(ts, na.rm = TRUE))) |>
+    # distinct() # Eliminates 1 row.
+  }
+
+  make_plotly_chart <- function(board_data, pid) {
+    if(all(!is.na(pid))) {
+      board_mask <- board_data$pid %in% pid
+      board_data <- board_data[board_mask,]
+    }
+
+    comp_board <- make_step_chart_data(board_data)
+
+    chart_items <- comp_board |>
+      select(name) |>
+      distinct() |>
+      pull()
+
+    plot_args <- map(chart_items, \(chart_item) {
+      res <- comp_board |>
+        filter(name == chart_item) |>
+        filter(!is.na(value))
+      if(nrow(res) > 0) {
+        res <- res |>
+          plot_ly(
+            x = ~ts,
+            y = ~value,
+            type = 'scatter',
+            mode = 'lines',
+            name = chart_item) |>
+          layout(
+            legend = list(orientation = 'h'),
+            yaxis = list(
+              range = c(
+                min(res$value, na.rm = TRUE),
+                max(res$value, na.rm = TRUE)),
+              fixedrange = TRUE))
+        return(res)
+      } else {
+        return(NULL)
+      }
+    })
+    names(plot_args) <- chart_items
+    plot_args <- plot_args |>
+      discard(is.null)
+    # mask <- unlist(lapply(plot_args, is.null))
+    # browser()
+    # plot_args <- plot_args[!mask]
+    plot_args <- c(plot_args, nrows = length(plot_args), shareX = TRUE)
+    return(
+      do.call(subplot, plot_args))
+  }
+
+  make_plotly_chart(phen_long, pid)
 }
 
