@@ -12,7 +12,7 @@
 
 
 
-<title>Getting started</title>
+<title>Getting started with Phea</title>
 
 <script>// Pandoc 2.9 adds attributes on both header and div. We remove the former (to
 // be compatible with the behavior of Pandoc < 2.8).
@@ -336,7 +336,7 @@ code > span.er { color: #a61717; background-color: #e3d2d2; }
 
 
 
-<h1 class="title toc-ignore">Getting started</h1>
+<h1 class="title toc-ignore">Getting started with Phea</h1>
 
 
 
@@ -349,11 +349,11 @@ phenotypes:</p>
 </li>
 <li>and without using SQL joins.</li>
 </ul>
-<p>Although, in principle, Phea’s approach need not be restricted to the
-intended use case, the intended use case is where you have a database
-with patient records and want to compute a formula.</p>
-<p>Since Phea passes the formula unmodified to the SQL server, it need
-not be restricted to mathematical operators. It can include any SQL
+<p>The intended use case is where you have a database with patient
+records and want to compute a formula. However, in principle, Phea’s
+approach need not be restricted to this intended use case.</p>
+<p>Phea passes the formula unmodified to the SQL query, so it need not
+be restricted to mathematical operators. It can include any SQL
 expression that would be valid in a <code>SELECT</code> statement, such
 as <code>CASE WHEN ...</code> expressions and function calls.</p>
 <p>To use Phea, you need a DBI connection to the SQL server, generated
@@ -366,17 +366,16 @@ by functions such as <code>DBI::dbConnect()</code> or
 you want to compute a formula:</p>
 <p><code>body_mass_index = body_weight / (body_height * body_height)</code></p>
 <p>Phea will compute <code>body_mass_index</code> for each person using
-the most recently available data at each point in time. Since this
-formula depends on <code>body_weight</code> and
-<code>body_height</code>, their timestamps are also the timestamps for
-the resulting <code>body_mass_index</code>. This means that at every
-point in time where there is a <code>body_weight</code> <em>or</em>
-<code>body_height</code> a record for a given patient, Phea will try to
-calculate <code>body_mass_index</code> again.</p>
-<p>Suppose a patient called John had a <code>body_weight = 75 kg</code>
-measurement on May 1st (of a given year), a
-<code>body_height = 1.8 meters</code> on August 1st (of the same year),
-then a new <code>body_weight = 79 kg</code> on October 1st. Phea would
+the most recently available data at each point in time.</p>
+<p>In this example, the formula depends on <code>body_weight</code> and
+<code>body_height</code>. Therefore, their timestamps will bethe
+timestamps for the resulting <code>body_mass_index</code>. This means
+that at every point in time where there is a <code>body_weight</code>
+<em>or</em> <code>body_height</code> a record for a given patient, Phea
+will try to calculate <code>body_mass_index</code> again.</p>
+<p>Suppose a patient had a <code>body_weight = 75 kg</code> measurement
+on May 1st, a <code>body_height = 1.8 meters</code> on August 1st, then
+a new <code>body_weight = 79 kg</code> on October 1st. Phea would
 produce 3 result rows as follows:</p>
 <p><em>May 1st:</em><br />
 <code>body_weight = 75 kg</code><br />
@@ -391,24 +390,24 @@ produce 3 result rows as follows:</p>
 <code>body_height = 1.8 meters</code><br />
 <code>body_mass_index = 79 / (1.8 * 1.8) = 24.38272</code></p>
 <p>The algorithm continues as long as new records are avaialable. For
-example, say that on November 1st a new record
-<code>body_height = 1.78 meters</code> appears. The result would then
-be:</p>
+example, if on November 1st a new record
+<code>body_height = 1.78 meters</code> appears, the result would be:</p>
 <p><em>November 1st:</em><br />
 <code>body_weight = 79 kg</code><br />
 <code>body_height = 1.78 meters</code><br />
 <code>body_mass_index = 75 / (1.78 * 1.78) = 24.93372</code></p>
-<p>At each point in time, the most recently available data point is
-used, unless you specify otherwise when creating a component.</p>
+<p>At each point in time, the most recently available data is used,
+unless you specify otherwise when creating a component.</p>
 </div>
 <div id="how-to-set-up" class="section level2">
 <h2>How to set up</h2>
 <p>First, you need to provide Phea with your SQL connection.
-<strong>Presently, only PostgreSQL is supported by Phea.</strong></p>
+<strong>While Phea is not necessarily restricted to PostgreSQL, this is
+the only SQL flavor where it has been tested.</strong></p>
 <div class="sourceCode" id="cb1"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(phea)</span>
 <span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="co"># kury - credenciais.R contains the cred$pg credentials.</span></span>
-<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="fu">source</span>(<span class="fu">paste0</span>(<span class="fu">Sys.getenv</span>(<span class="st">&quot;HOME&quot;</span>), <span class="st">&#39;/Trabalho/comum/kury - credenciais.R&#39;</span>))</span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="fu">source</span>(<span class="fu">paste0</span>(<span class="fu">Sys.getenv</span>(<span class="st">&quot;HOME&quot;</span>), <span class="st">&#39;/Estudo/Tecnologia/R/espinha/credenciais.R&#39;</span>))</span>
 <span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a><span class="co"># Connect to SQL server</span></span>
 <span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a>dbcon <span class="ot">&lt;-</span> DBI<span class="sc">::</span><span class="fu">dbConnect</span>(</span>
@@ -421,8 +420,8 @@ used, unless you specify otherwise when creating a component.</p>
 <span id="cb1-14"><a href="#cb1-14" aria-hidden="true" tabindex="-1"></a>    </span>
 <span id="cb1-15"><a href="#cb1-15" aria-hidden="true" tabindex="-1"></a><span class="co"># Setup Phea and define cdm_new_york3 as default schema.</span></span>
 <span id="cb1-16"><a href="#cb1-16" aria-hidden="true" tabindex="-1"></a><span class="fu">setup_phea</span>(</span>
-<span id="cb1-17"><a href="#cb1-17" aria-hidden="true" tabindex="-1"></a>  <span class="at">dbi_connection =</span> dbcon,</span>
-<span id="cb1-18"><a href="#cb1-18" aria-hidden="true" tabindex="-1"></a>  <span class="at">def_schema =</span> <span class="st">&#39;cdm_new_york3&#39;</span>)</span></code></pre></div>
+<span id="cb1-17"><a href="#cb1-17" aria-hidden="true" tabindex="-1"></a>  <span class="at">connection =</span> dbcon,</span>
+<span id="cb1-18"><a href="#cb1-18" aria-hidden="true" tabindex="-1"></a>  <span class="at">schema =</span> <span class="st">&#39;cdm_new_york3&#39;</span>)</span></code></pre></div>
 <p><code>setup_phea()</code> will save <code>dbi_connection</code> and
 <code>def_schema</code> for use by functions <code>sql0()</code> and
 <code>sqlt()</code>. Most importantly, however, it will install two
@@ -466,9 +465,8 @@ schema <code>cdm_new_york3</code>.<br />
 <span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a>hemoglobin_record_source <span class="ot">&lt;-</span> <span class="fu">make_record_source</span>(</span>
 <span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a>  <span class="at">records =</span> hemoglobin_query,</span>
-<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a>  <span class="at">rec_name =</span> <span class="st">&#39;hemo_a1c&#39;</span>,</span>
-<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a>  <span class="at">ts =</span> measurement_datetime,</span>
-<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a>  <span class="at">pid =</span> person_id)</span></code></pre></div>
+<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a>  <span class="at">ts =</span> measurement_datetime,</span>
+<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a>  <span class="at">pid =</span> person_id)</span></code></pre></div>
 <p>A <code>component</code> is a specification of what records to pick
 from <code>record source</code>. If you just want the most recently
 available record, the default values need not be overriden:</p>
@@ -489,9 +487,7 @@ merely the square root of the patient’s hemoglobin A1c level.</p>
 <p>Phea automatically recognizes that
 <code>hemo_a1c_value_as_number</code> means column
 <code>value_as_number</code> in the SQL table associated with component
-<code>hemo_a1c</code>. The name of the component in the formula
-(<code>hemo_a1c</code>) comes from the names of the list items in
-<code>components = list(...)</code>.</p>
+<code>hemo_a1c</code>.</p>
 <p>Object <code>phen</code> is a lazy table in the
 <code>dplyr</code>/<code>dbplyr</code> framework. It can be materialized
 into a tibble by calling <code>collect()</code>, or manipulated further
@@ -503,8 +499,8 @@ using Phea or <code>dplyr</code>/<code>dbplyr</code>.</p>
 <th align="right">row_id</th>
 <th align="right">pid</th>
 <th align="left">ts</th>
-<th align="right">hemo_a1c_value_as_number</th>
 <th align="left">window</th>
+<th align="right">hemo_a1c_value_as_number</th>
 <th align="right">value</th>
 </tr>
 </thead>
@@ -513,48 +509,48 @@ using Phea or <code>dplyr</code>/<code>dbplyr</code>.</p>
 <td align="right">1</td>
 <td align="right">1</td>
 <td align="left">2011-05-20</td>
-<td align="right">6.9</td>
 <td align="left">00:00:00</td>
+<td align="right">6.9</td>
 <td align="right">2.626785</td>
 </tr>
 <tr class="even">
 <td align="right">2</td>
 <td align="right">1</td>
 <td align="left">2014-03-07</td>
-<td align="right">6.9</td>
 <td align="left">00:00:00</td>
+<td align="right">6.9</td>
 <td align="right">2.626785</td>
 </tr>
 <tr class="odd">
 <td align="right">3</td>
 <td align="right">1</td>
 <td align="left">2016-03-11</td>
-<td align="right">6.9</td>
 <td align="left">00:00:00</td>
+<td align="right">6.9</td>
 <td align="right">2.626785</td>
 </tr>
 <tr class="even">
 <td align="right">4</td>
 <td align="right">1</td>
 <td align="left">2018-03-16</td>
-<td align="right">6.9</td>
 <td align="left">00:00:00</td>
+<td align="right">6.9</td>
 <td align="right">2.626785</td>
 </tr>
 <tr class="odd">
 <td align="right">5</td>
 <td align="right">1</td>
 <td align="left">2020-03-20</td>
-<td align="right">6.9</td>
 <td align="left">00:00:00</td>
+<td align="right">6.9</td>
 <td align="right">2.626785</td>
 </tr>
 <tr class="even">
 <td align="right">6</td>
 <td align="right">1</td>
 <td align="left">2022-02-11</td>
-<td align="right">6.9</td>
 <td align="left">00:00:00</td>
+<td align="right">6.9</td>
 <td align="right">2.626785</td>
 </tr>
 </tbody>
@@ -563,51 +559,59 @@ using Phea or <code>dplyr</code>/<code>dbplyr</code>.</p>
 or the option <code>.clip_sql</code> in
 <code>calculate_formula()</code>:</p>
 <div class="sourceCode" id="cb6"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>dbplyr<span class="sc">::</span><span class="fu">sql_render</span>(phen)</span>
-<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; &lt;SQL&gt; SELECT</span></span>
-<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;   &quot;row_id&quot;,</span></span>
-<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;   &quot;pid&quot;,</span></span>
-<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;   &quot;ts&quot;,</span></span>
-<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;   &quot;hemo_a1c_value_as_number&quot;,</span></span>
-<span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;   &quot;window&quot;,</span></span>
-<span id="cb6-8"><a href="#cb6-8" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;   sqrt(hemo_a1c_value_as_number) AS &quot;value&quot;</span></span>
-<span id="cb6-9"><a href="#cb6-9" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; FROM (</span></span>
-<span id="cb6-10"><a href="#cb6-10" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;   SELECT</span></span>
-<span id="cb6-11"><a href="#cb6-11" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;     &quot;row_id&quot;,</span></span>
-<span id="cb6-12"><a href="#cb6-12" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;     &quot;pid&quot;,</span></span>
-<span id="cb6-13"><a href="#cb6-13" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;     &quot;ts&quot;,</span></span>
-<span id="cb6-14"><a href="#cb6-14" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;     &quot;hemo_a1c_value_as_number&quot;,</span></span>
-<span id="cb6-15"><a href="#cb6-15" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;     &quot;hemo_a1c_ts&quot;,</span></span>
-<span id="cb6-16"><a href="#cb6-16" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;     &quot;ts&quot; - least(hemo_a1c_ts) AS &quot;window&quot;,</span></span>
-<span id="cb6-17"><a href="#cb6-17" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;     last_value(row_id) over (partition by &quot;pid&quot;, &quot;ts&quot;) AS &quot;ts_row&quot;</span></span>
-<span id="cb6-18"><a href="#cb6-18" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;   FROM (</span></span>
-<span id="cb6-19"><a href="#cb6-19" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;     SELECT</span></span>
-<span id="cb6-20"><a href="#cb6-20" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;       *,</span></span>
-<span id="cb6-21"><a href="#cb6-21" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;       phea_find_last_ignore_nulls(&quot;hemo_a1c_value_as_number_calc&quot;) over (partition by &quot;pid&quot; order by &quot;ts&quot; rows unbounded preceding) AS &quot;hemo_a1c_value_as_number&quot;,</span></span>
-<span id="cb6-22"><a href="#cb6-22" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;       phea_find_last_ignore_nulls(&quot;hemo_a1c_ts_calc&quot;) over (partition by &quot;pid&quot; order by &quot;ts&quot; rows unbounded preceding) AS &quot;hemo_a1c_ts&quot;</span></span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; &lt;SQL&gt; SELECT *</span></span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; FROM (</span></span>
+<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; SELECT</span></span>
+<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;   &quot;row_id&quot;,</span></span>
+<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;   &quot;pid&quot;,</span></span>
+<span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;   &quot;ts&quot;,</span></span>
+<span id="cb6-8"><a href="#cb6-8" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;   &quot;window&quot;,</span></span>
+<span id="cb6-9"><a href="#cb6-9" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;   &quot;hemo_a1c_value_as_number&quot;,</span></span>
+<span id="cb6-10"><a href="#cb6-10" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;   sqrt(hemo_a1c_value_as_number) AS &quot;value&quot;</span></span>
+<span id="cb6-11"><a href="#cb6-11" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; FROM (</span></span>
+<span id="cb6-12"><a href="#cb6-12" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;   SELECT</span></span>
+<span id="cb6-13"><a href="#cb6-13" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;     *,</span></span>
+<span id="cb6-14"><a href="#cb6-14" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;     &quot;ts&quot; - ts AS &quot;window&quot;,</span></span>
+<span id="cb6-15"><a href="#cb6-15" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;     last_value(row_id) over (partition by &quot;pid&quot;, &quot;ts&quot;) AS &quot;ts_row&quot;</span></span>
+<span id="cb6-16"><a href="#cb6-16" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;   FROM (</span></span>
+<span id="cb6-17"><a href="#cb6-17" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;     SELECT</span></span>
+<span id="cb6-18"><a href="#cb6-18" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;       &quot;row_id&quot;,</span></span>
+<span id="cb6-19"><a href="#cb6-19" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;       &quot;pid&quot;,</span></span>
+<span id="cb6-20"><a href="#cb6-20" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;       &quot;ts&quot;,</span></span>
+<span id="cb6-21"><a href="#cb6-21" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;       MAX(&quot;hemo_a1c_value_as_number&quot;) OVER (PARTITION BY &quot;..dbplyr_partion_1&quot;) AS &quot;hemo_a1c_value_as_number&quot;,</span></span>
+<span id="cb6-22"><a href="#cb6-22" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;       MAX(&quot;hemo_a1c_ts&quot;) OVER (PARTITION BY &quot;..dbplyr_partion_2&quot;) AS &quot;hemo_a1c_ts&quot;</span></span>
 <span id="cb6-23"><a href="#cb6-23" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;     FROM (</span></span>
 <span id="cb6-24"><a href="#cb6-24" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;       SELECT</span></span>
-<span id="cb6-25"><a href="#cb6-25" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;         &quot;pid&quot;,</span></span>
-<span id="cb6-26"><a href="#cb6-26" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;         &quot;ts&quot;,</span></span>
-<span id="cb6-27"><a href="#cb6-27" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;         row_number() over () AS &quot;row_id&quot;,</span></span>
-<span id="cb6-28"><a href="#cb6-28" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;         last_value(case when &quot;name&quot; = &#39;hemo_a1c&#39; then &quot;value_as_number&quot; else null end) over (partition by &quot;pid&quot;, &quot;name&quot; order by &quot;ts&quot; rows between unbounded preceding and 0 preceding) AS &quot;hemo_a1c_value_as_number_calc&quot;,</span></span>
-<span id="cb6-29"><a href="#cb6-29" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;         last_value(case when &quot;name&quot; = &#39;hemo_a1c&#39; then &quot;ts&quot; else null end) over (partition by &quot;pid&quot;, &quot;name&quot; order by &quot;ts&quot; rows between unbounded preceding and 0 preceding) AS &quot;hemo_a1c_ts_calc&quot;</span></span>
-<span id="cb6-30"><a href="#cb6-30" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;       FROM (</span></span>
-<span id="cb6-31"><a href="#cb6-31" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;         SELECT</span></span>
-<span id="cb6-32"><a href="#cb6-32" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;           &#39;hemo_a1c&#39; AS &quot;name&quot;,</span></span>
-<span id="cb6-33"><a href="#cb6-33" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;           &quot;person_id&quot; AS &quot;pid&quot;,</span></span>
-<span id="cb6-34"><a href="#cb6-34" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;           &quot;measurement_datetime&quot; AS &quot;ts&quot;,</span></span>
-<span id="cb6-35"><a href="#cb6-35" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;           &quot;value_as_number&quot;</span></span>
-<span id="cb6-36"><a href="#cb6-36" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;         FROM (</span></span>
-<span id="cb6-37"><a href="#cb6-37" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; </span></span>
-<span id="cb6-38"><a href="#cb6-38" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;   select * from cdm_new_york3.measurement</span></span>
-<span id="cb6-39"><a href="#cb6-39" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;   where measurement_concept_id = 3004410</span></span>
-<span id="cb6-40"><a href="#cb6-40" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; </span></span>
-<span id="cb6-41"><a href="#cb6-41" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;         ) &quot;q01&quot;</span></span>
-<span id="cb6-42"><a href="#cb6-42" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;       ) &quot;q02&quot;</span></span>
-<span id="cb6-43"><a href="#cb6-43" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;     ) &quot;q03&quot;</span></span>
-<span id="cb6-44"><a href="#cb6-44" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;   ) &quot;q04&quot;</span></span>
-<span id="cb6-45"><a href="#cb6-45" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; ) &quot;q05&quot;</span></span>
-<span id="cb6-46"><a href="#cb6-46" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; WHERE (&quot;row_id&quot; = &quot;ts_row&quot;)</span></span></code></pre></div>
+<span id="cb6-25"><a href="#cb6-25" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;         *,</span></span>
+<span id="cb6-26"><a href="#cb6-26" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;         SUM(CASE WHEN ((&quot;hemo_a1c_value_as_number&quot; IS NULL)) THEN 0 ELSE 1 </span><span class="re">END</span><span class="co">) OVER (ORDER BY &quot;pid&quot;, &quot;ts&quot; ROWS UNBOUNDED PRECEDING) AS &quot;..dbplyr_partion_1&quot;,</span></span>
+<span id="cb6-27"><a href="#cb6-27" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;         SUM(CASE WHEN ((&quot;hemo_a1c_ts&quot; IS NULL)) THEN 0 ELSE 1 </span><span class="re">END</span><span class="co">) OVER (ORDER BY &quot;pid&quot;, &quot;ts&quot; ROWS UNBOUNDED PRECEDING) AS &quot;..dbplyr_partion_2&quot;</span></span>
+<span id="cb6-28"><a href="#cb6-28" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;       FROM (</span></span>
+<span id="cb6-29"><a href="#cb6-29" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;         SELECT</span></span>
+<span id="cb6-30"><a href="#cb6-30" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;           row_number() over () AS &quot;row_id&quot;,</span></span>
+<span id="cb6-31"><a href="#cb6-31" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;           &quot;pid&quot;,</span></span>
+<span id="cb6-32"><a href="#cb6-32" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;           &quot;ts&quot;,</span></span>
+<span id="cb6-33"><a href="#cb6-33" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;           last_value(case when &quot;name&quot; = &#39;Rcea2747451&#39; then &quot;value_as_number&quot; else null end) over (partition by &quot;pid&quot;, &quot;name&quot; order by &quot;ts&quot; rows between unbounded preceding and 0 preceding) AS &quot;hemo_a1c_value_as_number&quot;,</span></span>
+<span id="cb6-34"><a href="#cb6-34" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;           last_value(case when &quot;name&quot; = &#39;Rcea2747451&#39; then &quot;ts&quot; else null end) over (partition by &quot;pid&quot;, &quot;name&quot; order by &quot;ts&quot; rows between unbounded preceding and 0 preceding) AS &quot;hemo_a1c_ts&quot;</span></span>
+<span id="cb6-35"><a href="#cb6-35" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;         FROM (</span></span>
+<span id="cb6-36"><a href="#cb6-36" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;           SELECT</span></span>
+<span id="cb6-37"><a href="#cb6-37" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;             &#39;Rcea2747451&#39; AS &quot;name&quot;,</span></span>
+<span id="cb6-38"><a href="#cb6-38" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;             &quot;person_id&quot; AS &quot;pid&quot;,</span></span>
+<span id="cb6-39"><a href="#cb6-39" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;             &quot;measurement_datetime&quot; AS &quot;ts&quot;,</span></span>
+<span id="cb6-40"><a href="#cb6-40" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;             &quot;value_as_number&quot;</span></span>
+<span id="cb6-41"><a href="#cb6-41" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;           FROM (</span></span>
+<span id="cb6-42"><a href="#cb6-42" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; </span></span>
+<span id="cb6-43"><a href="#cb6-43" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;   select * from cdm_new_york3.measurement</span></span>
+<span id="cb6-44"><a href="#cb6-44" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;   where measurement_concept_id = 3004410</span></span>
+<span id="cb6-45"><a href="#cb6-45" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; </span></span>
+<span id="cb6-46"><a href="#cb6-46" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;           ) &quot;q01&quot;</span></span>
+<span id="cb6-47"><a href="#cb6-47" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;         ) &quot;q02&quot;</span></span>
+<span id="cb6-48"><a href="#cb6-48" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;       ) &quot;q03&quot;</span></span>
+<span id="cb6-49"><a href="#cb6-49" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;     ) &quot;q04&quot;</span></span>
+<span id="cb6-50"><a href="#cb6-50" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;   ) &quot;q05&quot;</span></span>
+<span id="cb6-51"><a href="#cb6-51" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; ) &quot;q06&quot;</span></span>
+<span id="cb6-52"><a href="#cb6-52" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; WHERE (&quot;row_id&quot; = &quot;ts_row&quot;)</span></span>
+<span id="cb6-53"><a href="#cb6-53" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; ) &quot;q01&quot;</span></span>
+<span id="cb6-54"><a href="#cb6-54" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; ORDER BY &quot;pid&quot;, &quot;ts&quot;</span></span></code></pre></div>
 <p>Notice that the result of the
 <code>sqrt(hemo_a1c_value_as_number)</code> is in column
 <code>value</code>. This can be changed by giving a name to the formula
@@ -625,8 +629,8 @@ in the call to <code>calculate_formula()</code>:</p>
 <th align="right">row_id</th>
 <th align="right">pid</th>
 <th align="left">ts</th>
-<th align="right">hemo_a1c_value_as_number</th>
 <th align="left">window</th>
+<th align="right">hemo_a1c_value_as_number</th>
 <th align="right">a1c_sqrt</th>
 </tr>
 </thead>
@@ -635,48 +639,48 @@ in the call to <code>calculate_formula()</code>:</p>
 <td align="right">1</td>
 <td align="right">1</td>
 <td align="left">2011-05-20</td>
-<td align="right">6.9</td>
 <td align="left">00:00:00</td>
+<td align="right">6.9</td>
 <td align="right">2.626785</td>
 </tr>
 <tr class="even">
 <td align="right">2</td>
 <td align="right">1</td>
 <td align="left">2014-03-07</td>
-<td align="right">6.9</td>
 <td align="left">00:00:00</td>
+<td align="right">6.9</td>
 <td align="right">2.626785</td>
 </tr>
 <tr class="odd">
 <td align="right">3</td>
 <td align="right">1</td>
 <td align="left">2016-03-11</td>
-<td align="right">6.9</td>
 <td align="left">00:00:00</td>
+<td align="right">6.9</td>
 <td align="right">2.626785</td>
 </tr>
 <tr class="even">
 <td align="right">4</td>
 <td align="right">1</td>
 <td align="left">2018-03-16</td>
-<td align="right">6.9</td>
 <td align="left">00:00:00</td>
+<td align="right">6.9</td>
 <td align="right">2.626785</td>
 </tr>
 <tr class="odd">
 <td align="right">5</td>
 <td align="right">1</td>
 <td align="left">2020-03-20</td>
-<td align="right">6.9</td>
 <td align="left">00:00:00</td>
+<td align="right">6.9</td>
 <td align="right">2.626785</td>
 </tr>
 <tr class="even">
 <td align="right">6</td>
 <td align="right">1</td>
 <td align="left">2022-02-11</td>
-<td align="right">6.9</td>
 <td align="left">00:00:00</td>
+<td align="right">6.9</td>
 <td align="right">2.626785</td>
 </tr>
 </tbody>
@@ -690,13 +694,13 @@ in the call to <code>calculate_formula()</code>:</p>
 <span id="cb8-6"><a href="#cb8-6" aria-hidden="true" tabindex="-1"></a>    <span class="at">a1c_cubed =</span> <span class="st">&#39;hemo_a1c_value_as_number * hemo_a1c_value_as_number * hemo_a1c_value_as_number&#39;</span>))</span>
 <span id="cb8-7"><a href="#cb8-7" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb8-8"><a href="#cb8-8" aria-hidden="true" tabindex="-1"></a>dplyr<span class="sc">::</span><span class="fu">collect</span>(<span class="fu">head</span>(phen)) <span class="sc">|&gt;</span> knitr<span class="sc">::</span><span class="fu">kable</span>()</span></code></pre></div>
-<table>
+<table style="width:100%;">
 <colgroup>
 <col width="9%" />
 <col width="5%" />
 <col width="14%" />
-<col width="33%" />
 <col width="12%" />
+<col width="33%" />
 <col width="12%" />
 <col width="13%" />
 </colgroup>
@@ -705,8 +709,8 @@ in the call to <code>calculate_formula()</code>:</p>
 <th align="right">row_id</th>
 <th align="right">pid</th>
 <th align="left">ts</th>
-<th align="right">hemo_a1c_value_as_number</th>
 <th align="left">window</th>
+<th align="right">hemo_a1c_value_as_number</th>
 <th align="right">a1c_sqrt</th>
 <th align="right">a1c_cubed</th>
 </tr>
@@ -716,8 +720,8 @@ in the call to <code>calculate_formula()</code>:</p>
 <td align="right">1</td>
 <td align="right">1</td>
 <td align="left">2011-05-20</td>
-<td align="right">6.9</td>
 <td align="left">00:00:00</td>
+<td align="right">6.9</td>
 <td align="right">2.626785</td>
 <td align="right">328.509</td>
 </tr>
@@ -725,8 +729,8 @@ in the call to <code>calculate_formula()</code>:</p>
 <td align="right">2</td>
 <td align="right">1</td>
 <td align="left">2014-03-07</td>
-<td align="right">6.9</td>
 <td align="left">00:00:00</td>
+<td align="right">6.9</td>
 <td align="right">2.626785</td>
 <td align="right">328.509</td>
 </tr>
@@ -734,8 +738,8 @@ in the call to <code>calculate_formula()</code>:</p>
 <td align="right">3</td>
 <td align="right">1</td>
 <td align="left">2016-03-11</td>
-<td align="right">6.9</td>
 <td align="left">00:00:00</td>
+<td align="right">6.9</td>
 <td align="right">2.626785</td>
 <td align="right">328.509</td>
 </tr>
@@ -743,8 +747,8 @@ in the call to <code>calculate_formula()</code>:</p>
 <td align="right">4</td>
 <td align="right">1</td>
 <td align="left">2018-03-16</td>
-<td align="right">6.9</td>
 <td align="left">00:00:00</td>
+<td align="right">6.9</td>
 <td align="right">2.626785</td>
 <td align="right">328.509</td>
 </tr>
@@ -752,8 +756,8 @@ in the call to <code>calculate_formula()</code>:</p>
 <td align="right">5</td>
 <td align="right">1</td>
 <td align="left">2020-03-20</td>
-<td align="right">6.9</td>
 <td align="left">00:00:00</td>
+<td align="right">6.9</td>
 <td align="right">2.626785</td>
 <td align="right">328.509</td>
 </tr>
@@ -761,8 +765,8 @@ in the call to <code>calculate_formula()</code>:</p>
 <td align="right">6</td>
 <td align="right">1</td>
 <td align="left">2022-02-11</td>
-<td align="right">6.9</td>
 <td align="left">00:00:00</td>
+<td align="right">6.9</td>
 <td align="right">2.626785</td>
 <td align="right">328.509</td>
 </tr>
@@ -784,8 +788,8 @@ in the call to <code>calculate_formula()</code>:</p>
 <col width="8%" />
 <col width="5%" />
 <col width="13%" />
-<col width="31%" />
 <col width="11%" />
+<col width="31%" />
 <col width="11%" />
 <col width="17%" />
 </colgroup>
@@ -794,8 +798,8 @@ in the call to <code>calculate_formula()</code>:</p>
 <th align="right">row_id</th>
 <th align="right">pid</th>
 <th align="left">ts</th>
-<th align="right">hemo_a1c_value_as_number</th>
 <th align="left">window</th>
+<th align="right">hemo_a1c_value_as_number</th>
 <th align="right">a1c_sqrt</th>
 <th align="right">a1c_half_sqrt</th>
 </tr>
@@ -805,8 +809,8 @@ in the call to <code>calculate_formula()</code>:</p>
 <td align="right">1</td>
 <td align="right">1</td>
 <td align="left">2011-05-20</td>
-<td align="right">6.9</td>
 <td align="left">00:00:00</td>
+<td align="right">6.9</td>
 <td align="right">2.626785</td>
 <td align="right">1.313393</td>
 </tr>
@@ -814,8 +818,8 @@ in the call to <code>calculate_formula()</code>:</p>
 <td align="right">2</td>
 <td align="right">1</td>
 <td align="left">2014-03-07</td>
-<td align="right">6.9</td>
 <td align="left">00:00:00</td>
+<td align="right">6.9</td>
 <td align="right">2.626785</td>
 <td align="right">1.313393</td>
 </tr>
@@ -823,8 +827,8 @@ in the call to <code>calculate_formula()</code>:</p>
 <td align="right">3</td>
 <td align="right">1</td>
 <td align="left">2016-03-11</td>
-<td align="right">6.9</td>
 <td align="left">00:00:00</td>
+<td align="right">6.9</td>
 <td align="right">2.626785</td>
 <td align="right">1.313393</td>
 </tr>
@@ -832,8 +836,8 @@ in the call to <code>calculate_formula()</code>:</p>
 <td align="right">4</td>
 <td align="right">1</td>
 <td align="left">2018-03-16</td>
-<td align="right">6.9</td>
 <td align="left">00:00:00</td>
+<td align="right">6.9</td>
 <td align="right">2.626785</td>
 <td align="right">1.313393</td>
 </tr>
@@ -841,8 +845,8 @@ in the call to <code>calculate_formula()</code>:</p>
 <td align="right">5</td>
 <td align="right">1</td>
 <td align="left">2020-03-20</td>
-<td align="right">6.9</td>
 <td align="left">00:00:00</td>
+<td align="right">6.9</td>
 <td align="right">2.626785</td>
 <td align="right">1.313393</td>
 </tr>
@@ -850,8 +854,8 @@ in the call to <code>calculate_formula()</code>:</p>
 <td align="right">6</td>
 <td align="right">1</td>
 <td align="left">2022-02-11</td>
-<td align="right">6.9</td>
 <td align="left">00:00:00</td>
+<td align="right">6.9</td>
 <td align="right">2.626785</td>
 <td align="right">1.313393</td>
 </tr>
@@ -867,31 +871,30 @@ you would like to compute:<br />
 table <code>person</code>, then create a component from it.</p>
 <div class="sourceCode" id="cb10"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a>person_records <span class="ot">&lt;-</span> <span class="fu">make_record_source</span>(</span>
 <span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a>  <span class="at">records =</span> <span class="fu">sqlt</span>(person),</span>
-<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a>  <span class="at">rec_name =</span> <span class="st">&#39;birth&#39;</span>,</span>
-<span id="cb10-4"><a href="#cb10-4" aria-hidden="true" tabindex="-1"></a>  <span class="at">ts =</span> birth_datetime,</span>
-<span id="cb10-5"><a href="#cb10-5" aria-hidden="true" tabindex="-1"></a>  <span class="at">pid =</span> person_id)</span>
-<span id="cb10-6"><a href="#cb10-6" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb10-7"><a href="#cb10-7" aria-hidden="true" tabindex="-1"></a>person_component <span class="ot">&lt;-</span> <span class="fu">make_component</span>(person_records)</span>
-<span id="cb10-8"><a href="#cb10-8" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb10-9"><a href="#cb10-9" aria-hidden="true" tabindex="-1"></a>phen <span class="ot">&lt;-</span> <span class="fu">calculate_formula</span>(</span>
-<span id="cb10-10"><a href="#cb10-10" aria-hidden="true" tabindex="-1"></a>  <span class="at">components =</span> <span class="fu">list</span>(</span>
-<span id="cb10-11"><a href="#cb10-11" aria-hidden="true" tabindex="-1"></a>    <span class="at">hemo_a1c =</span> hemoglobin_component,</span>
-<span id="cb10-12"><a href="#cb10-12" aria-hidden="true" tabindex="-1"></a>    <span class="at">person =</span> person_component),</span>
-<span id="cb10-13"><a href="#cb10-13" aria-hidden="true" tabindex="-1"></a>  <span class="at">fml =</span> <span class="fu">list</span>(</span>
-<span id="cb10-14"><a href="#cb10-14" aria-hidden="true" tabindex="-1"></a>    <span class="at">pat_age =</span> <span class="st">&#39;age(hemo_a1c_measurement_datetime, person_birth_datetime)&#39;</span>,</span>
-<span id="cb10-15"><a href="#cb10-15" aria-hidden="true" tabindex="-1"></a>    <span class="at">a1c_times_age =</span> <span class="st">&#39;hemo_a1c_value_as_number * extract(year from pat_age)&#39;</span>),</span>
-<span id="cb10-16"><a href="#cb10-16" aria-hidden="true" tabindex="-1"></a>  <span class="at">.cascaded =</span> <span class="cn">TRUE</span>)</span>
-<span id="cb10-17"><a href="#cb10-17" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb10-18"><a href="#cb10-18" aria-hidden="true" tabindex="-1"></a>dplyr<span class="sc">::</span><span class="fu">collect</span>(<span class="fu">head</span>(phen)) <span class="sc">|&gt;</span> knitr<span class="sc">::</span><span class="fu">kable</span>()</span></code></pre></div>
+<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a>  <span class="at">ts =</span> birth_datetime,</span>
+<span id="cb10-4"><a href="#cb10-4" aria-hidden="true" tabindex="-1"></a>  <span class="at">pid =</span> person_id)</span>
+<span id="cb10-5"><a href="#cb10-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-6"><a href="#cb10-6" aria-hidden="true" tabindex="-1"></a>person_component <span class="ot">&lt;-</span> <span class="fu">make_component</span>(person_records)</span>
+<span id="cb10-7"><a href="#cb10-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-8"><a href="#cb10-8" aria-hidden="true" tabindex="-1"></a>phen <span class="ot">&lt;-</span> <span class="fu">calculate_formula</span>(</span>
+<span id="cb10-9"><a href="#cb10-9" aria-hidden="true" tabindex="-1"></a>  <span class="at">components =</span> <span class="fu">list</span>(</span>
+<span id="cb10-10"><a href="#cb10-10" aria-hidden="true" tabindex="-1"></a>    <span class="at">hemo_a1c =</span> hemoglobin_component,</span>
+<span id="cb10-11"><a href="#cb10-11" aria-hidden="true" tabindex="-1"></a>    <span class="at">person =</span> person_component),</span>
+<span id="cb10-12"><a href="#cb10-12" aria-hidden="true" tabindex="-1"></a>  <span class="at">fml =</span> <span class="fu">list</span>(</span>
+<span id="cb10-13"><a href="#cb10-13" aria-hidden="true" tabindex="-1"></a>    <span class="at">pat_age =</span> <span class="st">&#39;age(hemo_a1c_measurement_datetime, person_birth_datetime)&#39;</span>,</span>
+<span id="cb10-14"><a href="#cb10-14" aria-hidden="true" tabindex="-1"></a>    <span class="at">a1c_times_age =</span> <span class="st">&#39;hemo_a1c_value_as_number * extract(year from pat_age)&#39;</span>),</span>
+<span id="cb10-15"><a href="#cb10-15" aria-hidden="true" tabindex="-1"></a>  <span class="at">.cascaded =</span> <span class="cn">TRUE</span>)</span>
+<span id="cb10-16"><a href="#cb10-16" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-17"><a href="#cb10-17" aria-hidden="true" tabindex="-1"></a>dplyr<span class="sc">::</span><span class="fu">collect</span>(<span class="fu">head</span>(phen)) <span class="sc">|&gt;</span> knitr<span class="sc">::</span><span class="fu">kable</span>()</span></code></pre></div>
 <table>
 <colgroup>
 <col width="4%" />
 <col width="2%" />
 <col width="7%" />
+<col width="7%" />
 <col width="20%" />
 <col width="14%" />
 <col width="16%" />
-<col width="7%" />
 <col width="16%" />
 <col width="9%" />
 </colgroup>
@@ -900,10 +903,10 @@ table <code>person</code>, then create a component from it.</p>
 <th align="right">row_id</th>
 <th align="right">pid</th>
 <th align="left">ts</th>
+<th align="left">window</th>
 <th align="left">hemo_a1c_measurement_datetime</th>
 <th align="left">person_birth_datetime</th>
 <th align="right">hemo_a1c_value_as_number</th>
-<th align="left">window</th>
 <th align="left">pat_age</th>
 <th align="right">a1c_times_age</th>
 </tr>
@@ -913,10 +916,10 @@ table <code>person</code>, then create a component from it.</p>
 <td align="right">1</td>
 <td align="right">1</td>
 <td align="left">1974-03-01</td>
+<td align="left">00:00:00</td>
 <td align="left">NA</td>
 <td align="left">1974-03-01</td>
 <td align="right">NA</td>
-<td align="left">00:00:00</td>
 <td align="left">NA</td>
 <td align="right">NA</td>
 </tr>
@@ -924,10 +927,10 @@ table <code>person</code>, then create a component from it.</p>
 <td align="right">2</td>
 <td align="right">1</td>
 <td align="left">2011-05-20</td>
+<td align="left">13594 days</td>
 <td align="left">2011-05-20</td>
 <td align="left">1974-03-01</td>
 <td align="right">6.9</td>
-<td align="left">13594 days</td>
 <td align="left">37 years 2 mons 19 days</td>
 <td align="right">255.3</td>
 </tr>
@@ -935,10 +938,10 @@ table <code>person</code>, then create a component from it.</p>
 <td align="right">3</td>
 <td align="right">1</td>
 <td align="left">2014-03-07</td>
+<td align="left">14616 days</td>
 <td align="left">2014-03-07</td>
 <td align="left">1974-03-01</td>
 <td align="right">6.9</td>
-<td align="left">14616 days</td>
 <td align="left">40 years 6 days</td>
 <td align="right">276.0</td>
 </tr>
@@ -946,10 +949,10 @@ table <code>person</code>, then create a component from it.</p>
 <td align="right">4</td>
 <td align="right">1</td>
 <td align="left">2016-03-11</td>
+<td align="left">15351 days</td>
 <td align="left">2016-03-11</td>
 <td align="left">1974-03-01</td>
 <td align="right">6.9</td>
-<td align="left">15351 days</td>
 <td align="left">42 years 10 days</td>
 <td align="right">289.8</td>
 </tr>
@@ -957,10 +960,10 @@ table <code>person</code>, then create a component from it.</p>
 <td align="right">5</td>
 <td align="right">1</td>
 <td align="left">2018-03-16</td>
+<td align="left">16086 days</td>
 <td align="left">2018-03-16</td>
 <td align="left">1974-03-01</td>
 <td align="right">6.9</td>
-<td align="left">16086 days</td>
 <td align="left">44 years 15 days</td>
 <td align="right">303.6</td>
 </tr>
@@ -968,10 +971,10 @@ table <code>person</code>, then create a component from it.</p>
 <td align="right">6</td>
 <td align="right">1</td>
 <td align="left">2020-03-20</td>
+<td align="left">16821 days</td>
 <td align="left">2020-03-20</td>
 <td align="left">1974-03-01</td>
 <td align="right">6.9</td>
-<td align="left">16821 days</td>
 <td align="left">46 years 19 days</td>
 <td align="right">317.4</td>
 </tr>
@@ -994,18 +997,18 @@ computation. If other columns from the same rows are wanted,
 <span id="cb11-12"><a href="#cb11-12" aria-hidden="true" tabindex="-1"></a>    <span class="st">&#39;person_gender_concept_id&#39;</span>))</span>
 <span id="cb11-13"><a href="#cb11-13" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb11-14"><a href="#cb11-14" aria-hidden="true" tabindex="-1"></a>dplyr<span class="sc">::</span><span class="fu">collect</span>(<span class="fu">head</span>(phen)) <span class="sc">|&gt;</span> knitr<span class="sc">::</span><span class="fu">kable</span>()</span></code></pre></div>
-<table style="width:100%;">
+<table>
 <colgroup>
 <col width="3%" />
 <col width="1%" />
 <col width="4%" />
-<col width="13%" />
-<col width="9%" />
-<col width="11%" />
-<col width="9%" />
-<col width="13%" />
-<col width="11%" />
 <col width="4%" />
+<col width="13%" />
+<col width="9%" />
+<col width="11%" />
+<col width="9%" />
+<col width="13%" />
+<col width="11%" />
 <col width="10%" />
 <col width="6%" />
 </colgroup>
@@ -1014,13 +1017,13 @@ computation. If other columns from the same rows are wanted,
 <th align="right">row_id</th>
 <th align="right">pid</th>
 <th align="left">ts</th>
+<th align="left">window</th>
 <th align="left">hemo_a1c_measurement_datetime</th>
 <th align="left">person_birth_datetime</th>
 <th align="right">hemo_a1c_value_as_number</th>
 <th align="right">hemo_a1c_provider_id</th>
 <th align="right">hemo_a1c_visit_occurrence_id</th>
 <th align="right">person_gender_concept_id</th>
-<th align="left">window</th>
 <th align="left">pat_age</th>
 <th align="right">a1c_times_age</th>
 </tr>
@@ -1030,13 +1033,13 @@ computation. If other columns from the same rows are wanted,
 <td align="right">1</td>
 <td align="right">1</td>
 <td align="left">1974-03-01</td>
+<td align="left">00:00:00</td>
 <td align="left">NA</td>
 <td align="left">1974-03-01</td>
 <td align="right">NA</td>
 <td align="right">NA</td>
 <td align="right">NA</td>
 <td align="right">8507</td>
-<td align="left">00:00:00</td>
 <td align="left">NA</td>
 <td align="right">NA</td>
 </tr>
@@ -1044,13 +1047,13 @@ computation. If other columns from the same rows are wanted,
 <td align="right">2</td>
 <td align="right">1</td>
 <td align="left">2011-05-20</td>
+<td align="left">13594 days</td>
 <td align="left">2011-05-20</td>
 <td align="left">1974-03-01</td>
 <td align="right">6.9</td>
 <td align="right">22084</td>
 <td align="right">21</td>
 <td align="right">8507</td>
-<td align="left">13594 days</td>
 <td align="left">37 years 2 mons 19 days</td>
 <td align="right">255.3</td>
 </tr>
@@ -1058,13 +1061,13 @@ computation. If other columns from the same rows are wanted,
 <td align="right">3</td>
 <td align="right">1</td>
 <td align="left">2014-03-07</td>
+<td align="left">14616 days</td>
 <td align="left">2014-03-07</td>
 <td align="left">1974-03-01</td>
 <td align="right">6.9</td>
 <td align="right">27</td>
 <td align="right">24</td>
 <td align="right">8507</td>
-<td align="left">14616 days</td>
 <td align="left">40 years 6 days</td>
 <td align="right">276.0</td>
 </tr>
@@ -1072,13 +1075,13 @@ computation. If other columns from the same rows are wanted,
 <td align="right">4</td>
 <td align="right">1</td>
 <td align="left">2016-03-11</td>
+<td align="left">15351 days</td>
 <td align="left">2016-03-11</td>
 <td align="left">1974-03-01</td>
 <td align="right">6.9</td>
 <td align="right">22084</td>
 <td align="right">19</td>
 <td align="right">8507</td>
-<td align="left">15351 days</td>
 <td align="left">42 years 10 days</td>
 <td align="right">289.8</td>
 </tr>
@@ -1086,13 +1089,13 @@ computation. If other columns from the same rows are wanted,
 <td align="right">5</td>
 <td align="right">1</td>
 <td align="left">2018-03-16</td>
+<td align="left">16086 days</td>
 <td align="left">2018-03-16</td>
 <td align="left">1974-03-01</td>
 <td align="right">6.9</td>
 <td align="right">22084</td>
 <td align="right">18</td>
 <td align="right">8507</td>
-<td align="left">16086 days</td>
 <td align="left">44 years 15 days</td>
 <td align="right">303.6</td>
 </tr>
@@ -1100,13 +1103,13 @@ computation. If other columns from the same rows are wanted,
 <td align="right">6</td>
 <td align="right">1</td>
 <td align="left">2020-03-20</td>
+<td align="left">16821 days</td>
 <td align="left">2020-03-20</td>
 <td align="left">1974-03-01</td>
 <td align="right">6.9</td>
 <td align="right">22084</td>
 <td align="right">17</td>
 <td align="right">8507</td>
-<td align="left">16821 days</td>
 <td align="left">46 years 19 days</td>
 <td align="right">317.4</td>
 </tr>
@@ -1145,11 +1148,11 @@ so on.</p>
 <col width="4%" />
 <col width="2%" />
 <col width="6%" />
+<col width="6%" />
 <col width="15%" />
 <col width="18%" />
 <col width="17%" />
 <col width="20%" />
-<col width="6%" />
 <col width="9%" />
 </colgroup>
 <thead>
@@ -1157,11 +1160,11 @@ so on.</p>
 <th align="right">row_id</th>
 <th align="right">pid</th>
 <th align="left">ts</th>
+<th align="left">window</th>
 <th align="right">hemo_a1c_value_as_number</th>
 <th align="right">prev_hemo_a1c_value_as_number</th>
 <th align="right">hemo_a1c_visit_occurrence_id</th>
 <th align="right">prev_hemo_a1c_visit_occurrence_id</th>
-<th align="left">window</th>
 <th align="right">a1c_difference</th>
 </tr>
 </thead>
@@ -1170,66 +1173,66 @@ so on.</p>
 <td align="right">1</td>
 <td align="right">1</td>
 <td align="left">2011-05-20</td>
+<td align="left">00:00:00</td>
 <td align="right">6.9</td>
 <td align="right">NA</td>
 <td align="right">21</td>
 <td align="right">NA</td>
-<td align="left">00:00:00</td>
 <td align="right">NA</td>
 </tr>
 <tr class="even">
 <td align="right">2</td>
 <td align="right">1</td>
 <td align="left">2014-03-07</td>
+<td align="left">1022 days</td>
 <td align="right">6.9</td>
 <td align="right">6.9</td>
 <td align="right">24</td>
 <td align="right">21</td>
-<td align="left">1022 days</td>
 <td align="right">0</td>
 </tr>
 <tr class="odd">
 <td align="right">3</td>
 <td align="right">1</td>
 <td align="left">2016-03-11</td>
+<td align="left">735 days</td>
 <td align="right">6.9</td>
 <td align="right">6.9</td>
 <td align="right">19</td>
 <td align="right">24</td>
-<td align="left">735 days</td>
 <td align="right">0</td>
 </tr>
 <tr class="even">
 <td align="right">4</td>
 <td align="right">1</td>
 <td align="left">2018-03-16</td>
+<td align="left">735 days</td>
 <td align="right">6.9</td>
 <td align="right">6.9</td>
 <td align="right">18</td>
 <td align="right">19</td>
-<td align="left">735 days</td>
 <td align="right">0</td>
 </tr>
 <tr class="odd">
 <td align="right">5</td>
 <td align="right">1</td>
 <td align="left">2020-03-20</td>
+<td align="left">735 days</td>
 <td align="right">6.9</td>
 <td align="right">6.9</td>
 <td align="right">17</td>
 <td align="right">18</td>
-<td align="left">735 days</td>
 <td align="right">0</td>
 </tr>
 <tr class="even">
 <td align="right">6</td>
 <td align="right">1</td>
 <td align="left">2022-02-11</td>
+<td align="left">693 days</td>
 <td align="right">6.9</td>
 <td align="right">6.9</td>
 <td align="right">29</td>
 <td align="right">17</td>
-<td align="left">693 days</td>
 <td align="right">0</td>
 </tr>
 </tbody>
@@ -1261,11 +1264,11 @@ phenotype. If there are no such records, the value is empty.</p>
 <col width="4%" />
 <col width="2%" />
 <col width="6%" />
+<col width="6%" />
 <col width="15%" />
 <col width="17%" />
 <col width="17%" />
 <col width="20%" />
-<col width="6%" />
 <col width="8%" />
 </colgroup>
 <thead>
@@ -1273,11 +1276,11 @@ phenotype. If there are no such records, the value is empty.</p>
 <th align="right">row_id</th>
 <th align="right">pid</th>
 <th align="left">ts</th>
+<th align="left">window</th>
 <th align="right">hemo_a1c_value_as_number</th>
 <th align="right">old_hemo_a1c_value_as_number</th>
 <th align="right">hemo_a1c_visit_occurrence_id</th>
 <th align="right">old_hemo_a1c_visit_occurrence_id</th>
-<th align="left">window</th>
 <th align="right">six_year_diff</th>
 </tr>
 </thead>
@@ -1286,66 +1289,66 @@ phenotype. If there are no such records, the value is empty.</p>
 <td align="right">1</td>
 <td align="right">1</td>
 <td align="left">2011-05-20</td>
+<td align="left">00:00:00</td>
 <td align="right">6.9</td>
 <td align="right">NA</td>
 <td align="right">21</td>
 <td align="right">NA</td>
-<td align="left">00:00:00</td>
 <td align="right">NA</td>
 </tr>
 <tr class="even">
 <td align="right">2</td>
 <td align="right">1</td>
 <td align="left">2014-03-07</td>
+<td align="left">00:00:00</td>
 <td align="right">6.9</td>
 <td align="right">NA</td>
 <td align="right">24</td>
 <td align="right">NA</td>
-<td align="left">00:00:00</td>
 <td align="right">NA</td>
 </tr>
 <tr class="odd">
 <td align="right">3</td>
 <td align="right">1</td>
 <td align="left">2016-03-11</td>
+<td align="left">00:00:00</td>
 <td align="right">6.9</td>
 <td align="right">NA</td>
 <td align="right">19</td>
 <td align="right">NA</td>
-<td align="left">00:00:00</td>
 <td align="right">NA</td>
 </tr>
 <tr class="even">
 <td align="right">4</td>
 <td align="right">1</td>
 <td align="left">2018-03-16</td>
+<td align="left">2492 days</td>
 <td align="right">6.9</td>
 <td align="right">6.9</td>
 <td align="right">18</td>
 <td align="right">21</td>
-<td align="left">2492 days</td>
 <td align="right">0</td>
 </tr>
 <tr class="odd">
 <td align="right">5</td>
 <td align="right">1</td>
 <td align="left">2020-03-20</td>
+<td align="left">2205 days</td>
 <td align="right">6.9</td>
 <td align="right">6.9</td>
 <td align="right">17</td>
 <td align="right">24</td>
-<td align="left">2205 days</td>
 <td align="right">0</td>
 </tr>
 <tr class="even">
 <td align="right">6</td>
 <td align="right">1</td>
 <td align="left">2022-02-11</td>
+<td align="left">2898 days</td>
 <td align="right">6.9</td>
 <td align="right">6.9</td>
 <td align="right">29</td>
 <td align="right">24</td>
-<td align="left">2898 days</td>
 <td align="right">0</td>
 </tr>
 </tbody>

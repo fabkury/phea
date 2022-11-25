@@ -188,12 +188,8 @@ make_component <- function(input_source, line = NA, delay = NA, window = Inf, re
       } else {
         # component$rec_source <- input_source
         if('tbl_lazy' %in% class(input_source)) {
-          sql_txt <- dbplyr::sql_render(input_source) |> as.character()
-          new_name <- paste0(sample(c(letters, LETTERS), 1), # Ensure it begins with a letter. Any letter.
-            substr(openssl::md5(sql_txt), 1, 10)) # 10 characters of space to avoid collisions.
           component$rec_source <- make_record_source(
             records = input_source,
-            rec_name = new_name,
             .ts = deparse(substitute(.ts)),
             .pid = deparse(substitute(.pid)))
         }
@@ -240,11 +236,17 @@ make_component <- function(input_source, line = NA, delay = NA, window = Inf, re
 #' used.
 #' @param .capture_col Unquoted string. Not yet implemented.
 #' @return Phea record source object.
-make_record_source <- function(records, rec_name, ts, pid, vars = NULL, .capture_col = NULL, .type = 'direct',
+make_record_source <- function(records, rec_name = NULL, ts, pid, vars = NULL, .capture_col = NULL, .type = 'direct',
   .ts = NULL, .pid = NULL) {
   rec_source <- list()
 
   rec_source$records <- records
+  
+  if(is.null(rec_name)) {
+    sql_txt <- dbplyr::sql_render(records) |> as.character()
+    rec_name <- paste0(sample(c(letters, LETTERS), 1), # Ensure it begins with a letter. Any letter.
+      substr(openssl::md5(sql_txt), 1, 10)) # 10 characters of space to avoid collisions.
+  }
 
   if(.type == 'column') {
     stop('Column-type record sources are not supported. rec_name must be a character string.')
@@ -372,23 +374,22 @@ calculate_formula <- function(components, fml = NULL, window = NA, export = NULL
   
   # Build variable map, with all valid combinations of components, record sources, and record source columns.
   var_map <- purrr::map2(names(components), components, \(component_name, component) {
-    res <- list(
-      component_name = component_name,
-      
-      rec_name = component$rec_source$rec_name,
-      
-      column = component$rec_source$vars,
-      
-      variable = {
-        if(component$.passthrough || keep_names_unchanged)
-          component$rec_source$vars
-        else
-          paste0(component_name, '_', component$rec_source$vars)
-      }
-    )
+    if(component$.passthrough || keep_names_unchanged) {
+      res <- dplyr::tibble(
+        component_name = component_name,
+        rec_name = component$rec_source$rec_name,
+        column = component$rec_source$vars,
+        composed_name = component$rec_source$vars)
+    } else {
+      res <- dplyr::tibble(
+        component_name = component_name,
+        rec_name = component$rec_source$rec_name,
+        column = component$rec_source$vars,
+        composed_name = paste0(component_name, '_', component$rec_source$vars))
+    }
     return(res)
   }) |>
-    bind_rows()
+    dplyr::bind_rows()
   
   # Read input formula or formulas.
   if(!is.null(fml)) {
@@ -411,18 +412,18 @@ calculate_formula <- function(components, fml = NULL, window = NA, export = NULL
     }
     fml <- fml |>
       number_and_return('value') |>
-      pluck('fmll')
+      purrr::pluck('fmll')
     
     # Extract components from formula.
     g_vars <- unlist(fml) |>
       stringr::str_match_all('([A-z][A-z0-9_]+)') |>
       unlist() |> unique()
 
-    # Filter bogus matches (eg. SQL keywords in the formula) by keeping only the variables that can possibly come from
+    # Filter bogus matches (eg. SQL keywords in the formula) by keeping only the composed_names that can possibly come from
     # the given combination of record sources and components.
-    g_vars <- g_vars[g_vars %in% var_map$variable]
+    g_vars <- g_vars[g_vars %in% var_map$composed_name]
   } else {
-    # If no formula, no variables to export from it.
+    # If no formula, no composed_names to export from it.
     g_vars <- NULL
   }
 
@@ -430,8 +431,8 @@ calculate_formula <- function(components, fml = NULL, window = NA, export = NULL
   g_vars <- c(g_vars, export)
   
   # Filter the variable map to contain only what we'll need.
-  var_map <- filter(var_map, variable %in% g_vars) |>
-    distinct()
+  var_map <- dplyr::filter(var_map, composed_name %in% g_vars) |>
+    dplyr::distinct()
 
 # Prepare record sources ------------------------------------------------------------------------------------------
   prepare_record_source <- function(record_source) {
@@ -451,8 +452,8 @@ calculate_formula <- function(components, fml = NULL, window = NA, export = NULL
       # Select only the columns that will be needed later, according to g_vars. This requires checking all applicable
       # components.
       out_vars <- var_map |>
-        filter(rec_name == .env$rec_name) |>
-        pull(column) |>
+        dplyr::filter(rec_name == .env$rec_name) |>
+        dplyr::pull(column) |>
         unique()
       
       export_records <- record_source$records |>
@@ -460,7 +461,7 @@ calculate_formula <- function(components, fml = NULL, window = NA, export = NULL
           name = local(rec_name),
           pid = !!rlang::sym(record_source$rec_pid),
           ts = !!rlang::sym(record_source$ts),
-          !!!syms(out_vars))
+          !!!rlang::syms(out_vars))
     }
 
     return(export_records)
@@ -473,8 +474,8 @@ calculate_formula <- function(components, fml = NULL, window = NA, export = NULL
 # Produce components ----------------------------------------------------------------------------------------------
   produce_component <- function(comp_name, component) {
     columns <- var_map |>
-      filter(component_name == comp_name) |>
-      pull(column) |>
+      dplyr::filter(component_name == comp_name) |>
+      dplyr::pull(column) |>
       unique()
 
     if(!is.na(component$delay) && !is.na(component$line)) {

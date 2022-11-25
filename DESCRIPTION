@@ -16,7 +16,9 @@ Imports:
 	dbplyr,
 	stringr,
 	purrr,
-	rlang
+	rlang,
+	openssl,
+	tidyr
 Suggests: 
     knitr,
     rmarkdown

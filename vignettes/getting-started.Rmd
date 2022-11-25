@@ -1,5 +1,5 @@
 ---
-title: "Getting started"
+title: "Getting started with Phea"
 output: rmarkdown::html_vignette
 vignette: >
   %\VignetteIndexEntry{Getting started}
@@ -19,10 +19,10 @@ Phea is a framework for computing electronic [patient] phenotypes:
  - using formulas written in SQL language,  
  - and without using SQL joins.  
  
-Although, in principle, Phea's approach need not be restricted to the intended use case, the intended use case is where
-you have a database with patient records and want to compute a formula.  
+The intended use case is where you have a database with patient records and want to compute a formula. However, in
+principle, Phea's approach need not be restricted to this intended use case.  
 
-Since Phea passes the formula unmodified to the SQL server, it need not be restricted to mathematical operators. It can
+Phea passes the formula unmodified to the SQL query, so it need not be restricted to mathematical operators. It can
 include any SQL expression that would be valid in a `SELECT` statement, such as `CASE WHEN ...` expressions and function
 calls.  
 
@@ -35,13 +35,14 @@ _Phea goes over patient records in chronological order._ Say you want to compute
 `body_mass_index = body_weight / (body_height * body_height)`
 
 Phea will compute `body_mass_index` for each person using the most recently available data at each point in
-time. Since this formula depends on `body_weight` and `body_height`, their timestamps are also the timestamps for
-the resulting `body_mass_index`. This means that at every point in time where there is a `body_weight` *or*
-`body_height` a record for a given patient, Phea will try to calculate `body_mass_index` again.
+time.  
 
-Suppose a patient called John had a `body_weight = 75 kg` measurement on May 1st (of a given year), a
-`body_height = 1.8 meters` on August 1st (of the same year), then a new `body_weight = 79 kg` on October 1st. Phea would
-produce 3 result rows as follows:
+In this example, the formula depends on `body_weight` and `body_height`. Therefore, their timestamps will bethe
+timestamps for the resulting `body_mass_index`. This means that at every point in time where there is a `body_weight`
+*or* `body_height` a record for a given patient, Phea will try to calculate `body_mass_index` again.  
+
+Suppose a patient had a `body_weight = 75 kg` measurement on May 1st, a `body_height = 1.8 meters` on August 1st, then a
+new `body_weight = 79 kg` on October 1st. Phea would produce 3 result rows as follows:
 
 _May 1st:_  
 `body_weight = 75 kg`  
@@ -58,21 +59,22 @@ _October 1st:_
 `body_height = 1.8 meters`  
 `body_mass_index = 79 / (1.8 * 1.8) = 24.38272`   
 
-The algorithm continues as long as new records are avaialable. For example, say that on November 1st a new
-record `body_height = 1.78 meters` appears. The result would then be:  
+The algorithm continues as long as new records are avaialable. For example, if on November 1st a new record
+`body_height = 1.78 meters` appears, the result would be:  
 
 _November 1st:_  
 `body_weight = 79 kg`  
 `body_height = 1.78 meters`  
 `body_mass_index = 75 / (1.78 * 1.78) = 24.93372`  
 
-At each point in time, the most recently available data point is used, unless you specify otherwise when creating a
+At each point in time, the most recently available data is used, unless you specify otherwise when creating a
 component.  
 
 
 
 ## How to set up
-First, you need to provide Phea with your SQL connection. **Presently, only PostgreSQL is supported by Phea.**    
+First, you need to provide Phea with your SQL connection. 
+**While Phea is not necessarily restricted to PostgreSQL, this is the only SQL flavor where it has been tested.**  
 ```{r setup}
 library(phea)
 
@@ -90,8 +92,8 @@ dbcon <- DBI::dbConnect(
     
 # Setup Phea and define cdm_new_york3 as default schema.
 setup_phea(
-  dbi_connection = dbcon,
-  def_schema = 'cdm_new_york3')
+  connection = dbcon,
+  schema = 'cdm_new_york3')
 ```
 
 `setup_phea()` will save `dbi_connection` and `def_schema` for use by functions `sql0()` and `sqlt()`. Most importantly,
@@ -127,7 +129,6 @@ hemoglobin_query <- sql0('
 
 hemoglobin_record_source <- make_record_source(
   records = hemoglobin_query,
-  rec_name = 'hemo_a1c',
   ts = measurement_datetime,
   pid = person_id)
 ```
@@ -156,8 +157,7 @@ phen <- calculate_formula(
 ```
 
 Phea automatically recognizes that `hemo_a1c_value_as_number` means column `value_as_number` in the SQL table associated
-with component `hemo_a1c`. The name of the component in the formula (`hemo_a1c`) comes from the names of the list items
-in `components = list(...)`.  
+with component `hemo_a1c`.    
 
 Object `phen` is a lazy table in the `dplyr`/`dbplyr` framework. It can be materialized into a tibble by calling
 `collect()`, or manipulated further using Phea or `dplyr`/`dbplyr`.
@@ -219,7 +219,6 @@ To obtain the patient's age, we can collect the date of birth from table `person
 ```{r}
 person_records <- make_record_source(
   records = sqlt(person),
-  rec_name = 'birth',
   ts = birth_datetime,
   pid = person_id)
 
@@ -309,96 +308,8 @@ dplyr::collect(head(phen)) |> knitr::kable()
 
 As of now, `line` and `delay` **cannot** be used simultaneously in the same component (this is yet to be implemented).
 If both are provided, `line` is considered and `delay` is ignored. `delay` is only considered when `line = NA`.  
-
-
-Plot:  
-```{r}
-library(plotly)
-library(dplyr)
-library(purrr)
-phea_plot <- function(phen, pid_select) {
-  pid_select <- phen |>
-    select(pid) |>
-    head(1) |>
-    pull()
   
-  phen_long <- phen |>
-    filter(pid %in% pid_select) |>
-    collect() |>
-    tidyr::pivot_longer(
-      cols = !c(row_id, pid, ts, window))
-
-  make_step_chart_data <- function(board_data) {
-    union_all(
-      board_data |>
-        arrange(pid, ts) |>
-        group_by(pid, name) |>
-        mutate(linha = row_number()) |>
-        ungroup(),
-      board_data |>
-        arrange(pid, ts) |>
-        group_by(pid, name) |>
-        mutate(linha = row_number()) |>
-        mutate(ts = lead(ts)) |>
-        ungroup()) |>
-      arrange(pid, ts, linha)
-      # mutate(ts = coalesce(ts, max(ts, na.rm = TRUE))) |>
-      # distinct() # Eliminates 1 row.
-  }
-
-  make_plotly_chart <- function(board_data, pid) {
-    if(all(!is.na(pid))) {
-      board_mask <- board_data$pid %in% pid
-      board_data <- board_data[board_mask,]
-    }
-
-    comp_board <- make_step_chart_data(board_data)
-
-    chart_items <- comp_board |>
-      select(name) |>
-      distinct() |>
-      pull()
-
-    plot_args <- map(chart_items, \(chart_item) {
-      res <- comp_board |>
-        filter(name == chart_item) |>
-        filter(!is.na(value))
-      if(nrow(res) > 0) {
-        res <- res |>
-          plot_ly(
-            x = ~ts,
-            y = ~value,
-            type = 'scatter',
-            mode = 'lines',
-            name = chart_item) |>
-          layout(
-            legend = list(orientation = 'h'),
-            yaxis = list(
-              range = c(
-                min(res$value, na.rm = TRUE),
-                max(res$value, na.rm = TRUE)),
-              fixedrange = TRUE))
-        return(res)
-      } else {
-        return(NULL)
-      }
-    })
-    names(plot_args) <- chart_items
-    plot_args <- plot_args |>
-      discard(is.null)
-    # mask <- unlist(lapply(plot_args, is.null))
-    # browser()
-    # plot_args <- plot_args[!mask]
-    plot_args <- c(plot_args, nrows = length(plot_args), shareX = TRUE)
-    return(
-      do.call(subplot, plot_args))
-  }
-
-  make_plotly_chart(phen_long, pid_select)
-}
-
-phea_plot(phen)
-```
+  
 ## Author contact
 Contact Fabrício Kury at fab@kury.dev.  
 
