@@ -419,17 +419,14 @@ unless you specify otherwise when creating a component.</p>
 the only SQL flavor where it has been tested.</strong></p>
 <pre class="r"><code>library(phea)
 
-# kury - credenciais.R contains the cred$pg credentials.
-source(paste0(Sys.getenv(&quot;HOME&quot;), &#39;/Estudo/Tecnologia/R/espinha/credenciais.R&#39;))
-
 # Connect to SQL server
 dbcon &lt;- DBI::dbConnect(
     RPostgres::Postgres(),
     host = &#39;localhost&#39;,
     port = 7654,
     dbname = &#39;fort&#39;,
-    user = cred$pg$user,
-    password = cred$pg$pass)
+    user = cred$pg$user, # Credentials not declared in this file
+    password = cred$pg$pass) # Credentials not declared in this file
     
 # Setup Phea and define cdm_new_york3 as default schema.
 setup_phea(
@@ -572,9 +569,7 @@ using Phea or <code>dplyr</code>/<code>dbplyr</code>.</p>
 or the option <code>.clip_sql</code> in
 <code>calculate_formula()</code>:</p>
 <pre class="r"><code>dbplyr::sql_render(phen)
-#&gt; &lt;SQL&gt; SELECT *
-#&gt; FROM (
-#&gt; SELECT
+#&gt; &lt;SQL&gt; SELECT
 #&gt;   &quot;row_id&quot;,
 #&gt;   &quot;pid&quot;,
 #&gt;   &quot;ts&quot;,
@@ -603,11 +598,11 @@ or the option <code>.clip_sql</code> in
 #&gt;           row_number() over () AS &quot;row_id&quot;,
 #&gt;           &quot;pid&quot;,
 #&gt;           &quot;ts&quot;,
-#&gt;           last_value(case when &quot;name&quot; = &#39;dr5jtfhz9kqs&#39; then &quot;value_as_number&quot; else null end) over (partition by &quot;pid&quot;, &quot;name&quot; order by &quot;ts&quot; rows between unbounded preceding and 0 preceding) AS &quot;hemo_a1c_value_as_number&quot;,
-#&gt;           last_value(case when &quot;name&quot; = &#39;dr5jtfhz9kqs&#39; then &quot;ts&quot; else null end) over (partition by &quot;pid&quot;, &quot;name&quot; order by &quot;ts&quot; rows between unbounded preceding and 0 preceding) AS &quot;hemo_a1c_ts&quot;
+#&gt;           last_value(case when &quot;name&quot; = &#39;r0ro3ui1xgw7&#39; then &quot;value_as_number&quot; else null end) over (partition by &quot;pid&quot;, &quot;name&quot; order by &quot;ts&quot; rows between unbounded preceding and 0 preceding) AS &quot;hemo_a1c_value_as_number&quot;,
+#&gt;           last_value(case when &quot;name&quot; = &#39;r0ro3ui1xgw7&#39; then &quot;ts&quot; else null end) over (partition by &quot;pid&quot;, &quot;name&quot; order by &quot;ts&quot; rows between unbounded preceding and 0 preceding) AS &quot;hemo_a1c_ts&quot;
 #&gt;         FROM (
 #&gt;           SELECT
-#&gt;             &#39;dr5jtfhz9kqs&#39; AS &quot;name&quot;,
+#&gt;             &#39;r0ro3ui1xgw7&#39; AS &quot;name&quot;,
 #&gt;             &quot;person_id&quot; AS &quot;pid&quot;,
 #&gt;             &quot;measurement_datetime&quot; AS &quot;ts&quot;,
 #&gt;             &quot;value_as_number&quot;
@@ -622,9 +617,7 @@ or the option <code>.clip_sql</code> in
 #&gt;     ) &quot;q04&quot;
 #&gt;   ) &quot;q05&quot;
 #&gt; ) &quot;q06&quot;
-#&gt; WHERE (&quot;row_id&quot; = &quot;ts_row&quot;)
-#&gt; ) &quot;q01&quot;
-#&gt; ORDER BY &quot;pid&quot;, &quot;ts&quot;</code></pre>
+#&gt; WHERE (&quot;row_id&quot; = &quot;ts_row&quot;)</code></pre>
 <p>Notice that the result of the
 <code>sqrt(hemo_a1c_value_as_number)</code> is in column
 <code>value</code>. This can be changed by giving a name to the formula
@@ -1367,10 +1360,10 @@ dplyr::collect(head(phen)) |&gt; knitr::kable()</code></pre>
 </tbody>
 </table>
 <p>As of now, <code>line</code> and <code>delay</code>
-<strong>cannot</strong> be used simultaneously in the same component
-(this is yet to be implemented). If both are provided, <code>line</code>
-is considered and <code>delay</code> is ignored. <code>delay</code> is
-only considered when <code>line = NA</code>.</p>
+<strong>cannot</strong> be used simultaneously in the same component.
+This is a planned feature. If both are provided, <code>line</code> is
+considered and <code>delay</code> is ignored. <code>delay</code> is only
+considered when <code>line = NA</code>.</p>
 </div>
 <div id="author-contact" class="section level2">
 <h2>Author contact</h2>

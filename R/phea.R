@@ -649,10 +649,22 @@ calculate_formula <- function(components, fml = NULL, window = NA, export = NULL
   }
 
 # Collapse SQL and return -----------------------------------------------------------------------------------------
-  # Chamar o collapse() é necessário para evitar acúmulo de código lazy com eventual erro "C stack usage is too close to
-  # the limit". Vide https://github.com/tidyverse/dbplyr/issues/719. Obrigado, mgirlich!
-  board <- dplyr::collapse(board, cte = TRUE)
+  # For some reason, apparently a bug in dbplyr's SQL translation, we need to "erase" an ORDER BY "pid", "ts" that is
+  # left over in the translated query. That ORDER BY persists even if you posteriorly do a dplyr::group_by() on the
+  # result of the phenotype (i.e. the board at this point). This causes the SQL server's query engine to raise an error,
+  # saying that "ts" must also be part of the GROUP BY. This left over ORDER BY "pid", "ts" apparently comes from the
+  # dbplyr::window_order() call that was necessary to guarantee the intended behavior of the call to
+  # tidyr::fill.lazy_tbl() above.
+  board <- board |>
+    arrange()
+  
+  # Calling collapse() is necessary to minimize the accumulation of "lazy table generating code". That accumulation
+  # can produce error "C stack usage is too close to the limit", especially when compounding phenotypes (i.e. using 
+  # phenotypes as components of other phenotypes). See https://github.com/tidyverse/dbplyr/issues/719. Thanks, mgirlich!
+  board <- board |>
+    dplyr::collapse(cte = TRUE)
 
+  # Write attributes used to communicate internally in Phea.
   attr(board, 'phea') <- 'phenotype'
   attr(board, 'phea_res_vars') <- res_vars
   
