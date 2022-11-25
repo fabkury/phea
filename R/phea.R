@@ -1,15 +1,10 @@
 # Data ------------------------------------------------------------------------------------------------------------
-.pkgglobalenv <- new.env(parent=emptyenv())
+# TODO: Remove the if()?
+if(!exists('.pheaglobalenv'))
+  .pheaglobalenv <- new.env(parent=emptyenv())
 
 
 # Functions -------------------------------------------------------------------------------------------------------
-colnames_dbplyr <- function(records) {
-  records |>
-    utils::head(1) |> # Coletar 1 line.
-    dplyr::collect() |>
-    colnames()
-}
-
 #' Keep [first] row by [window function]
 #'
 #' Keeps the row containing the group-wise maximum or minimum.
@@ -40,6 +35,8 @@ keep_row_by <- function(lazy_tbl, by, partition, win_fn = 'min') {
   res
 }
 
+
+# Head shot & code shot -------------------------------------------------------------------------------------------
 #' Head shot
 #'
 #' Peek at the first rows of `lazy_tbl`.
@@ -66,55 +63,41 @@ head_shot <- function(lazy_tbl, nrows = 10, blind = FALSE, .title = NA) {
   res
 }
 
-#' Setup Phea
+#' Code shot
 #'
-#' Configures Phea for use.
+#' See the SQL code behind a `lazy_tbl`.
 #'
-#' Stores the DBI connection for later use, and verifies if Phea's user-defined aggregates are available. If they're
-#' not, runs the needed SQL queries to install them.
+#' Obtain the SQL code rendered from `lazy_tbl`, write to the clipboard, and return it. Optionally, don't write to
+#' clipboard.
 #'
 #' @export
-#' @param dbi_connection DBI-compatible SQL connection (e.g. produced by DBI::dbConnect).
+#' @param lazy_tbl Lazy table to look at.
+#' @param clip If `TRUE` (default), will write to clipboard.
+#' @return SQL object containing the query. Can be coerced to character by `as.character()`.
+code_shot <- function(lazy_tbl, clip = TRUE) {
+  # 2022-11-20 12:28
+  res <- lazy_tbl |>
+    dbplyr::sql_render()
+  
+  if(clip)
+    writeClipboard(res)
+  
+  return(res)
+}
+
+# Setup Phea ------------------------------------------------------------------------------------------------------
+#' Setup Phea
+#'
+#' Configures functions `sqlt()` and `sql0()` for use.
+#'
+#' Stores the DBI connection for later use.
+#'
+#' @export
+#' @param connection DBI-compatible SQL connection (e.g. produced by DBI::dbConnect).
 #' @param schema Schema to be used by default in `sqlt()`.
-setup_phea <- function(dbi_connection, def_schema) {
-  assign('con', dbi_connection, envir = .pkgglobalenv)
-  assign('schema', def_schema, envir = .pkgglobalenv)
-
-  function_exists <- DBI::dbGetQuery(.pkgglobalenv$con,
-    'select * from
-      pg_proc p
-      join pg_namespace n
-      on p.pronamespace = n.oid
-      where proname =\'phea_coalesce_r_sfunc\';') |>
-    nrow()
-  if(function_exists != 1) {
-    message('Installing phea_coalesce_r_sfunc.')
-    DBI::dbExecute(.pkgglobalenv$con,
-      "create function phea_coalesce_r_sfunc(state anyelement, value anyelement)
-      returns anyelement
-      immutable parallel safe
-      as
-      $$
-        select coalesce(value, state);
-      $$ language sql;")
-  }
-
-  function_exists <- DBI::dbGetQuery(.pkgglobalenv$con,
-    'select * from
-      pg_proc p
-      join pg_namespace n
-      on p.pronamespace = n.oid
-      where proname =\'phea_find_last_ignore_nulls\';') |>
-    nrow()
-
-  if(function_exists != 1) {
-    message('Installing phea_find_last_ignore_nulls.')
-    DBI::dbExecute(.pkgglobalenv$con,
-      "create aggregate phea_find_last_ignore_nulls(anyelement) (
-        sfunc = phea_coalesce_r_sfunc,
-        stype = anyelement
-      );")
-  }
+setup_phea <- function(connection, schema) {
+  assign('con', connection, envir = .pheaglobalenv)
+  assign('schema', schema, envir = .pheaglobalenv)
 }
 
 
@@ -131,8 +114,8 @@ setup_phea <- function(dbi_connection, def_schema) {
 #' @param schema Schema to be used by default in `sqlt()`.
 #' @return Lazy table equal to `select * from def_schema.table;`.
 sqlt <- function(table) {
-  dplyr::tbl(.pkgglobalenv$con,
-    dbplyr::in_schema(.pkgglobalenv$schema,
+  dplyr::tbl(.pheaglobalenv$con,
+    dbplyr::in_schema(.pheaglobalenv$schema,
       deparse(substitute(table))))
 }
 
@@ -141,11 +124,11 @@ sqlt <- function(table) {
 #' Combines with `paste0` the strings in `...`, then runs it as a SQL query.
 #'
 #' @export
-#' @param ... Character string, or vector of.
+#' @param ... Arguments to be coerced to `character` and concatenated.
 #' @return Lazy table corresponding to the query.
 sql0 <- function(...) {
   sql_txt <- paste0(...)
-  dplyr::tbl(.pkgglobalenv$con,
+  dplyr::tbl(.pheaglobalenv$con,
     dplyr::sql(sql_txt))
 }
 
@@ -160,61 +143,80 @@ sql0 <- function(...) {
 #' provided, overwrite existing ones.
 #'
 #' @export
-#' @param input_source A record source, a component, or a lazy table.
+#' @param input_source A record source from `make_record_source()`, a component from `make_component()`, or a lazy
+#' table. If the latter case, `.ts` and `.pid` must be provided.
 #' @param line Interger. Which line to pick. 0 = skip no lines, 1 = skip one line, 2 = skip two lines, etc.
 #' @param delay Character. Time interval in SQL language. Minimum time difference between phenotype date and component
 #' date.
 #' @param window Character. Time interval in SQL language. Maximum time difference between phenotype date and component
 #' date.
 #' @param rec_name Character. If provided, overwrites the `rec_name` of the record source.
+#' @param .ts Unquoted character. If passing a lazy table to `input_source`, `.ts` is used as `ts` to buid a record
+#' source.
+#' @param .pid Unquoted character. If passing a lazy table to `input_source`, `.pid` is used as `pid` to buid a record
+#' source.
 #' @return Phea component object.
-make_component <- function(input_source, line = NA, delay = NA, window = Inf, rec_name = NA) {
+make_component <- function(input_source, line = NA, delay = NA, window = Inf, rec_name = NA,
+  .passthrough = FALSE, .ts = NULL, .pid = NULL) {
   component <- list()
 
   if(isTRUE(attr(input_source, 'phea') == 'component')) {
     # rec_source is actually a component.
-    old_component <- input_source
-    component$rec_source <- old_component$rec_source
-    component$line <- old_component$line
-    component$delay <- old_component$delay
-    component$comp_window <- old_component$window
-
+    component <- input_source
+    
     # Overwrite if provided.
     if(!is.na(line))
       component$line <- line
+    
     if(!is.na(delay)) {
       component$delay <- delay
       # If the user tries to apply a delay, erase the line if not provided.
       if(is.na(line))
         component$line <- NA
     }
-    if(!is.na(window))
-      component$comp_window <- window
   } else {
     if(isTRUE(attr(input_source, 'phea') == 'record_source')) {
       component$rec_source <- input_source
     } else {
-      if('tbl_lazy' %in% class(input_source)) {
-        # Assume result from formula. Read its value column.
+      if(isTRUE(attr(input_source, 'phea') == 'phenotype')) {
+        # result from formula. Read its value column.
         component$rec_source <- make_record_source(
           records = input_source,
           rec_name = 'value',
           ts = ts,
           pid = pid)
       } else {
-        component$rec_source <- input_source
+        # component$rec_source <- input_source
+        if('tbl_lazy' %in% class(input_source)) {
+          sql_txt <- dbplyr::sql_render(input_source) |> as.character()
+          new_name <- paste0(sample(c(letters, LETTERS), 1), # Ensure it begins with a letter. Any letter.
+            substr(openssl::md5(sql_txt), 1, 10)) # 10 characters of space to avoid collisions.
+          component$rec_source <- make_record_source(
+            records = input_source,
+            rec_name = new_name,
+            .ts = deparse(substitute(.ts)),
+            .pid = deparse(substitute(.pid)))
+        }
       }
     }
-
+      
     if(is.na(line) && is.na(delay))
       line <- 0
+    
     component$line <- line
     component$delay <- delay
     component$comp_window <- window
+    component$.passthrough <- .passthrough
   }
+  
+  if(!is.na(window))
+    component$comp_window <- window
 
-  if(!is.na(rec_name))
-    component$rec_source$rec_name <- name
+  # if(!is.na(rec_name))
+  #   component$rec_source$rec_name <- name
+
+  if(!is.na(.passthrough))
+    component$.passthrough <- .passthrough
 
   attr(component, 'phea') <- 'component'
 
@@ -238,12 +240,13 @@ make_component <- function(input_source, line = NA, delay = NA, window = Inf, re
 #' used.
 #' @param .capture_col Unquoted string. Not yet implemented.
 #' @return Phea record source object.
-make_record_source <- function(records, rec_name, ts, pid, vars = NULL, .capture_col = NULL) {
+make_record_source <- function(records, rec_name, ts, pid, vars = NULL, .capture_col = NULL, .type = 'direct',
+  .ts = NULL, .pid = NULL) {
   rec_source <- list()
 
   rec_source$records <- records
 
-  if(class(substitute(rec_name)) == 'name') {
+  if(.type == 'column') {
     stop('Column-type record sources are not supported. rec_name must be a character string.')
     rec_name_name <- deparse(substitute(rec_name))
     rec_source$rec_name <- rec_name_name
@@ -257,21 +260,26 @@ make_record_source <- function(records, rec_name, ts, pid, vars = NULL, .capture
       vars <- records |>
         dplyr::select(!!rlang::sym(rec_name_name)) |> dplyr::distinct() |> dplyr::collect() |> dplyr::pull()
     }
-
-  } else {
+  }
+    
+  if(.type == 'direct') {
     rec_source$rec_name <- rec_name
     rec_source$type <- 'direct'
 
     if(is.null(vars))
-      vars <- records |>
-      colnames_dbplyr()
+      vars <- colnames(records)
   }
-
-  ts_name <- deparse(substitute(ts))
+  
+  if(is.null(.ts))
+    ts_name <- deparse(substitute(ts))
+  else
+    ts_name <- .ts
   rec_source$ts <- ts_name
 
-
-  pid_name <- deparse(substitute(pid))
+  if(is.null(.pid))
+    pid_name <- deparse(substitute(pid))
+  else
+    pid_name <- .pid
   vars <- setdiff(vars, pid_name)
 
   rec_source$vars <- vars
@@ -296,7 +304,6 @@ make_record_source <- function(records, rec_name, ts, pid, vars = NULL, .capture
 #' @param export List of additional variables to export.
 #' @param add_components Additional components. Used mostly in case components is not a list of components.
 #' @param .ts,.pid,.rec_name,.delay,.line If supplied, these will overwrite those of the given component.
-#' @param .exclude_na If `TRUE`, returns only rows where the result of the formula is not NA.
 #' @param .require_all If `TRUE`, returns only rows where all components to have been found according to their
 #' timestamps (even if their value is NA). If `.dont_require` is provided, `.require_all` is ignored.
 #' @param .lim Maximum number of rows to return. This is imposed before the calculation of the formula.
@@ -309,14 +316,23 @@ make_record_source <- function(records, rec_name, ts, pid, vars = NULL, .capture
 #' @return Lazy table with result of formula or formulas.
 calculate_formula <- function(components, fml = NULL, window = NA, export = NULL, add_components = NULL,
   .ts = NULL, .pid = NULL, .rec_name = NULL, .delay = NULL, .line = NULL,
-  .exclude_na = FALSE, .require_all = FALSE, .lim = NA, .dont_require = NULL,
-  .cascaded = FALSE, .clip_sql = FALSE,
-  .call_board = FALSE) {
-  # Prepare -------------------------------------------------------------------------------------------------------
-  if('tbl_lazy' %in% class(components)) {
-    # components is actually a lazy table. Make a component out of it. The function make_component() is also overloaded
-    # and will produce a record source from the lazy table.
-    new_component <- make_component(components)
+  .require_all = FALSE, .lim = NA, .dont_require = NULL,
+  .cascaded = FALSE, .clip_sql = FALSE) {
+# Prepare ---------------------------------------------------------------------------------------------------------
+  # TODO: Improve the logic regarding these two variables below.
+  keep_names_unchanged <- FALSE
+  input_is_phenotype <- FALSE
+  # 
+  
+  if(isTRUE(attr(components, 'phea') == 'phenotype')) {
+    keep_names_unchanged <- TRUE
+    input_is_phenotype <- TRUE
+    res_vars <- attr(components, 'phea_res_vars')
+    
+    new_component <- make_component(
+      input_source = components,
+      .ts = ts,
+      .pid = pid)
 
     if(!is.null(.rec_name))
       new_component$rec_source$rec_name <- .rec_name
@@ -334,9 +350,9 @@ calculate_formula <- function(components, fml = NULL, window = NA, export = NULL
 
     if(!is.null(.delay))
       new_component$delay <- .delay
-
-    components <- list(new_component = new_component)
-    names(components) <- new_component$rec_source$rec_name
+    
+    # Create one component per result var.
+    components <- sapply(res_vars, \(x) new_component, USE.NAMES = TRUE, simplify = FALSE)
   }
 
   if(!is.null(add_components))
@@ -345,44 +361,66 @@ calculate_formula <- function(components, fml = NULL, window = NA, export = NULL
   if(isTRUE(attr(components, 'phea') == 'component'))
     components <- list(components)
 
-  # Build record sources
+  # Build record sources, a deduplicated list of all record sources in the components.
   rec_source_names <- purrr::map(components, ~.$rec_source$rec_name) |> unlist()
   rec_source_mask <- !duplicated(rec_source_names)
   record_sources <- purrr::map(components[rec_source_mask], ~.$rec_source)
 
   if(is.null(names(components)) &&
-      isTRUE(attr(components[[1]], 'phea') == 'component')) {
+      isTRUE(attr(components[[1]], 'phea') == 'component'))
     names(components) <- components[[1]]$rec_source$rec_name
-  }
-
+  
+  # Build variable map, with all valid combinations of components, record sources, and record source columns.
+  var_map <- purrr::map2(names(components), components, \(component_name, component) {
+    res <- list(
+      component_name = component_name,
+      
+      rec_name = component$rec_source$rec_name,
+      
+      column = component$rec_source$vars,
+      
+      variable = {
+        if(component$.passthrough || keep_names_unchanged)
+          component$rec_source$vars
+        else
+          paste0(component_name, '_', component$rec_source$vars)
+      }
+    )
+    return(res)
+  }) |>
+    bind_rows()
+  
   # Read input formula or formulas.
   if(!is.null(fml)) {
-    # Check if user provided names in fml.
-    # If not, use default name 'value'.
-    if(is.null(names(fml))) {
-      # Apply a number in front of the default names, except for the first.
-      char_numbers <- as.character(1:length(fml))
-      char_numbers[char_numbers == '1'] <- ''
-      names(fml) <- paste0('value', char_numbers)
+    # Make sure the formulas have names.
+    number_and_return <- function(fmll, prefix, p = 0) {
+      for(i in seq(fmll)) {
+        if(class(fmll[[i]]) == 'list') {
+          retval <- number_and_return(fmll[[i]], prefix, p)
+          p <- retval$p
+          fmll[[i]] <- retval$fmll
+        } else {
+          if(is.null(names(fmll)[i]) || nchar(names(fmll)[i]) == 0) {
+            p <- p + 1
+            names(fmll)[i] <- paste0(prefix,
+              ifelse(p == 1, '', p))
+          }
+        }
+      }
+      return(list(fmll = fmll, p = p))
     }
-
-    # Extract used components from formula.
-    g_vars <- stringr::str_match_all(fml, '([A-z][A-z0-9_]+)') |> purrr::reduce(rbind)
-    g_vars <- g_vars[,2]
+    fml <- fml |>
+      number_and_return('value') |>
+      pluck('fmll')
+    
+    # Extract components from formula.
+    g_vars <- unlist(fml) |>
+      stringr::str_match_all('([A-z][A-z0-9_]+)') |>
+      unlist() |> unique()
 
     # Filter bogus matches (eg. SQL keywords in the formula) by keeping only the variables that can possibly come from
     # the given combination of record sources and components.
-    out_g_vars_mask <- purrr::map(record_sources, \(record_source) {
-      vars <- record_source$vars
-      comp_mask <- purrr::map(components, ~.$rec_source$rec_name) == record_source$rec_name
-      related_components <- names(components)[comp_mask]
-      pairs <- purrr::cross2(related_components, vars) # Create all combinations of components and vars.
-      out_vars <- purrr::map(pairs, \(x) paste0(x[[1]], '_', x[[2]])) |> unlist()
-      out_vars_mask <- g_vars %in% out_vars
-      return(out_vars_mask)
-    }) |> purrr::reduce(`|`) # Do element-wise OR operation. Combine with OR.
-
-    g_vars <- g_vars[out_g_vars_mask]
+    g_vars <- g_vars[g_vars %in% var_map$variable]
   } else {
     # If no formula, no variables to export from it.
     g_vars <- NULL
@@ -390,197 +428,147 @@ calculate_formula <- function(components, fml = NULL, window = NA, export = NULL
 
   # Add variables requested to export.
   g_vars <- c(g_vars, export)
+  
+  # Filter the variable map to contain only what we'll need.
+  var_map <- filter(var_map, variable %in% g_vars) |>
+    distinct()
 
-  # calc_suffix is used for the temporary columns required to circumvent the lack of IGNORE NULLs.
-  calc_suffix <- 'calc'
-
-  # Build record source - component - variable table.
-  # TODO
-
+# Prepare record sources ------------------------------------------------------------------------------------------
   prepare_record_source <- function(record_source) {
-    ts <- record_source$ts
     rec_name <- record_source$rec_name
-    rec_pid <- record_source$rec_pid
-    rec_type <- record_source$type
 
     # Normalize the column names.
-    if(rec_type == 'column') {
+    if(record_source$type == 'column') {
+      stop('Column-type record source is not yet implemented.')
       capture_col <- record_source$capture_col
       sql_txt <- paste0("concat('", rec_name, "_', \"", rec_name, '")')
       export_records <- dplyr::transmute(record_source$records,
         name = dplyr::sql(sql_txt),
-        pid = !!rlang::sym(rec_pid),
-        ts = !!rlang::sym(ts),
+        pid = !!rlang::sym(record_source$rec_pid),
+        ts = !!rlang::sym(record_source$ts),
         capture_col = !!rlang::sym(capture_col))
     } else {
-      export_records <- dplyr::mutate(record_source$records,
-        name = local(rec_name),
-        pid = !!rlang::sym(rec_pid),
-        ts = !!rlang::sym(ts))
-
       # Select only the columns that will be needed later, according to g_vars. This requires checking all applicable
       # components.
-      vars <- record_source$vars
-      comp_mask <- purrr::map(components, ~.$rec_source$rec_name) == rec_name
-      related_components <- names(components)[comp_mask]
-      pairs <- purrr::cross2(related_components, vars) # Create all combinations of components and vars.
-      pairs_mask <- purrr::map(pairs, \(x) {
-        composed_name <- paste0(x[[1]], '_', x[[2]])
-        return(composed_name %in% g_vars)
-      }) |> unlist()
-
-      if(any(pairs_mask)) {
-        out_vars <- pairs[unlist(pairs_mask)] |>
-          purrr::map(~.[[2]]) |> unlist()
-
-        export_records <- export_records |>
-          dplyr::select(name, pid, ts,
-            all_of(out_vars))
-      } else {
-        export_records <- export_records |>
-          dplyr::select(name, pid, ts)
-      }
+      out_vars <- var_map |>
+        filter(rec_name == .env$rec_name) |>
+        pull(column) |>
+        unique()
+      
+      export_records <- record_source$records |>
+        dplyr::transmute(
+          name = local(rec_name),
+          pid = !!rlang::sym(record_source$rec_pid),
+          ts = !!rlang::sym(record_source$ts),
+          !!!syms(out_vars))
     }
 
     return(export_records)
   }
 
-  board <- purrr::map(record_sources, prepare_record_source) |>
+  board <- record_sources |>
+    purrr::map(prepare_record_source) |>
     purrr::reduce(dplyr::union_all)
 
-  if(.call_board) {
-    board_wide <- board |>
-      tidyr::pivot_wider(
-        names_from = name,
-        values_from = c(value_as_number, provider_id),
-        id_cols = c(pid, ts)) |>
-      dbplyr::window_order(pid, ts) |>
-      fill(!c(pid, ts))
-    return(board)
-  }
-
-# Create component columns ----------------------------------------------------------------------------------------
-  extract_vars <- function(comp_name, component) {
-    rec_name <- component$rec_source$rec_name
-    # Locate the record source, so we know what variables to extract.
-    rec_mask <- purrr::map(record_sources, ~.$rec_name) == rec_name
-    rec_vars <- purrr::map(record_sources[rec_mask], \(rec_source) {
-      if(rec_source$type == 'direct')
-        return(rec_source$vars)
-      else {
-        rec_vars <- rec_source$records |>
-          dplyr::select(!!rlang::sym(rec_source$rec_name)) |>
-          dplyr::distinct() |>
-          dplyr::pull()
-        rec_vars <- paste0(rec_source$rec_name, '_', rec_vars)
-        return(rec_vars)
-      }
-    }) |> unlist()
-
-    if(component$rec_source$type == 'direct') {
-      vars <- c(rec_vars, 'ts')
-      ts_var <- paste0(comp_name, '_ts')
-      vars_mask <- paste0(comp_name, '_', vars) %in% c(g_vars, ts_var)
-    } else {
-      vars <- unlist(rec_vars)
-      vars_mask <- vars %in% g_vars
-    }
-    vars[vars_mask]
-  }
-
+# Produce components ----------------------------------------------------------------------------------------------
   produce_component <- function(comp_name, component) {
-    rec_name <- component$rec_source$rec_name
+    columns <- var_map |>
+      filter(component_name == comp_name) |>
+      pull(column) |>
+      unique()
 
-    delay <- component$delay
-    line <- component$line
-    comp_window <- component$comp_window
-
-    vars <- extract_vars(comp_name, component)
-
-    if(component$rec_source$type == 'direct')
-      colunas <- paste0(comp_name, '_', vars, '_', calc_suffix)
-    else
-      colunas <- paste0(vars, '_', calc_suffix)
-
+    if(!is.na(component$delay) && !is.na(component$line)) {
+      stop(paste0('Component ', comp_name, ': line and delay simultaneously is not implemented.'))
+      new_records <- make_component(component,
+        line = NA,
+        delay = component$delay,
+        .passthrough = TRUE) |>
+        calculate_formula(
+          export = columns)
+      
+      component$rec_source$records <- new_records |>
+        dplyr::rename(
+          !!sym(component$rec_source$rec_pid) := pid,
+          !!sym(component$rec_source$ts) := ts) |>
+        select(-tidyr::any_of(c('row_id', 'window')))
+      
+      component$delay <- NA
+      
+      browser()
+    }
+    
+    # Add timestamp column
+    if(!component$.passthrough)
+      columns <- c(columns, 'ts')
+    
+    if(component$rec_source$type == 'direct') {
+      if(component$.passthrough || keep_names_unchanged)
+        component_columns <- columns
+      else
+          component_columns <- paste0(comp_name, '_', columns)
+    } else
+      component_columns <- columns
+    
     # Por algum motivo, o "lag()" não funciona com "range between window preceeding and delay preceeding", i.e. não é
     # possível aplicar line *e* delay em uma só chamada à função de window. O last_value() funciona com esse "range".
     if(component$rec_source$type == 'column') {
+      stop('Column-type record source is not yet supported.')
       capture_col <- component$rec_source$capture_col
-      vars_sql <- paste0('case when "name" = \'', vars, '\' then "capture_col" else null end')
+      columns_sql <- paste0('case when "name" = \'', columns, '\' then "capture_col" else null end')
     }
-    else
-      vars_sql <- paste0('case when "name" = \'', rec_name, '\' then "', vars, '" else null end')
+    else {
+      columns_sql <- paste0(
+        'case when "name" = \'', component$rec_source$rec_name, '\' then "', columns, '" else null end')
+    }
 
-    over_clause <- paste0('partition by "pid", "name" order by "ts"') #paste0('partition by "pid", "name" order by "ts"')
+    over_clause <- paste0('partition by "pid", "name" order by "ts"')
 
-    # Dar a preferência ao acesso via *line*.
-    if(!is.na(line)) {
+    # Give priority to access via *line*.
+    if(!is.na(component$line)) {
       # TODO: Test if last_value() + find_last_ignore_nulls() has better performance than just find_last_ignore_nulls().
-      sql_txts <- paste0('last_value(', vars_sql, ') over (', over_clause,
-        ' rows between unbounded preceding and ', line, ' preceding)')
+      sql_txts <- paste0('last_value(', columns_sql, ') over (', over_clause,
+        ' rows between unbounded preceding and ', component$line, ' preceding)')
     } else {
-      # Caso contrário, produzir acesso via *delay*.
-      range_start_clause <- ifelse(comp_window == Inf,
+      # Otherwise, produce access via *delay*.
+      range_start_clause <- ifelse(component$comp_window == Inf,
         'range between unbounded preceding',
-        paste0('range between \'', comp_window, '\'::interval preceding'))
+        paste0('range between \'', component$comp_window, '\'::interval preceding'))
 
-      sql_txts <- paste0('last_value(', vars_sql, ') over (', over_clause, ' ',
-        range_start_clause, ' and \'', delay, '\'::interval preceding', ')')
+      sql_txts <- paste0('last_value(', columns_sql, ') over (', over_clause, ' ',
+        range_start_clause, ' and \'', component$delay, '\'::interval preceding', ')')
     }
 
-    comandos <- purrr::map2(colunas, sql_txts,
+    commands <- purrr::map2(component_columns, sql_txts,
       ~rlang::exprs(!!..1 := dplyr::sql(!!..2))) |>
       unlist()
 
-    return(comandos)
+    return(commands)
   }
 
   # First, generate commands.
   commands <- purrr::map2(names(components), components, produce_component) |> unlist()
-
+  
   # Then, apply on the board.
   board <- dplyr::transmute(board,
-    pid, ts,
     row_id = dplyr::sql('row_number() over ()'),
+    pid, ts,
     !!!commands)
 
+  # Then fill the blanks downward with the last non-blank value.
+  board <- board |>
+    dbplyr::window_order(pid, ts) |>
+    tidyr::fill(!c(row_id, pid, ts))
 
-# Fill-in blanks --------------------------------------------------------------------------------------------------
-  # Neste ponto o componente já foi adicionado à board de valores, porém cada componente só tem valor em sua line de
-  # origem. Se o PostgreSQL suportasse IGNORE NULLS no last_value(), o trabalho terminaria aqui. Como ele não
-  # suporta, precisamos contornar o problema.
-  extract_ts_variables <- function(i) {
-    component <- components[[i]]
-    if(component$rec_source$type == 'direct') {
-      return(paste0(names(components)[i], '_ts'))
-    } else {
-      rec_vars <- extract_vars(names(components)[i], component)
-      return(paste0(rec_vars, '_ts'))
-    }
-  }
-
-  ts_variables <- purrr::map(seq(components), extract_ts_variables) |> unlist()
-
-  calc_vars <- unique(c(g_vars, ts_variables))
-  sql_txts <- paste0('phea_find_last_ignore_nulls("', calc_vars, '_', calc_suffix, '") over ',
-    '(partition by "pid" order by "ts" rows unbounded preceding)')
-
-  commands <- purrr::map2(calc_vars, sql_txts,
-    ~rlang::exprs(!!.x := dplyr::sql(!!.y))) |>
-    unlist()
-
+# Compute window --------------------------------------------------------------------------------------------------
   # The front (most recent point) of the window is column ts of the current line. The back (oldest point) is the
   # smallest among the ts's of the components.
-  sql_ts_least <- paste0('least(', paste0(ts_variables, collapse = ', '), ')')
+  if(length(unique(var_map$component_name)) > 1 && !input_is_phenotype)
+    sql_ts_least <- paste0('least(', paste0(paste0(unique(var_map$component_name), '_ts'), collapse = ', '), ')')
+  else
+    sql_ts_least <- 'ts'
 
-  # Apply the commands.
-  # The use of transmute + mutate + select(-...) is to keep the query "tight." By "tight" I mean no use of select *,
-  # that is, every step of the process passes forward only strictly what the next step needs. The hope is that this
-  # will help the SQL query optimizer and computation engine as a whole.
   board <- board |>
-    dplyr::transmute(
-      row_id, pid, ts,
-      !!!commands,
+    dplyr::mutate(
       window = ts - dplyr::sql(sql_ts_least),
       ts_row = dplyr::sql('last_value(row_id) over (partition by "pid", "ts")'))
 
@@ -607,13 +595,11 @@ calculate_formula <- function(components, fml = NULL, window = NA, export = NULL
       dplyr::filter(row_id == ts_row)
   }
 
-  # Clean temporary variables used for computing the formula.
+  # Clean temporary variables used for computing the formula and the window.
   board <- board |>
-    dplyr::select(
-      -ts_row,
-      -dplyr::any_of(setdiff(calc_vars, g_vars)))
+    dplyr::select(row_id, pid, ts, window, !!!g_vars)
 
-  # Filtrar e calcular ----------------------------------------------------------------------------------------------
+# Filter and calculate --------------------------------------------------------------------------------------------
   # Impose the time window, if any.
   if(!is.na(window))
     board <- dplyr::filter(board,
@@ -625,35 +611,51 @@ calculate_formula <- function(components, fml = NULL, window = NA, export = NULL
       head(n = lim)
 
   # Calculate the formula, if any.
+  res_vars <- NULL
   if(!is.null(fml)) {
     if(.cascaded) {
       # Compute one at a time, so that the prior result can be used in the next formula.
       for(i in seq(fml)) {
-        sql_txt <- fml[[i]]
-        board <- dplyr::mutate(board,
-          !!rlang::sym(names(fml)[i]) := dplyr::sql(sql_txt))
+        if(class(fml[[i]]) == 'list') {
+          if(any(lapply(fml[[i]], class) == 'list'))
+            stop('Formulas cannot be nested deeper than 1 level.')
+          
+          res_vars <- c(res_vars, names(fml[[i]]))
+          commands <- map2(names(fml[[i]]), fml[[i]],
+              ~rlang::exprs(!!..1 := dplyr::sql(!!..2))) |>
+            unlist()
+          board <- dplyr::mutate(board,
+            !!!commands)
+        } else {
+          res_vars <- c(res_vars, names(fml)[i])
+          sql_txt <- fml[[i]]
+          board <- dplyr::mutate(board,
+            !!rlang::sym(names(fml)[i]) := dplyr::sql(sql_txt))
+        }
       }
     } else {
+      # Check if these formulas are meant to be cascaded.
+      if(any(lapply(fml, class) == 'list'))
+        stop('Nested formulas require .cascaded = TRUE.')
+      
       # Compute them all in one statement, so that computation time is (potentially, haven't tested) minimized.
+      res_vars <- c(res_vars, names(fml))
       commands <- purrr::map2(names(fml), fml,
-        ~rlang::exprs(!!..1 := dplyr::sql(!!..2))) |>
-        unlist()
+        ~rlang::exprs(!!..1 := dplyr::sql(!!..2))) |> unlist()
 
       board <- dplyr::mutate(board,
         !!!commands)
     }
   }
 
-  # Require result to exist.
-  if(.exclude_na)
-    board <- dplyr::filter(board,
-      !is.na(!!rlang::sym(.out_var)))
-
-  # Colapsar e retornar -------------------------------------------------------------------------------------------
+# Collapse SQL and return -----------------------------------------------------------------------------------------
   # Chamar o collapse() é necessário para evitar acúmulo de código lazy com eventual erro "C stack usage is too close to
   # the limit". Vide https://github.com/tidyverse/dbplyr/issues/719. Obrigado, mgirlich!
   board <- dplyr::collapse(board, cte = TRUE)
 
+  attr(board, 'phea') <- 'phenotype'
+  attr(board, 'phea_res_vars') <- res_vars
+  
   if(.clip_sql) {
     sql_txt <- dbplyr::sql_render(board)
     writeClipboard(sql_txt)
@@ -661,96 +663,5 @@ calculate_formula <- function(components, fml = NULL, window = NA, export = NULL
   } else {
     return(board)
   }
-}
-
-
-# Phea plot -------------------------------------------------------------------------------------------------------
-library(plotly)
-#' @export
-phea_plot <- function(phen, pids = NULL) {
-  if(!is.null(pids))
-    phen <- phen |>
-      filter(pid %in% local(pids))
-
-  phen_wide <- phen |>
-    tidyr::pivot_wider(
-      names_from = name,
-      values_from = c(value_as_number, provider_id),
-      id_cols = c(pid, ts)) |>
-    dbplyr::window_order(pid, ts) |>
-    fill(!c(pid, ts))
-
-  browser()
-  phen_long <- collect(phen) |>
-    tidyr::pivot_longer(
-      cols = !c(row_id, pid, ts, window))
-
-  make_step_chart_data <- function(board_data) {
-    union_all(
-      board_data |>
-        arrange(pid, ts) |>
-        group_by(pid, name) |>
-        mutate(linha = row_number()) |>
-        ungroup(),
-      board_data |>
-        arrange(pid, ts) |>
-        group_by(pid, name) |>
-        mutate(linha = row_number()) |>
-        mutate(ts = lead(ts)) |>
-        ungroup()) |>
-      arrange(pid, ts, linha)
-    # mutate(ts = coalesce(ts, max(ts, na.rm = TRUE))) |>
-    # distinct() # Eliminates 1 row.
-  }
-
-  make_plotly_chart <- function(board_data, pid) {
-    if(all(!is.na(pid))) {
-      board_mask <- board_data$pid %in% pid
-      board_data <- board_data[board_mask,]
-    }
-
-    comp_board <- make_step_chart_data(board_data)
-
-    chart_items <- comp_board |>
-      select(name) |>
-      distinct() |>
-      pull()
-
-    plot_args <- map(chart_items, \(chart_item) {
-      res <- comp_board |>
-        filter(name == chart_item) |>
-        filter(!is.na(value))
-      if(nrow(res) > 0) {
-        res <- res |>
-          plot_ly(
-            x = ~ts,
-            y = ~value,
-            type = 'scatter',
-            mode = 'lines',
-            name = chart_item) |>
-          layout(
-            legend = list(orientation = 'h'),
-            yaxis = list(
-              range = c(
-                min(res$value, na.rm = TRUE),
-                max(res$value, na.rm = TRUE)),
-              fixedrange = TRUE))
-        return(res)
-      } else {
-        return(NULL)
-      }
-    })
-    names(plot_args) <- chart_items
-    plot_args <- plot_args |>
-      discard(is.null)
-    # mask <- unlist(lapply(plot_args, is.null))
-    # browser()
-    # plot_args <- plot_args[!mask]
-    plot_args <- c(plot_args, nrows = length(plot_args), shareX = TRUE)
-    return(
-      do.call(subplot, plot_args))
-  }
-
-  make_plotly_chart(phen_long, pid)
 }
 
