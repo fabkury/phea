@@ -12,6 +12,9 @@ knitr::opts_chunk$set(
   collapse = TRUE,
   comment = "#>"
 )
+
+# kury - credenciais.R contains the cred$pg credentials.
+source(paste0(Sys.getenv("HOME"), '/Estudo/Tecnologia/R/espinha/credenciais.R'))
 ```
 ## Background
 Phea is a framework for computing electronic [patient] phenotypes:  
@@ -78,17 +81,14 @@ First, you need to provide Phea with your SQL connection.
 ```{r setup}
 library(phea)
 
-# kury - credenciais.R contains the cred$pg credentials.
-source(paste0(Sys.getenv("HOME"), '/Estudo/Tecnologia/R/espinha/credenciais.R'))
-
 # Connect to SQL server
 dbcon <- DBI::dbConnect(
     RPostgres::Postgres(),
     host = 'localhost',
     port = 7654,
     dbname = 'fort',
-    user = cred$pg$user,
-    password = cred$pg$pass)
+    user = cred$pg$user, # Credentials not declared in this file
+    password = cred$pg$pass) # Credentials not declared in this file
     
 # Setup Phea and define cdm_new_york3 as default schema.
 setup_phea(
@@ -306,8 +306,8 @@ phen <- calculate_formula(
 dplyr::collect(head(phen)) |> knitr::kable()
 ```
 
-As of now, `line` and `delay` **cannot** be used simultaneously in the same component (this is yet to be implemented).
-If both are provided, `line` is considered and `delay` is ignored. `delay` is only considered when `line = NA`.  
+As of now, `line` and `delay` **cannot** be used simultaneously in the same component. This is a planned feature. If
+both are provided, `line` is considered and `delay` is ignored. `delay` is only considered when `line = NA`.  
   
   
 ## Author contact

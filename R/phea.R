@@ -186,7 +186,6 @@ make_component <- function(input_source, line = NA, delay = NA, window = Inf, re
           ts = ts,
           pid = pid)
       } else {
-        # component$rec_source <- input_source
         if('tbl_lazy' %in% class(input_source)) {
           component$rec_source <- make_record_source(
             records = input_source,
@@ -311,15 +310,15 @@ make_record_source <- function(records, rec_name = NULL, ts, pid, vars = NULL, .
 #' @param .lim Maximum number of rows to return. This is imposed before the calculation of the formula.
 #' @param .dont_require If provided, causes formula to require all components (regardless of .require_all), except for
 #' those listed here.
-#' @param .cascaded If `TRUE`, each formula is computed in a separate, nested SELECT statement. This allows the result
-#' of the prior formula to be used in the following, at the potential cost of longer computation times.
+#' @param .cascaded If `TRUE` (default), each formula is computed in a separate, nested SELECT statement. This allows
+#' the result of the prior formula to be used in the following, at the potential cost of longer computation times.
 #' @param .clip_sql If `TRUE`, instead of lazy table it returns the SQL query as a SQL object (can be converted to
 #' character using `as.character()`), and also copies it to the clipboard.
 #' @return Lazy table with result of formula or formulas.
 calculate_formula <- function(components, fml = NULL, window = NA, export = NULL, add_components = NULL,
   .ts = NULL, .pid = NULL, .rec_name = NULL, .delay = NULL, .line = NULL,
   .require_all = FALSE, .lim = NA, .dont_require = NULL,
-  .cascaded = FALSE, .clip_sql = FALSE) {
+  .cascaded = TRUE, .clip_sql = FALSE) {
 # Prepare ---------------------------------------------------------------------------------------------------------
   # TODO: Improve the logic regarding these two variables below.
   keep_names_unchanged <- FALSE

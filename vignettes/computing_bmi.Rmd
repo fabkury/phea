@@ -1,0 +1,80 @@
+---
+title: "computing_bmi"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{computing_bmi}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+library(knitr)
+opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+# kury - credenciais.R contains the cred$pg credentials.
+source(paste0(Sys.getenv("HOME"), '/Estudo/Tecnologia/R/espinha/credenciais.R'))
+```
+
+```{r setup}
+library(phea)
+library(dplyr)
+
+# Connect to SQL server.
+dbcon <- DBI::dbConnect(
+    RPostgres::Postgres(),
+    host = 'localhost',
+    port = 7654,
+    dbname = 'fort',
+    user = cred$pg$user,
+    password = cred$pg$pass)
+
+# Provide the connection to Phea so we can use the sqlt() and sql0() shorthands.
+setup_phea(dbcon, 'cdm_new_york3')
+
+
+# Weight records
+# Loinc 29463-7 Body weight, concept ID 3025315
+weight <- sqlt(measurement) |>
+  filter(measurement_concept_id == 3025315) |>
+  make_component(
+    .ts = measurement_datetime,
+    .pid = person_id)
+
+# Height records
+# Loinc 8302-2 Body height, concept ID 3036277
+height <- sqlt(measurement) |>
+  filter(measurement_concept_id == 3036277) |>
+  make_component(
+    .ts = measurement_datetime,
+    .pid = person_id)
+
+# BMI phenotype
+bmi <- calculate_formula(
+  components = list(
+    weight = weight,
+    height = height),
+  fml = list(
+    height_in_meters = 'height_value_as_number / 100',
+    bmi = 'weight_value_as_number / (height_in_meters * height_in_meters)'))
+
+kable(head_shot(bmi))
+```
+
+```{r}
+# See summary statistics
+# kable(head_shot(
+#   bmi |>
+#     group_by(pid) |>
+#     summarise(
+#       min_bmi = min(bmi, na.rm = TRUE),
+#       avg_bmi = mean(bmi, na.rm = TRUE),
+#       max_bmi = max(bmi, na.rm = TRUE),
+#       n_distinct_bmi = n_distinct(bmi))
+# ))
+```
+
+```{r, include = FALSE}
+DBI::dbDisconnect(dbcon)
+```
