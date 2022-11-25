@@ -11,7 +11,7 @@
 
 
 
-<title>Computing body mass index</title>
+<title>Getting started with Phea</title>
 
 <script>// Pandoc 2.9 adds attributes on both header and div. We remove the former (to
 // be compatible with the behavior of Pandoc < 2.8).
@@ -348,105 +348,933 @@ display: none;
 
 
 
-<h1 class="title toc-ignore">Computing body mass index</h1>
+<h1 class="title toc-ignore">Getting started with Phea</h1>
 
 </div>
 
 
-<p>Here we compute the body mass index (BMI) formula:</p>
-<p><code>body_mass_index = body_weight / (body_height * body_height)</code></p>
-<p>The formula assumes weight is in kilograms, and height in
-meters.<br />
-Furthermore, this vignette assumes:</p>
+<div id="background" class="section level2">
+<h2>Background</h2>
+<p>Phea is a framework for computing electronic [patient]
+phenotypes:</p>
 <ul>
-<li>You have a SQL server at <code>localhost</code>. This example uses
-PostgreSQL.</li>
-<li>You have an OMOP Common Data Model v5.4 in schema
-<code>cdm_new_york3</code> in that server.</li>
-<li>Body weight records are in table <code>MEASUREMENT</code>, with
-<code>measurement_concept_id</code> of <code>3025315</code>,
-<code>Loinc 29463-7 Body weight</code>.</li>
-<li>Body height records are in table <code>MEASUREMENT</code>, with
-<code>measurement_concept_id</code> of <code>3036277</code>,
-<code>Loinc 8302-2 Body height</code>.</li>
+<li>using formulas written in SQL language,<br />
+</li>
+<li>and without using SQL joins.</li>
 </ul>
-<div id="setup-phea" class="section level2">
-<h2>Setup Phea</h2>
-<p>First we connect to the server and call <code>setup_phea()</code>.
-Calling <code>setup_phea()</code> is optional, but it allows us to use
-the convenience functions <code>slqt()</code> and
-<code>sql0()</code>.</p>
+<p>The intended use case is where you have a database with patient
+records and want to compute a formula. However, in principle, Phea’s
+approach need not be restricted to this intended use case.</p>
+<p>Phea passes the formula unmodified to the SQL query, so it need not
+be restricted to mathematical operators. It can include any SQL
+expression that would be valid in a <code>SELECT</code> statement, such
+as <code>CASE WHEN ...</code> expressions and function calls.</p>
+<p>To use Phea, you need a DBI connection to the SQL server, generated
+by functions such as <code>DBI::dbConnect()</code> or
+<code>DatabaseConnector::connect()</code>.</p>
+</div>
+<div id="intuition" class="section level2">
+<h2>Intuition</h2>
+<p><em>Phea goes over patient records in chronological order.</em> Say
+you want to compute a formula:</p>
+<p><code>body_mass_index = body_weight / (body_height * body_height)</code></p>
+<p>Phea will compute <code>body_mass_index</code> for each person using
+the most recently available data at each point in time.</p>
+<p>In this example, the formula depends on <code>body_weight</code> and
+<code>body_height</code>. Therefore, their timestamps will bethe
+timestamps for the resulting <code>body_mass_index</code>. This means
+that at every point in time where there is a <code>body_weight</code>
+<em>or</em> <code>body_height</code> a record for a given patient, Phea
+will try to calculate <code>body_mass_index</code> again.</p>
+<p>Suppose a patient had a <code>body_weight = 75 kg</code> measurement
+on May 1st, a <code>body_height = 1.8 meters</code> on August 1st, then
+a new <code>body_weight = 79 kg</code> on October 1st. Phea would
+produce 3 result rows as follows:</p>
+<p><em>May 1st:</em><br />
+<code>body_weight = 75 kg</code><br />
+<code>body_height = NULL</code><br />
+<code>body_mass_index = 75 / (NULL * NULL) = NULL</code></p>
+<p><em>August 1st:</em><br />
+<code>body_weight = 75 kg</code><br />
+<code>body_height = 1.8 meters</code><br />
+<code>body_mass_index = 75 / (1.8 * 1.8) = 23.14815</code></p>
+<p><em>October 1st:</em><br />
+<code>body_weight = 79 kg</code><br />
+<code>body_height = 1.8 meters</code><br />
+<code>body_mass_index = 79 / (1.8 * 1.8) = 24.38272</code></p>
+<p>The algorithm continues as long as new records are avaialable. For
+example, if on November 1st a new record
+<code>body_height = 1.78 meters</code> appears, the result would be:</p>
+<p><em>November 1st:</em><br />
+<code>body_weight = 79 kg</code><br />
+<code>body_height = 1.78 meters</code><br />
+<code>body_mass_index = 75 / (1.78 * 1.78) = 24.93372</code></p>
+<p>At each point in time, the most recently available data is used,
+unless you specify otherwise when creating a component.</p>
+</div>
+<div id="how-to-set-up" class="section level2">
+<h2>How to set up</h2>
+<p>First, you need to provide Phea with your SQL connection.
+<strong>While Phea is not necessarily restricted to PostgreSQL, this is
+the only SQL flavor where it has been tested.</strong></p>
 <pre class="r"><code>library(phea)
-suppressPackageStartupMessages(library(dplyr))
 
-# Connect to SQL server.
+# Connect to SQL server
 dbcon &lt;- DBI::dbConnect(
     RPostgres::Postgres(),
     host = &#39;localhost&#39;,
     port = 7654,
     dbname = &#39;fort&#39;,
-    user = cred$pg$user,
-    password = cred$pg$pass)
-
-# Provide the connection to Phea so we can use the sqlt() and sql0() shorthands.
-setup_phea(dbcon, &#39;cdm_new_york3&#39;)</code></pre>
+    user = cred$pg$user, # Credentials not declared in this file
+    password = cred$pg$pass) # Credentials not declared in this file
+    
+# Setup Phea and define cdm_new_york3 as default schema.
+setup_phea(
+  connection = dbcon,
+  schema = &#39;cdm_new_york3&#39;)</code></pre>
+<p><code>setup_phea()</code> will save <code>dbi_connection</code> and
+<code>def_schema</code> for use by functions <code>sql0()</code> and
+<code>sqlt()</code>. Most importantly, however, it will install two
+user-defined functions on the SQL server
+(<code>phea_coalesce_r_sfunc</code> and
+<code>phea_find_last_ignore_nulls</code>), if they are not already
+there.</p>
 </div>
-<div id="create-components" class="section level2">
-<h2>Create components</h2>
-<p><code>make_component()</code> receives a lazy table
-(<code>dbplyr</code>/<code>dplyr</code> interface) and returns a
-component to use in <code>calculate_formula()</code>.<br />
-We must specify which column (in the lazy table) is the timestamp, and
-which column is the patient ID. Notice that we don’t use quotes ““.</p>
-<pre class="r"><code># Weight records
-# Loinc 29463-7 Body weight, concept ID 3025315
-weight &lt;- sqlt(measurement) |&gt;
-  filter(measurement_concept_id == 3025315) |&gt;
-  make_component(
-    .ts = measurement_datetime,
-    .pid = person_id)
+<div id="how-to-compute-a-formula" class="section level2">
+<h2>How to compute a formula</h2>
+<p>Each formula computation comes from combining three parts:</p>
+<ul>
+<li>One or more <code>record sources</code><br />
+</li>
+<li>One or more <code>components</code><br />
+</li>
+<li>One or more <code>formulas</code></li>
+</ul>
+<p>A <code>record source</code> is any SQL query that provides data you
+want to use. Its records are assigned a label <code>rec_name</code>. The
+<code>record source</code> is assumed to be a <em>long table</em>, that
+is, each row corresponds to one record. At a minimum, each row in a
+<code>record source</code> must have a patient identifier
+(<code>pid</code>) column and a timestamp (<code>ts</code>) column.</p>
+<p>For exemple, suppose you have an OMOP Common Data Model schema called
+<code>cdm_new_york3</code>, and you would like to compute a formula
+involving a patient’s hemoglobin A1c level.<br />
+- Such hemoglobin records are in table <code>measurement</code> inside
+schema <code>cdm_new_york3</code>.<br />
+- They are identified by the OMOP CDM concept_id of <code>3004410</code>
+(corresponds to LOINC code <code>4548-4</code>,
+<code>Hemoglobin A1c/Hemoglobin.total in Blood</code>).<br />
+- The patient identifiers are in column <code>person_id</code><br />
+- The timestamps are in column <code>measurement_datetime</code>.<br />
+- In the formula, we want to refer to this value as “hemo_a1c”.</p>
+<p>Let’s create the record source:</p>
+<pre class="r"><code>hemoglobin_query &lt;- sql0(&#39;
+  select * from cdm_new_york3.measurement
+  where measurement_concept_id = 3004410
+&#39;)
 
-# Height records
-# Loinc 8302-2 Body height, concept ID 3036277
-height &lt;- sqlt(measurement) |&gt;
-  filter(measurement_concept_id == 3036277) |&gt;
-  make_component(
-    .ts = measurement_datetime,
-    .pid = person_id)</code></pre>
-<p><code>sqlt(measurement)</code> returns a reference (lazy table) to
-table <code>MEASUREMENT</code> in <code>cdm_new_york3</code>.
-<code>dplyr::filter()</code> selects the desired records using a SQL
-<code>WHERE</code> statement.</p>
-</div>
-<div id="calculate-the-phenotype" class="section level2">
-<h2>Calculate the phenotype</h2>
-<p>Each component goes inside a <code>list</code> in the call to
-<code>calculate_formula()</code>. The names of the list items become the
-names available to use in the formula. For example, if you want the
-<code>value_as_number</code> column from component <code>height</code>,
-use <code>height_value_as_number</code>.<br />
-Notice that, because the body height records in cdm_new_york3 are in
-centimeters, we use a separate formula to produce
-<code>height_in_meters</code>.</p>
-<pre class="r"><code># BMI phenotype
-bmi &lt;- calculate_formula(
+hemoglobin_record_source &lt;- make_record_source(
+  records = hemoglobin_query,
+  ts = measurement_datetime,
+  pid = person_id)</code></pre>
+<p>A <code>component</code> is a specification of what records to pick
+from <code>record source</code>. If you just want the most recently
+available record, the default values need not be overriden:</p>
+<pre class="r"><code>hemoglobin_component &lt;- make_component(
+  input_source = hemoglobin_record_source)</code></pre>
+<p>The <code>hemoglobin_component</code> can now be used to call
+<code>calculate_formula()</code>. For the sake of the example, let us
+suppose the phenotype <code>phen</code> that you want to compute is
+merely the square root of the patient’s hemoglobin A1c level.</p>
+<p><code>phen = sqrt(hemoglobin A1c level)</code></p>
+<p>The numeric value hemoglobin A1c is located in column
+<code>value_as_number</code> within the record source. The call to
+<code>calculate_formula()</code> is then:</p>
+<pre class="r"><code>phen &lt;- calculate_formula(
   components = list(
-    weight = weight,
-    height = height),
+    hemo_a1c = hemoglobin_component),
+  fml = &#39;sqrt(hemo_a1c_value_as_number)&#39;)</code></pre>
+<p>Phea automatically recognizes that
+<code>hemo_a1c_value_as_number</code> means column
+<code>value_as_number</code> in the SQL table associated with component
+<code>hemo_a1c</code>.</p>
+<p>Object <code>phen</code> is a lazy table in the
+<code>dplyr</code>/<code>dbplyr</code> framework. It can be materialized
+into a tibble by calling <code>collect()</code>, or manipulated further
+using Phea or <code>dplyr</code>/<code>dbplyr</code>.</p>
+<pre class="r"><code>dplyr::collect(head(phen)) |&gt; knitr::kable()</code></pre>
+<table>
+<thead>
+<tr class="header">
+<th align="right">row_id</th>
+<th align="right">pid</th>
+<th align="left">ts</th>
+<th align="left">window</th>
+<th align="right">hemo_a1c_value_as_number</th>
+<th align="right">value</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="right">1</td>
+<td align="right">1</td>
+<td align="left">2011-05-20</td>
+<td align="left">00:00:00</td>
+<td align="right">6.9</td>
+<td align="right">2.626785</td>
+</tr>
+<tr class="even">
+<td align="right">2</td>
+<td align="right">1</td>
+<td align="left">2014-03-07</td>
+<td align="left">00:00:00</td>
+<td align="right">6.9</td>
+<td align="right">2.626785</td>
+</tr>
+<tr class="odd">
+<td align="right">3</td>
+<td align="right">1</td>
+<td align="left">2016-03-11</td>
+<td align="left">00:00:00</td>
+<td align="right">6.9</td>
+<td align="right">2.626785</td>
+</tr>
+<tr class="even">
+<td align="right">4</td>
+<td align="right">1</td>
+<td align="left">2018-03-16</td>
+<td align="left">00:00:00</td>
+<td align="right">6.9</td>
+<td align="right">2.626785</td>
+</tr>
+<tr class="odd">
+<td align="right">5</td>
+<td align="right">1</td>
+<td align="left">2020-03-20</td>
+<td align="left">00:00:00</td>
+<td align="right">6.9</td>
+<td align="right">2.626785</td>
+</tr>
+<tr class="even">
+<td align="right">6</td>
+<td align="right">1</td>
+<td align="left">2022-02-11</td>
+<td align="left">00:00:00</td>
+<td align="right">6.9</td>
+<td align="right">2.626785</td>
+</tr>
+</tbody>
+</table>
+<p>To obtain just the SQL code, <code>sql_render()</code> can be used,
+or the option <code>.clip_sql</code> in
+<code>calculate_formula()</code>:</p>
+<pre class="r"><code>dbplyr::sql_render(phen)
+#&gt; &lt;SQL&gt; SELECT
+#&gt;   &quot;row_id&quot;,
+#&gt;   &quot;pid&quot;,
+#&gt;   &quot;ts&quot;,
+#&gt;   &quot;window&quot;,
+#&gt;   &quot;hemo_a1c_value_as_number&quot;,
+#&gt;   sqrt(hemo_a1c_value_as_number) AS &quot;value&quot;
+#&gt; FROM (
+#&gt;   SELECT
+#&gt;     *,
+#&gt;     &quot;ts&quot; - ts AS &quot;window&quot;,
+#&gt;     last_value(row_id) over (partition by &quot;pid&quot;, &quot;ts&quot;) AS &quot;ts_row&quot;
+#&gt;   FROM (
+#&gt;     SELECT
+#&gt;       &quot;row_id&quot;,
+#&gt;       &quot;pid&quot;,
+#&gt;       &quot;ts&quot;,
+#&gt;       MAX(&quot;hemo_a1c_value_as_number&quot;) OVER (PARTITION BY &quot;..dbplyr_partion_1&quot;) AS &quot;hemo_a1c_value_as_number&quot;,
+#&gt;       MAX(&quot;hemo_a1c_ts&quot;) OVER (PARTITION BY &quot;..dbplyr_partion_2&quot;) AS &quot;hemo_a1c_ts&quot;
+#&gt;     FROM (
+#&gt;       SELECT
+#&gt;         *,
+#&gt;         SUM(CASE WHEN ((&quot;hemo_a1c_value_as_number&quot; IS NULL)) THEN 0 ELSE 1 END) OVER (ORDER BY &quot;pid&quot;, &quot;ts&quot; ROWS UNBOUNDED PRECEDING) AS &quot;..dbplyr_partion_1&quot;,
+#&gt;         SUM(CASE WHEN ((&quot;hemo_a1c_ts&quot; IS NULL)) THEN 0 ELSE 1 END) OVER (ORDER BY &quot;pid&quot;, &quot;ts&quot; ROWS UNBOUNDED PRECEDING) AS &quot;..dbplyr_partion_2&quot;
+#&gt;       FROM (
+#&gt;         SELECT
+#&gt;           row_number() over () AS &quot;row_id&quot;,
+#&gt;           &quot;pid&quot;,
+#&gt;           &quot;ts&quot;,
+#&gt;           last_value(case when &quot;name&quot; = &#39;d08hxb754l2e&#39; then &quot;value_as_number&quot; else null end) over (partition by &quot;pid&quot;, &quot;name&quot; order by &quot;ts&quot; rows between unbounded preceding and 0 preceding) AS &quot;hemo_a1c_value_as_number&quot;,
+#&gt;           last_value(case when &quot;name&quot; = &#39;d08hxb754l2e&#39; then &quot;ts&quot; else null end) over (partition by &quot;pid&quot;, &quot;name&quot; order by &quot;ts&quot; rows between unbounded preceding and 0 preceding) AS &quot;hemo_a1c_ts&quot;
+#&gt;         FROM (
+#&gt;           SELECT
+#&gt;             &#39;d08hxb754l2e&#39; AS &quot;name&quot;,
+#&gt;             &quot;person_id&quot; AS &quot;pid&quot;,
+#&gt;             &quot;measurement_datetime&quot; AS &quot;ts&quot;,
+#&gt;             &quot;value_as_number&quot;
+#&gt;           FROM (
+#&gt; 
+#&gt;   select * from cdm_new_york3.measurement
+#&gt;   where measurement_concept_id = 3004410
+#&gt; 
+#&gt;           ) &quot;q01&quot;
+#&gt;         ) &quot;q02&quot;
+#&gt;       ) &quot;q03&quot;
+#&gt;     ) &quot;q04&quot;
+#&gt;   ) &quot;q05&quot;
+#&gt; ) &quot;q06&quot;
+#&gt; WHERE (&quot;row_id&quot; = &quot;ts_row&quot;)</code></pre>
+<p>Notice that the result of the
+<code>sqrt(hemo_a1c_value_as_number)</code> is in column
+<code>value</code>. This can be changed by giving a name to the formula
+in the call to <code>calculate_formula()</code>:</p>
+<pre class="r"><code>phen &lt;- calculate_formula(
+  components = list(
+    hemo_a1c = hemoglobin_component),
   fml = list(
-    height_in_meters = &#39;height_value_as_number / 100&#39;,
-    bmi = &#39;weight_value_as_number / (height_in_meters * height_in_meters)&#39;))
+    a1c_sqrt = &#39;sqrt(hemo_a1c_value_as_number)&#39;))
 
-kable(head_shot(bmi, blind = TRUE))</code></pre>
+dplyr::collect(head(phen)) |&gt; knitr::kable()</code></pre>
+<table>
+<thead>
+<tr class="header">
+<th align="right">row_id</th>
+<th align="right">pid</th>
+<th align="left">ts</th>
+<th align="left">window</th>
+<th align="right">hemo_a1c_value_as_number</th>
+<th align="right">a1c_sqrt</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="right">1</td>
+<td align="right">1</td>
+<td align="left">2011-05-20</td>
+<td align="left">00:00:00</td>
+<td align="right">6.9</td>
+<td align="right">2.626785</td>
+</tr>
+<tr class="even">
+<td align="right">2</td>
+<td align="right">1</td>
+<td align="left">2014-03-07</td>
+<td align="left">00:00:00</td>
+<td align="right">6.9</td>
+<td align="right">2.626785</td>
+</tr>
+<tr class="odd">
+<td align="right">3</td>
+<td align="right">1</td>
+<td align="left">2016-03-11</td>
+<td align="left">00:00:00</td>
+<td align="right">6.9</td>
+<td align="right">2.626785</td>
+</tr>
+<tr class="even">
+<td align="right">4</td>
+<td align="right">1</td>
+<td align="left">2018-03-16</td>
+<td align="left">00:00:00</td>
+<td align="right">6.9</td>
+<td align="right">2.626785</td>
+</tr>
+<tr class="odd">
+<td align="right">5</td>
+<td align="right">1</td>
+<td align="left">2020-03-20</td>
+<td align="left">00:00:00</td>
+<td align="right">6.9</td>
+<td align="right">2.626785</td>
+</tr>
+<tr class="even">
+<td align="right">6</td>
+<td align="right">1</td>
+<td align="left">2022-02-11</td>
+<td align="left">00:00:00</td>
+<td align="right">6.9</td>
+<td align="right">2.626785</td>
+</tr>
+</tbody>
+</table>
+<p>Multiple formulas can be computed at once:</p>
+<pre class="r"><code>phen &lt;- calculate_formula(
+  components = list(
+    hemo_a1c = hemoglobin_component),
+  fml = list(
+    a1c_sqrt = &#39;sqrt(hemo_a1c_value_as_number)&#39;,
+    a1c_cubed = &#39;hemo_a1c_value_as_number * hemo_a1c_value_as_number * hemo_a1c_value_as_number&#39;))
+
+dplyr::collect(head(phen)) |&gt; knitr::kable()</code></pre>
+<table style="width:100%;">
+<colgroup>
+<col width="9%" />
+<col width="5%" />
+<col width="14%" />
+<col width="12%" />
+<col width="33%" />
+<col width="12%" />
+<col width="13%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th align="right">row_id</th>
+<th align="right">pid</th>
+<th align="left">ts</th>
+<th align="left">window</th>
+<th align="right">hemo_a1c_value_as_number</th>
+<th align="right">a1c_sqrt</th>
+<th align="right">a1c_cubed</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="right">1</td>
+<td align="right">1</td>
+<td align="left">2011-05-20</td>
+<td align="left">00:00:00</td>
+<td align="right">6.9</td>
+<td align="right">2.626785</td>
+<td align="right">328.509</td>
+</tr>
+<tr class="even">
+<td align="right">2</td>
+<td align="right">1</td>
+<td align="left">2014-03-07</td>
+<td align="left">00:00:00</td>
+<td align="right">6.9</td>
+<td align="right">2.626785</td>
+<td align="right">328.509</td>
+</tr>
+<tr class="odd">
+<td align="right">3</td>
+<td align="right">1</td>
+<td align="left">2016-03-11</td>
+<td align="left">00:00:00</td>
+<td align="right">6.9</td>
+<td align="right">2.626785</td>
+<td align="right">328.509</td>
+</tr>
+<tr class="even">
+<td align="right">4</td>
+<td align="right">1</td>
+<td align="left">2018-03-16</td>
+<td align="left">00:00:00</td>
+<td align="right">6.9</td>
+<td align="right">2.626785</td>
+<td align="right">328.509</td>
+</tr>
+<tr class="odd">
+<td align="right">5</td>
+<td align="right">1</td>
+<td align="left">2020-03-20</td>
+<td align="left">00:00:00</td>
+<td align="right">6.9</td>
+<td align="right">2.626785</td>
+<td align="right">328.509</td>
+</tr>
+<tr class="even">
+<td align="right">6</td>
+<td align="right">1</td>
+<td align="left">2022-02-11</td>
+<td align="left">00:00:00</td>
+<td align="right">6.9</td>
+<td align="right">2.626785</td>
+<td align="right">328.509</td>
+</tr>
+</tbody>
+</table>
+<p>If you need to use the result of one formula in the next one, set
+<code>.cascaded = TRUE</code>:</p>
+<pre class="r"><code>phen &lt;- calculate_formula(
+  components = list(
+    hemo_a1c = hemoglobin_component),
+  fml = list(
+    a1c_sqrt = &#39;sqrt(hemo_a1c_value_as_number)&#39;,
+    a1c_half_sqrt = &#39;a1c_sqrt / 2&#39;),
+  .cascaded = TRUE)
+
+dplyr::collect(head(phen)) |&gt; knitr::kable()</code></pre>
 <table>
 <colgroup>
-<col width="6%" />
-<col width="3%" />
-<col width="10%" />
 <col width="8%" />
-<col width="22%" />
-<col width="22%" />
+<col width="5%" />
+<col width="13%" />
+<col width="11%" />
+<col width="31%" />
+<col width="11%" />
+<col width="17%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th align="right">row_id</th>
+<th align="right">pid</th>
+<th align="left">ts</th>
+<th align="left">window</th>
+<th align="right">hemo_a1c_value_as_number</th>
+<th align="right">a1c_sqrt</th>
+<th align="right">a1c_half_sqrt</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="right">1</td>
+<td align="right">1</td>
+<td align="left">2011-05-20</td>
+<td align="left">00:00:00</td>
+<td align="right">6.9</td>
+<td align="right">2.626785</td>
+<td align="right">1.313393</td>
+</tr>
+<tr class="even">
+<td align="right">2</td>
+<td align="right">1</td>
+<td align="left">2014-03-07</td>
+<td align="left">00:00:00</td>
+<td align="right">6.9</td>
+<td align="right">2.626785</td>
+<td align="right">1.313393</td>
+</tr>
+<tr class="odd">
+<td align="right">3</td>
+<td align="right">1</td>
+<td align="left">2016-03-11</td>
+<td align="left">00:00:00</td>
+<td align="right">6.9</td>
+<td align="right">2.626785</td>
+<td align="right">1.313393</td>
+</tr>
+<tr class="even">
+<td align="right">4</td>
+<td align="right">1</td>
+<td align="left">2018-03-16</td>
+<td align="left">00:00:00</td>
+<td align="right">6.9</td>
+<td align="right">2.626785</td>
+<td align="right">1.313393</td>
+</tr>
+<tr class="odd">
+<td align="right">5</td>
+<td align="right">1</td>
+<td align="left">2020-03-20</td>
+<td align="left">00:00:00</td>
+<td align="right">6.9</td>
+<td align="right">2.626785</td>
+<td align="right">1.313393</td>
+</tr>
+<tr class="even">
+<td align="right">6</td>
+<td align="right">1</td>
+<td align="left">2022-02-11</td>
+<td align="left">00:00:00</td>
+<td align="right">6.9</td>
+<td align="right">2.626785</td>
+<td align="right">1.313393</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div id="example-with-more-components" class="section level2">
+<h2>Example with more components</h2>
+<p>So far the examples showed formulas with only one component. Suppose
+you would like to compute:<br />
+<code>phen = sqrt([hemoglobin a1c]) * [patient&#39;s age at the time of measurement]</code></p>
+<p>To obtain the patient’s age, we can collect the date of birth from
+table <code>person</code>, then create a component from it.</p>
+<pre class="r"><code>person_records &lt;- make_record_source(
+  records = sqlt(person),
+  ts = birth_datetime,
+  pid = person_id)
+
+person_component &lt;- make_component(person_records)
+
+phen &lt;- calculate_formula(
+  components = list(
+    hemo_a1c = hemoglobin_component,
+    person = person_component),
+  fml = list(
+    pat_age = &#39;age(hemo_a1c_measurement_datetime, person_birth_datetime)&#39;,
+    a1c_times_age = &#39;hemo_a1c_value_as_number * extract(year from pat_age)&#39;),
+  .cascaded = TRUE)
+
+dplyr::collect(head(phen)) |&gt; knitr::kable()</code></pre>
+<table>
+<colgroup>
+<col width="4%" />
+<col width="2%" />
+<col width="7%" />
+<col width="7%" />
+<col width="20%" />
+<col width="14%" />
 <col width="16%" />
+<col width="16%" />
+<col width="9%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th align="right">row_id</th>
+<th align="right">pid</th>
+<th align="left">ts</th>
+<th align="left">window</th>
+<th align="left">hemo_a1c_measurement_datetime</th>
+<th align="left">person_birth_datetime</th>
+<th align="right">hemo_a1c_value_as_number</th>
+<th align="left">pat_age</th>
+<th align="right">a1c_times_age</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="right">8</td>
+<td align="right">1</td>
+<td align="left">1974-03-01</td>
+<td align="left">00:00:00</td>
+<td align="left">NA</td>
+<td align="left">1974-03-01</td>
+<td align="right">NA</td>
+<td align="left">NA</td>
+<td align="right">NA</td>
+</tr>
+<tr class="even">
+<td align="right">1</td>
+<td align="right">1</td>
+<td align="left">2011-05-20</td>
+<td align="left">13594 days</td>
+<td align="left">2011-05-20</td>
+<td align="left">1974-03-01</td>
+<td align="right">6.9</td>
+<td align="left">37 years 2 mons 19 days</td>
+<td align="right">255.3</td>
+</tr>
+<tr class="odd">
+<td align="right">2</td>
+<td align="right">1</td>
+<td align="left">2014-03-07</td>
+<td align="left">14616 days</td>
+<td align="left">2014-03-07</td>
+<td align="left">1974-03-01</td>
+<td align="right">6.9</td>
+<td align="left">40 years 6 days</td>
+<td align="right">276.0</td>
+</tr>
+<tr class="even">
+<td align="right">3</td>
+<td align="right">1</td>
+<td align="left">2016-03-11</td>
+<td align="left">15351 days</td>
+<td align="left">2016-03-11</td>
+<td align="left">1974-03-01</td>
+<td align="right">6.9</td>
+<td align="left">42 years 10 days</td>
+<td align="right">289.8</td>
+</tr>
+<tr class="odd">
+<td align="right">4</td>
+<td align="right">1</td>
+<td align="left">2018-03-16</td>
+<td align="left">16086 days</td>
+<td align="left">2018-03-16</td>
+<td align="left">1974-03-01</td>
+<td align="right">6.9</td>
+<td align="left">44 years 15 days</td>
+<td align="right">303.6</td>
+</tr>
+<tr class="even">
+<td align="right">5</td>
+<td align="right">1</td>
+<td align="left">2020-03-20</td>
+<td align="left">16821 days</td>
+<td align="left">2020-03-20</td>
+<td align="left">1974-03-01</td>
+<td align="right">6.9</td>
+<td align="left">46 years 19 days</td>
+<td align="right">317.4</td>
+</tr>
+</tbody>
+</table>
+<p>Phea includes in the result all data points used in the formula
+computation. If other columns from the same rows are wanted,
+<code>export =</code> can be used:</p>
+<pre class="r"><code>phen &lt;- calculate_formula(
+  components = list(
+    hemo_a1c = hemoglobin_component,
+    person = person_component),
+  fml = list(
+    pat_age = &#39;age(hemo_a1c_measurement_datetime, person_birth_datetime)&#39;,
+    a1c_times_age = &#39;hemo_a1c_value_as_number * extract(year from pat_age)&#39;),
+  .cascaded = TRUE,
+  export = c(
+    &#39;hemo_a1c_provider_id&#39;,
+    &#39;hemo_a1c_visit_occurrence_id&#39;,
+    &#39;person_gender_concept_id&#39;))
+
+dplyr::collect(head(phen)) |&gt; knitr::kable()</code></pre>
+<table>
+<colgroup>
+<col width="3%" />
+<col width="1%" />
+<col width="4%" />
+<col width="4%" />
+<col width="13%" />
+<col width="9%" />
+<col width="11%" />
+<col width="9%" />
+<col width="13%" />
+<col width="11%" />
+<col width="10%" />
+<col width="6%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th align="right">row_id</th>
+<th align="right">pid</th>
+<th align="left">ts</th>
+<th align="left">window</th>
+<th align="left">hemo_a1c_measurement_datetime</th>
+<th align="left">person_birth_datetime</th>
+<th align="right">hemo_a1c_value_as_number</th>
+<th align="right">hemo_a1c_provider_id</th>
+<th align="right">hemo_a1c_visit_occurrence_id</th>
+<th align="right">person_gender_concept_id</th>
+<th align="left">pat_age</th>
+<th align="right">a1c_times_age</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="right">8</td>
+<td align="right">1</td>
+<td align="left">1974-03-01</td>
+<td align="left">00:00:00</td>
+<td align="left">NA</td>
+<td align="left">1974-03-01</td>
+<td align="right">NA</td>
+<td align="right">NA</td>
+<td align="right">NA</td>
+<td align="right">8507</td>
+<td align="left">NA</td>
+<td align="right">NA</td>
+</tr>
+<tr class="even">
+<td align="right">1</td>
+<td align="right">1</td>
+<td align="left">2011-05-20</td>
+<td align="left">13594 days</td>
+<td align="left">2011-05-20</td>
+<td align="left">1974-03-01</td>
+<td align="right">6.9</td>
+<td align="right">22084</td>
+<td align="right">21</td>
+<td align="right">8507</td>
+<td align="left">37 years 2 mons 19 days</td>
+<td align="right">255.3</td>
+</tr>
+<tr class="odd">
+<td align="right">2</td>
+<td align="right">1</td>
+<td align="left">2014-03-07</td>
+<td align="left">14616 days</td>
+<td align="left">2014-03-07</td>
+<td align="left">1974-03-01</td>
+<td align="right">6.9</td>
+<td align="right">27</td>
+<td align="right">24</td>
+<td align="right">8507</td>
+<td align="left">40 years 6 days</td>
+<td align="right">276.0</td>
+</tr>
+<tr class="even">
+<td align="right">3</td>
+<td align="right">1</td>
+<td align="left">2016-03-11</td>
+<td align="left">15351 days</td>
+<td align="left">2016-03-11</td>
+<td align="left">1974-03-01</td>
+<td align="right">6.9</td>
+<td align="right">22084</td>
+<td align="right">19</td>
+<td align="right">8507</td>
+<td align="left">42 years 10 days</td>
+<td align="right">289.8</td>
+</tr>
+<tr class="odd">
+<td align="right">4</td>
+<td align="right">1</td>
+<td align="left">2018-03-16</td>
+<td align="left">16086 days</td>
+<td align="left">2018-03-16</td>
+<td align="left">1974-03-01</td>
+<td align="right">6.9</td>
+<td align="right">22084</td>
+<td align="right">18</td>
+<td align="right">8507</td>
+<td align="left">44 years 15 days</td>
+<td align="right">303.6</td>
+</tr>
+<tr class="even">
+<td align="right">5</td>
+<td align="right">1</td>
+<td align="left">2020-03-20</td>
+<td align="left">16821 days</td>
+<td align="left">2020-03-20</td>
+<td align="left">1974-03-01</td>
+<td align="right">6.9</td>
+<td align="right">22084</td>
+<td align="right">17</td>
+<td align="right">8507</td>
+<td align="left">46 years 19 days</td>
+<td align="right">317.4</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div id="using-records-other-than-the-one-most-recently-available" class="section level2">
+<h2>Using records other than the one most recently available</h2>
+<p>When creating a component, arguments <code>line</code> and
+<code>delay</code> can be used to pick records other than the one most
+recently available.</p>
+<p><code>line</code> causes records to be <em>skipped</em> in reverse
+chronological order. <code>line = 0</code> (default) gives the most
+recent record available. <code>line = 1</code> skips 1 record, that is,
+gives the second most recent. <code>line = 2</code> skips 2 records, and
+so on.</p>
+<pre class="r"><code>hemoglobin_component &lt;- make_component(
+  input_source = hemoglobin_record_source)
+
+previous_hemoglobin_component &lt;- make_component(
+  input_source = hemoglobin_record_source,
+  line = 1)
+
+phen &lt;- calculate_formula(
+  components = list(
+    hemo_a1c = hemoglobin_component,
+    prev_hemo_a1c = previous_hemoglobin_component),
+  fml = list(
+    a1c_difference = &#39;hemo_a1c_value_as_number - prev_hemo_a1c_value_as_number&#39;),
+  export = c(
+    &#39;hemo_a1c_visit_occurrence_id&#39;,
+    &#39;prev_hemo_a1c_visit_occurrence_id&#39;))
+dplyr::collect(head(phen)) |&gt; knitr::kable()</code></pre>
+<table>
+<colgroup>
+<col width="4%" />
+<col width="2%" />
+<col width="6%" />
+<col width="6%" />
+<col width="15%" />
+<col width="18%" />
+<col width="17%" />
+<col width="20%" />
+<col width="9%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th align="right">row_id</th>
+<th align="right">pid</th>
+<th align="left">ts</th>
+<th align="left">window</th>
+<th align="right">hemo_a1c_value_as_number</th>
+<th align="right">prev_hemo_a1c_value_as_number</th>
+<th align="right">hemo_a1c_visit_occurrence_id</th>
+<th align="right">prev_hemo_a1c_visit_occurrence_id</th>
+<th align="right">a1c_difference</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="right">1</td>
+<td align="right">1</td>
+<td align="left">2011-05-20</td>
+<td align="left">00:00:00</td>
+<td align="right">6.9</td>
+<td align="right">NA</td>
+<td align="right">21</td>
+<td align="right">NA</td>
+<td align="right">NA</td>
+</tr>
+<tr class="even">
+<td align="right">2</td>
+<td align="right">1</td>
+<td align="left">2014-03-07</td>
+<td align="left">1022 days</td>
+<td align="right">6.9</td>
+<td align="right">6.9</td>
+<td align="right">24</td>
+<td align="right">21</td>
+<td align="right">0</td>
+</tr>
+<tr class="odd">
+<td align="right">3</td>
+<td align="right">1</td>
+<td align="left">2016-03-11</td>
+<td align="left">735 days</td>
+<td align="right">6.9</td>
+<td align="right">6.9</td>
+<td align="right">19</td>
+<td align="right">24</td>
+<td align="right">0</td>
+</tr>
+<tr class="even">
+<td align="right">4</td>
+<td align="right">1</td>
+<td align="left">2018-03-16</td>
+<td align="left">735 days</td>
+<td align="right">6.9</td>
+<td align="right">6.9</td>
+<td align="right">18</td>
+<td align="right">19</td>
+<td align="right">0</td>
+</tr>
+<tr class="odd">
+<td align="right">5</td>
+<td align="right">1</td>
+<td align="left">2020-03-20</td>
+<td align="left">735 days</td>
+<td align="right">6.9</td>
+<td align="right">6.9</td>
+<td align="right">17</td>
+<td align="right">18</td>
+<td align="right">0</td>
+</tr>
+<tr class="even">
+<td align="right">6</td>
+<td align="right">1</td>
+<td align="left">2022-02-11</td>
+<td align="left">693 days</td>
+<td align="right">6.9</td>
+<td align="right">6.9</td>
+<td align="right">29</td>
+<td align="right">17</td>
+<td align="right">0</td>
+</tr>
+</tbody>
+</table>
+<p><code>delay</code> imposes a minimum time difference between the
+timestamp of the component and the timestamp of the phenotype. They are
+defined in SQL language. For example, <code>delay = &#39;1 day&#39;</code> gives
+the most recently available record that is at least 1 day older than the
+phenotype. If there are no such records, the value is empty.</p>
+<pre class="r"><code>hemoglobin_component &lt;- make_component(
+  input_source = hemoglobin_record_source)
+
+old_hemoglobin_component &lt;- make_component(
+  input_source = hemoglobin_record_source,
+  delay = &#39;6 years&#39;)
+
+phen &lt;- calculate_formula(
+  components = list(
+    hemo_a1c = hemoglobin_component,
+    old_hemo_a1c = old_hemoglobin_component),
+  fml = list(
+    six_year_diff = &#39;hemo_a1c_value_as_number - old_hemo_a1c_value_as_number&#39;),
+  export = c(
+    &#39;hemo_a1c_visit_occurrence_id&#39;,
+    &#39;old_hemo_a1c_visit_occurrence_id&#39;))
+dplyr::collect(head(phen)) |&gt; knitr::kable()</code></pre>
+<table>
+<colgroup>
+<col width="4%" />
+<col width="2%" />
+<col width="6%" />
+<col width="6%" />
+<col width="15%" />
+<col width="17%" />
+<col width="17%" />
+<col width="20%" />
 <col width="8%" />
 </colgroup>
 <thead>
@@ -455,302 +1283,91 @@ kable(head_shot(bmi, blind = TRUE))</code></pre>
 <th align="right">pid</th>
 <th align="left">ts</th>
 <th align="left">window</th>
-<th align="right">height_value_as_number</th>
-<th align="right">weight_value_as_number</th>
-<th align="right">height_in_meters</th>
-<th align="right">bmi</th>
+<th align="right">hemo_a1c_value_as_number</th>
+<th align="right">old_hemo_a1c_value_as_number</th>
+<th align="right">hemo_a1c_visit_occurrence_id</th>
+<th align="right">old_hemo_a1c_visit_occurrence_id</th>
+<th align="right">six_year_diff</th>
 </tr>
 </thead>
 <tbody>
 <tr class="odd">
 <td align="right">1</td>
 <td align="right">1</td>
-<td align="left">2005-05-13</td>
-<td align="left">00:00:00</td>
-<td align="right">189.3</td>
-<td align="right">98.3</td>
-<td align="right">1.893</td>
-<td align="right">27.43167</td>
-</tr>
-<tr class="even">
-<td align="right">12</td>
-<td align="right">1</td>
-<td align="left">2006-05-12</td>
-<td align="left">00:00:00</td>
-<td align="right">189.3</td>
-<td align="right">98.3</td>
-<td align="right">1.893</td>
-<td align="right">27.43167</td>
-</tr>
-<tr class="odd">
-<td align="right">13</td>
-<td align="right">1</td>
-<td align="left">2008-05-16</td>
-<td align="left">00:00:00</td>
-<td align="right">189.3</td>
-<td align="right">98.3</td>
-<td align="right">1.893</td>
-<td align="right">27.43167</td>
-</tr>
-<tr class="even">
-<td align="right">14</td>
-<td align="right">1</td>
 <td align="left">2011-05-20</td>
 <td align="left">00:00:00</td>
-<td align="right">189.3</td>
-<td align="right">98.3</td>
-<td align="right">1.893</td>
-<td align="right">27.43167</td>
+<td align="right">6.9</td>
+<td align="right">NA</td>
+<td align="right">21</td>
+<td align="right">NA</td>
+<td align="right">NA</td>
+</tr>
+<tr class="even">
+<td align="right">2</td>
+<td align="right">1</td>
+<td align="left">2014-03-07</td>
+<td align="left">00:00:00</td>
+<td align="right">6.9</td>
+<td align="right">NA</td>
+<td align="right">24</td>
+<td align="right">NA</td>
+<td align="right">NA</td>
+</tr>
+<tr class="odd">
+<td align="right">3</td>
+<td align="right">1</td>
+<td align="left">2016-03-11</td>
+<td align="left">00:00:00</td>
+<td align="right">6.9</td>
+<td align="right">NA</td>
+<td align="right">19</td>
+<td align="right">NA</td>
+<td align="right">NA</td>
+</tr>
+<tr class="even">
+<td align="right">4</td>
+<td align="right">1</td>
+<td align="left">2018-03-16</td>
+<td align="left">2492 days</td>
+<td align="right">6.9</td>
+<td align="right">6.9</td>
+<td align="right">18</td>
+<td align="right">21</td>
+<td align="right">0</td>
 </tr>
 <tr class="odd">
 <td align="right">5</td>
 <td align="right">1</td>
-<td align="left">2014-03-07</td>
-<td align="left">00:00:00</td>
-<td align="right">189.3</td>
-<td align="right">98.3</td>
-<td align="right">1.893</td>
-<td align="right">27.43167</td>
+<td align="left">2020-03-20</td>
+<td align="left">2205 days</td>
+<td align="right">6.9</td>
+<td align="right">6.9</td>
+<td align="right">17</td>
+<td align="right">24</td>
+<td align="right">0</td>
 </tr>
 <tr class="even">
 <td align="right">6</td>
 <td align="right">1</td>
-<td align="left">2016-03-11</td>
-<td align="left">00:00:00</td>
-<td align="right">189.3</td>
-<td align="right">98.3</td>
-<td align="right">1.893</td>
-<td align="right">27.43167</td>
-</tr>
-<tr class="odd">
-<td align="right">7</td>
-<td align="right">1</td>
-<td align="left">2018-03-16</td>
-<td align="left">00:00:00</td>
-<td align="right">189.3</td>
-<td align="right">98.3</td>
-<td align="right">1.893</td>
-<td align="right">27.43167</td>
-</tr>
-<tr class="even">
-<td align="right">18</td>
-<td align="right">1</td>
-<td align="left">2020-03-20</td>
-<td align="left">00:00:00</td>
-<td align="right">189.3</td>
-<td align="right">98.3</td>
-<td align="right">1.893</td>
-<td align="right">27.43167</td>
-</tr>
-<tr class="odd">
-<td align="right">19</td>
-<td align="right">1</td>
 <td align="left">2022-02-11</td>
-<td align="left">00:00:00</td>
-<td align="right">189.3</td>
-<td align="right">98.3</td>
-<td align="right">1.893</td>
-<td align="right">27.43167</td>
-</tr>
-<tr class="even">
-<td align="right">20</td>
-<td align="right">1</td>
-<td align="left">2022-03-25</td>
-<td align="left">00:00:00</td>
-<td align="right">189.3</td>
-<td align="right">98.3</td>
-<td align="right">1.893</td>
-<td align="right">27.43167</td>
+<td align="left">2898 days</td>
+<td align="right">6.9</td>
+<td align="right">6.9</td>
+<td align="right">29</td>
+<td align="right">24</td>
+<td align="right">0</td>
 </tr>
 </tbody>
 </table>
-<p>The conversion of centimeters to meters could also be done using
-<code>mutate()</code> before creating the component, or using
-parentheses in the <code>bmi</code> formula. Either approach would be
-equivalent.</p>
-<p><code>head_shot()</code> is a convenience function to peek into the
-first rows of the lazy table.</p>
+<p>As of now, <code>line</code> and <code>delay</code>
+<strong>cannot</strong> be used simultaneously in the same component.
+This is a planned feature. If both are provided, <code>line</code> is
+considered and <code>delay</code> is ignored. <code>delay</code> is only
+considered when <code>line = NA</code>.</p>
 </div>
-<div id="plot-the-phenotype-result" class="section level2">
-<h2>Plot the phenotype result</h2>
-<p><code>phea_plot()</code> creates an interactive chart using the
-<code>plotly</code> library. It requires specifying the ID of one
-patient.</p>
-<pre class="r"><code># Plot patient whose pid = 8012
-phea_plot(bmi, 8012)</code></pre>
-<div class="figure">
-<img src="data:image/png;base64,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SGnUPBECCCCAAAIIIIAAAggQIOwDCCCAAAIIIIAAAgggUJoAAVIaNU+EAAIIIIAAAggggAACBAj7AAIIIIAAAggggAACCJQmQICURs0TIYAAAggggAACCCCAAAHCPoAAAggggAACCCCAAAKlCRAgpVHzRAgggAACCCCAAAIIIECAsA8ggAACCCCAAAIIIIBAaQIESGnUPBECCCCAAAIIIIAAAggQIOwDCCCAAAIIIIAAAgggUJoAAVIaNU+EAAIIIIAAAggggAACBAj7AAIIIIAAAggggAACCJQmQICURs0TIYAAAggggAACCCCAAAHCPoAAAggggAACCCCAAAKlCRAgpVHzRAgggAACCCCAAAIIIECAsA8ggAACCCCAAAIIIIBAaQIESGnUPBECCCCAAAIIIIAAAggQIOwDCCCAAAIIIIAAAgggUJoAAVIaNU+EAAIIIIAAAggggAACBAj7AAIIIIAAAggggAACCJQmQICURs0TIYAAAggggAACCCCAAAHCPoAAAggggAACCCCAAAKlCRAgpVHzRAgggAACCCCAAAIIIECAsA8ggAACCCCAAAIIIIBAaQIESGnUPBECCCCAAAIIIIAAAggQIOwDCCCAAAIIIIAAAgggUJoAAVIaNU+EAAIIIIAAAggggAACBAj7AAIIIIBA0wWWl5dtcXHR5ubmrL+/v+nrwwoggAACCOyeAAGye7YsGQEEEEAgUoAAiYRiGAIIINAGAgRIG2xEXgICCCDQygIrKys2Pj5ua2trtZdx8uRJGx0dtfy0vr4+O3funA0ODrbyS2bdEUAAgT0tQIDs6c3Pi0cAAQSqIVDvCsjq6qqNjY3Z6dOnbWhoKFlRH3flyhUbGRmpxoqzFggggAACsgABIpMxAwIIIIBA0QL1AsSvfszOztrk5CRXPIoGZ3kIIIBAEwUIkCbi89QIIIAAAt8UqBcgt27dspmZGbt06VIyxq+EcOWDPQYBBBBofQECpGLbsN4tB7GrqHyIc2lpKXnDn5qast7e3tinKHzc/Px8sky/15tHfYGd7BOY/leB9GTWb+UJncRWxXwvXQFodPwKhUhVjmfN/Hnbyb6iHIeVsSEP5WcytCym757ATvat/FoVuazde8UsuQwBAqQMZeE5dnLiU1SA7GQdhJeaDC3yzUx97lYZX+b2aBWT57OeyslOyLysE9699Gbt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" alt />
-<p class="caption">BMI phenotype plot</p>
-</div>
-<p>The result <code>bmi</code> is a lazy table. Let us manipulate it
-further to produce a few aggregates:</p>
-<pre class="r"><code># See summary statistics
-bmi |&gt;
-  group_by(pid) |&gt;
-  summarise(
-    min_bmi = min(bmi, na.rm = TRUE),
-    avg_bmi = mean(bmi, na.rm = TRUE),
-    max_bmi = max(bmi, na.rm = TRUE),
-    n_distinct_bmi = n_distinct(bmi)) |&gt;
-  arrange(desc(n_distinct_bmi), avg_bmi) |&gt;
-  head_shot(blind = TRUE) |&gt;
-  kable()</code></pre>
-<table>
-<thead>
-<tr class="header">
-<th align="right">pid</th>
-<th align="right">min_bmi</th>
-<th align="right">avg_bmi</th>
-<th align="right">max_bmi</th>
-<th align="right">n_distinct_bmi</th>
-</tr>
-</thead>
-<tbody>
-<tr class="odd">
-<td align="right">11872</td>
-<td align="right">34.82498</td>
-<td align="right">36.72123</td>
-<td align="right">38.41281</td>
-<td align="right">81</td>
-</tr>
-<tr class="even">
-<td align="right">22242</td>
-<td align="right">27.40980</td>
-<td align="right">28.91259</td>
-<td align="right">30.29330</td>
-<td align="right">78</td>
-</tr>
-<tr class="odd">
-<td align="right">22906</td>
-<td align="right">27.58095</td>
-<td align="right">29.46034</td>
-<td align="right">30.35070</td>
-<td align="right">76</td>
-</tr>
-<tr class="even">
-<td align="right">4191</td>
-<td align="right">27.40982</td>
-<td align="right">28.92541</td>
-<td align="right">30.28767</td>
-<td align="right">75</td>
-</tr>
-<tr class="odd">
-<td align="right">20198</td>
-<td align="right">27.53843</td>
-<td align="right">29.35831</td>
-<td align="right">30.34387</td>
-<td align="right">73</td>
-</tr>
-<tr class="even">
-<td align="right">5274</td>
-<td align="right">27.42844</td>
-<td align="right">29.46449</td>
-<td align="right">30.36412</td>
-<td align="right">72</td>
-</tr>
-<tr class="odd">
-<td align="right">18843</td>
-<td align="right">27.14441</td>
-<td align="right">29.09229</td>
-<td align="right">30.09168</td>
-<td align="right">71</td>
-</tr>
-<tr class="even">
-<td align="right">10583</td>
-<td align="right">27.57425</td>
-<td align="right">29.14332</td>
-<td align="right">30.36699</td>
-<td align="right">69</td>
-</tr>
-<tr class="odd">
-<td align="right">1665</td>
-<td align="right">27.32200</td>
-<td align="right">29.18407</td>
-<td align="right">30.09031</td>
-<td align="right">69</td>
-</tr>
-<tr class="even">
-<td align="right">8055</td>
-<td align="right">27.60844</td>
-<td align="right">28.86689</td>
-<td align="right">30.37667</td>
-<td align="right">68</td>
-</tr>
-</tbody>
-</table>
-<p>To see the SQL query underlying the phenotype, use
-<code>dbplyr::sql_render()</code>, or the <code>.clip_sql</code> option
-in <code>calculate_formula()</code>:</p>
-<pre class="r"><code>dbplyr::sql_render(bmi)
-#&gt; &lt;SQL&gt; SELECT
-#&gt;   *,
-#&gt;   weight_value_as_number / (height_in_meters * height_in_meters) AS &quot;bmi&quot;
-#&gt; FROM (
-#&gt;   SELECT
-#&gt;     &quot;row_id&quot;,
-#&gt;     &quot;pid&quot;,
-#&gt;     &quot;ts&quot;,
-#&gt;     &quot;window&quot;,
-#&gt;     &quot;height_value_as_number&quot;,
-#&gt;     &quot;weight_value_as_number&quot;,
-#&gt;     height_value_as_number / 100 AS &quot;height_in_meters&quot;
-#&gt;   FROM (
-#&gt;     SELECT
-#&gt;       *,
-#&gt;       &quot;ts&quot; - least(weight_ts, height_ts) AS &quot;window&quot;,
-#&gt;       last_value(row_id) over (partition by &quot;pid&quot;, &quot;ts&quot;) AS &quot;ts_row&quot;
-#&gt;     FROM (
-#&gt;       SELECT
-#&gt;         &quot;row_id&quot;,
-#&gt;         &quot;pid&quot;,
-#&gt;         &quot;ts&quot;,
-#&gt;         MAX(&quot;weight_value_as_number&quot;) OVER (PARTITION BY &quot;..dbplyr_partion_1&quot;) AS &quot;weight_value_as_number&quot;,
-#&gt;         MAX(&quot;weight_ts&quot;) OVER (PARTITION BY &quot;..dbplyr_partion_2&quot;) AS &quot;weight_ts&quot;,
-#&gt;         MAX(&quot;height_value_as_number&quot;) OVER (PARTITION BY &quot;..dbplyr_partion_3&quot;) AS &quot;height_value_as_number&quot;,
-#&gt;         MAX(&quot;height_ts&quot;) OVER (PARTITION BY &quot;..dbplyr_partion_4&quot;) AS &quot;height_ts&quot;
-#&gt;       FROM (
-#&gt;         SELECT
-#&gt;           *,
-#&gt;           SUM(CASE WHEN ((&quot;weight_value_as_number&quot; IS NULL)) THEN 0 ELSE 1 END) OVER (ORDER BY &quot;pid&quot;, &quot;ts&quot; ROWS UNBOUNDED PRECEDING) AS &quot;..dbplyr_partion_1&quot;,
-#&gt;           SUM(CASE WHEN ((&quot;weight_ts&quot; IS NULL)) THEN 0 ELSE 1 END) OVER (ORDER BY &quot;pid&quot;, &quot;ts&quot; ROWS UNBOUNDED PRECEDING) AS &quot;..dbplyr_partion_2&quot;,
-#&gt;           SUM(CASE WHEN ((&quot;height_value_as_number&quot; IS NULL)) THEN 0 ELSE 1 END) OVER (ORDER BY &quot;pid&quot;, &quot;ts&quot; ROWS UNBOUNDED PRECEDING) AS &quot;..dbplyr_partion_3&quot;,
-#&gt;           SUM(CASE WHEN ((&quot;height_ts&quot; IS NULL)) THEN 0 ELSE 1 END) OVER (ORDER BY &quot;pid&quot;, &quot;ts&quot; ROWS UNBOUNDED PRECEDING) AS &quot;..dbplyr_partion_4&quot;
-#&gt;         FROM (
-#&gt;           SELECT
-#&gt;             row_number() over () AS &quot;row_id&quot;,
-#&gt;             &quot;pid&quot;,
-#&gt;             &quot;ts&quot;,
-#&gt;             last_value(case when &quot;name&quot; = &#39;fdua4toj8mrl&#39; then &quot;value_as_number&quot; else null end) over (partition by &quot;pid&quot;, &quot;name&quot; order by &quot;ts&quot; rows between unbounded preceding and 0 preceding) AS &quot;weight_value_as_number&quot;,
-#&gt;             last_value(case when &quot;name&quot; = &#39;fdua4toj8mrl&#39; then &quot;ts&quot; else null end) over (partition by &quot;pid&quot;, &quot;name&quot; order by &quot;ts&quot; rows between unbounded preceding and 0 preceding) AS &quot;weight_ts&quot;,
-#&gt;             last_value(case when &quot;name&quot; = &#39;c6izgt4pnjc5&#39; then &quot;value_as_number&quot; else null end) over (partition by &quot;pid&quot;, &quot;name&quot; order by &quot;ts&quot; rows between unbounded preceding and 0 preceding) AS &quot;height_value_as_number&quot;,
-#&gt;             last_value(case when &quot;name&quot; = &#39;c6izgt4pnjc5&#39; then &quot;ts&quot; else null end) over (partition by &quot;pid&quot;, &quot;name&quot; order by &quot;ts&quot; rows between unbounded preceding and 0 preceding) AS &quot;height_ts&quot;
-#&gt;           FROM (
-#&gt;             (
-#&gt;               SELECT
-#&gt;                 &#39;fdua4toj8mrl&#39; AS &quot;name&quot;,
-#&gt;                 &quot;person_id&quot; AS &quot;pid&quot;,
-#&gt;                 &quot;measurement_datetime&quot; AS &quot;ts&quot;,
-#&gt;                 &quot;value_as_number&quot;
-#&gt;               FROM &quot;cdm_new_york3&quot;.&quot;measurement&quot;
-#&gt;               WHERE (&quot;measurement_concept_id&quot; = 3025315.0)
-#&gt;             )
-#&gt;             UNION ALL
-#&gt;             (
-#&gt;               SELECT
-#&gt;                 &#39;c6izgt4pnjc5&#39; AS &quot;name&quot;,
-#&gt;                 &quot;person_id&quot; AS &quot;pid&quot;,
-#&gt;                 &quot;measurement_datetime&quot; AS &quot;ts&quot;,
-#&gt;                 &quot;value_as_number&quot;
-#&gt;               FROM &quot;cdm_new_york3&quot;.&quot;measurement&quot;
-#&gt;               WHERE (&quot;measurement_concept_id&quot; = 3036277.0)
-#&gt;             )
-#&gt;           ) &quot;q01&quot;
-#&gt;         ) &quot;q02&quot;
-#&gt;       ) &quot;q03&quot;
-#&gt;     ) &quot;q04&quot;
-#&gt;   ) &quot;q05&quot;
-#&gt;   WHERE (&quot;row_id&quot; = &quot;ts_row&quot;)
-#&gt; ) &quot;q06&quot;</code></pre>
+<div id="author-contact" class="section level2">
+<h2>Author contact</h2>
+<p>Contact Fabrício Kury at <a href="mailto:fab@kury.dev" class="email">fab@kury.dev</a>.</p>
 </div>
 
 

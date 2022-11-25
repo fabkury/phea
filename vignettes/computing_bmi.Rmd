@@ -103,6 +103,7 @@ parentheses in the `bmi` formula. Either approach would be equivalent.
 # Plot patient whose pid = 8012
 phea_plot(bmi, 8012)
 ```
+![BMI phenotype plot](https://github.com/fabkury/phea/raw/main/vignettes/bmi%20plot.png)
 
 The result `bmi` is a lazy table. Let us manipulate it further to produce a few aggregates:  
 ```{r, aggregates}
