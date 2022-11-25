@@ -598,11 +598,11 @@ or the option <code>.clip_sql</code> in
 #&gt;           row_number() over () AS &quot;row_id&quot;,
 #&gt;           &quot;pid&quot;,
 #&gt;           &quot;ts&quot;,
-#&gt;           last_value(case when &quot;name&quot; = &#39;r0ro3ui1xgw7&#39; then &quot;value_as_number&quot; else null end) over (partition by &quot;pid&quot;, &quot;name&quot; order by &quot;ts&quot; rows between unbounded preceding and 0 preceding) AS &quot;hemo_a1c_value_as_number&quot;,
-#&gt;           last_value(case when &quot;name&quot; = &#39;r0ro3ui1xgw7&#39; then &quot;ts&quot; else null end) over (partition by &quot;pid&quot;, &quot;name&quot; order by &quot;ts&quot; rows between unbounded preceding and 0 preceding) AS &quot;hemo_a1c_ts&quot;
+#&gt;           last_value(case when &quot;name&quot; = &#39;b6kajye79tf1&#39; then &quot;value_as_number&quot; else null end) over (partition by &quot;pid&quot;, &quot;name&quot; order by &quot;ts&quot; rows between unbounded preceding and 0 preceding) AS &quot;hemo_a1c_value_as_number&quot;,
+#&gt;           last_value(case when &quot;name&quot; = &#39;b6kajye79tf1&#39; then &quot;ts&quot; else null end) over (partition by &quot;pid&quot;, &quot;name&quot; order by &quot;ts&quot; rows between unbounded preceding and 0 preceding) AS &quot;hemo_a1c_ts&quot;
 #&gt;         FROM (
 #&gt;           SELECT
-#&gt;             &#39;r0ro3ui1xgw7&#39; AS &quot;name&quot;,
+#&gt;             &#39;b6kajye79tf1&#39; AS &quot;name&quot;,
 #&gt;             &quot;person_id&quot; AS &quot;pid&quot;,
 #&gt;             &quot;measurement_datetime&quot; AS &quot;ts&quot;,
 #&gt;             &quot;value_as_number&quot;

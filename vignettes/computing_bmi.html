@@ -666,6 +666,79 @@ bmi |&gt;
 </tr>
 </tbody>
 </table>
+<p>To see the SQL query underlying the phenotype, use
+<code>dbplyr::sql_render()</code>, or the <code>.clip_sql</code> option
+in <code>calculate_formula()</code>:</p>
+<pre class="r"><code>dbplyr::sql_render(bmi)
+#&gt; &lt;SQL&gt; SELECT
+#&gt;   *,
+#&gt;   weight_value_as_number / (height_in_meters * height_in_meters) AS &quot;bmi&quot;
+#&gt; FROM (
+#&gt;   SELECT
+#&gt;     &quot;row_id&quot;,
+#&gt;     &quot;pid&quot;,
+#&gt;     &quot;ts&quot;,
+#&gt;     &quot;window&quot;,
+#&gt;     &quot;height_value_as_number&quot;,
+#&gt;     &quot;weight_value_as_number&quot;,
+#&gt;     height_value_as_number / 100 AS &quot;height_in_meters&quot;
+#&gt;   FROM (
+#&gt;     SELECT
+#&gt;       *,
+#&gt;       &quot;ts&quot; - least(weight_ts, height_ts) AS &quot;window&quot;,
+#&gt;       last_value(row_id) over (partition by &quot;pid&quot;, &quot;ts&quot;) AS &quot;ts_row&quot;
+#&gt;     FROM (
+#&gt;       SELECT
+#&gt;         &quot;row_id&quot;,
+#&gt;         &quot;pid&quot;,
+#&gt;         &quot;ts&quot;,
+#&gt;         MAX(&quot;weight_value_as_number&quot;) OVER (PARTITION BY &quot;..dbplyr_partion_1&quot;) AS &quot;weight_value_as_number&quot;,
+#&gt;         MAX(&quot;weight_ts&quot;) OVER (PARTITION BY &quot;..dbplyr_partion_2&quot;) AS &quot;weight_ts&quot;,
+#&gt;         MAX(&quot;height_value_as_number&quot;) OVER (PARTITION BY &quot;..dbplyr_partion_3&quot;) AS &quot;height_value_as_number&quot;,
+#&gt;         MAX(&quot;height_ts&quot;) OVER (PARTITION BY &quot;..dbplyr_partion_4&quot;) AS &quot;height_ts&quot;
+#&gt;       FROM (
+#&gt;         SELECT
+#&gt;           *,
+#&gt;           SUM(CASE WHEN ((&quot;weight_value_as_number&quot; IS NULL)) THEN 0 ELSE 1 END) OVER (ORDER BY &quot;pid&quot;, &quot;ts&quot; ROWS UNBOUNDED PRECEDING) AS &quot;..dbplyr_partion_1&quot;,
+#&gt;           SUM(CASE WHEN ((&quot;weight_ts&quot; IS NULL)) THEN 0 ELSE 1 END) OVER (ORDER BY &quot;pid&quot;, &quot;ts&quot; ROWS UNBOUNDED PRECEDING) AS &quot;..dbplyr_partion_2&quot;,
+#&gt;           SUM(CASE WHEN ((&quot;height_value_as_number&quot; IS NULL)) THEN 0 ELSE 1 END) OVER (ORDER BY &quot;pid&quot;, &quot;ts&quot; ROWS UNBOUNDED PRECEDING) AS &quot;..dbplyr_partion_3&quot;,
+#&gt;           SUM(CASE WHEN ((&quot;height_ts&quot; IS NULL)) THEN 0 ELSE 1 END) OVER (ORDER BY &quot;pid&quot;, &quot;ts&quot; ROWS UNBOUNDED PRECEDING) AS &quot;..dbplyr_partion_4&quot;
+#&gt;         FROM (
+#&gt;           SELECT
+#&gt;             row_number() over () AS &quot;row_id&quot;,
+#&gt;             &quot;pid&quot;,
+#&gt;             &quot;ts&quot;,
+#&gt;             last_value(case when &quot;name&quot; = &#39;x60g8r2pu4td&#39; then &quot;value_as_number&quot; else null end) over (partition by &quot;pid&quot;, &quot;name&quot; order by &quot;ts&quot; rows between unbounded preceding and 0 preceding) AS &quot;weight_value_as_number&quot;,
+#&gt;             last_value(case when &quot;name&quot; = &#39;x60g8r2pu4td&#39; then &quot;ts&quot; else null end) over (partition by &quot;pid&quot;, &quot;name&quot; order by &quot;ts&quot; rows between unbounded preceding and 0 preceding) AS &quot;weight_ts&quot;,
+#&gt;             last_value(case when &quot;name&quot; = &#39;g2rd6u9tvxn0&#39; then &quot;value_as_number&quot; else null end) over (partition by &quot;pid&quot;, &quot;name&quot; order by &quot;ts&quot; rows between unbounded preceding and 0 preceding) AS &quot;height_value_as_number&quot;,
+#&gt;             last_value(case when &quot;name&quot; = &#39;g2rd6u9tvxn0&#39; then &quot;ts&quot; else null end) over (partition by &quot;pid&quot;, &quot;name&quot; order by &quot;ts&quot; rows between unbounded preceding and 0 preceding) AS &quot;height_ts&quot;
+#&gt;           FROM (
+#&gt;             (
+#&gt;               SELECT
+#&gt;                 &#39;x60g8r2pu4td&#39; AS &quot;name&quot;,
+#&gt;                 &quot;person_id&quot; AS &quot;pid&quot;,
+#&gt;                 &quot;measurement_datetime&quot; AS &quot;ts&quot;,
+#&gt;                 &quot;value_as_number&quot;
+#&gt;               FROM &quot;cdm_new_york3&quot;.&quot;measurement&quot;
+#&gt;               WHERE (&quot;measurement_concept_id&quot; = 3025315.0)
+#&gt;             )
+#&gt;             UNION ALL
+#&gt;             (
+#&gt;               SELECT
+#&gt;                 &#39;g2rd6u9tvxn0&#39; AS &quot;name&quot;,
+#&gt;                 &quot;person_id&quot; AS &quot;pid&quot;,
+#&gt;                 &quot;measurement_datetime&quot; AS &quot;ts&quot;,
+#&gt;                 &quot;value_as_number&quot;
+#&gt;               FROM &quot;cdm_new_york3&quot;.&quot;measurement&quot;
+#&gt;               WHERE (&quot;measurement_concept_id&quot; = 3036277.0)
+#&gt;             )
+#&gt;           ) &quot;q01&quot;
+#&gt;         ) &quot;q02&quot;
+#&gt;       ) &quot;q03&quot;
+#&gt;     ) &quot;q04&quot;
+#&gt;   ) &quot;q05&quot;
+#&gt;   WHERE (&quot;row_id&quot; = &quot;ts_row&quot;)
+#&gt; ) &quot;q06&quot;</code></pre>
 </div>
 
 

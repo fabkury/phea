@@ -112,7 +112,8 @@ bmi |>
   kable()
 ```
 
-To see the SQL query underlying the phenotype, use dbplyr::sql_render(), or the `.clip_sql` option in `calculate_formula()`:  
+To see the SQL query underlying the phenotype, use `dbplyr::sql_render()`, or the `.clip_sql` option in
+`calculate_formula()`:  
 ```{r, sql_query}
 dbplyr::sql_render(bmi)
 ```
