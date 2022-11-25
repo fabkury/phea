@@ -1,6 +1,6 @@
 Package: phea
 Title: Phenotyping Algebra
-Version: 0.0.0.9000
+Version: 0.1.0.0000
 Authors@R: 
     person("Fabrício", "Kury", , "github@kury.dev", role = c("aut", "cre"),
            comment = c(ORCID = "YOUR-ORCID-ID"))
@@ -17,7 +17,6 @@ Imports:
 	stringr,
 	purrr,
 	rlang,
-	openssl,
 	tidyr
 Suggests: 
     knitr,

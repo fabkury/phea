@@ -243,9 +243,9 @@ make_record_source <- function(records, rec_name = NULL, ts, pid, vars = NULL, .
   rec_source$records <- records
   
   if(is.null(rec_name)) {
-    sql_txt <- dbplyr::sql_render(records) |> as.character()
-    rec_name <- paste0(sample(c(letters, LETTERS), 1), # Ensure it begins with a letter. Any letter.
-      substr(openssl::md5(sql_txt), 1, 10)) # 10 characters of space to avoid collisions.
+    # Generate random rec_name, 12 characters long, case-insensitive, starting with a letter.
+    rec_name <- c(sample(letters, 1), sample(c(letters, 0:9), 12-1)) |>
+      as.list() |> do.call(what = paste0)
   }
 
   if(.type == 'column') {
