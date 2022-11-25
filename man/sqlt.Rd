@@ -15,8 +15,9 @@ sqlt(table)
 Lazy table equal to \verb{select * from def_schema.table;}.
 }
 \description{
-Produces lazy table object from the name of a SQL table in the preconfigured schema.
+Produces lazy table object of table \code{table} in the preconfigured schema.
 }
 \details{
-This function is a shorthand for \verb{select * from def_schema.table;}.
+This function is a shorthand for \verb{select * from def_schema.table;}. \code{def_schema} is the schema passed to
+\code{setup_phea()} previously.
 }

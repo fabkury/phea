@@ -4,17 +4,16 @@
 \alias{setup_phea}
 \title{Setup Phea}
 \usage{
-setup_phea(dbi_connection, def_schema)
+setup_phea(connection, schema)
 }
 \arguments{
-\item{dbi_connection}{DBI-compatible SQL connection (e.g. produced by DBI::dbConnect).}
+\item{connection}{DBI-compatible SQL connection (e.g. produced by DBI::dbConnect).}
 
 \item{schema}{Schema to be used by default in \code{sqlt()}.}
 }
 \description{
-Configures Phea for use.
+Configures functions \code{sqlt()} and \code{sql0()} for use.
 }
 \details{
-Stores the DBI connection for later use, and verifies if Phea's user-defined aggregates are available. If they're
-not, runs the needed SQL queries to install them.
+Stores the DBI connection for later use.
 }

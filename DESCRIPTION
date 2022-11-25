@@ -17,7 +17,8 @@ Imports:
 	stringr,
 	purrr,
 	rlang,
-	tidyr
+	tidyr,
+	plotly
 Suggests: 
     knitr,
     rmarkdown

@@ -6,11 +6,14 @@
 \usage{
 make_record_source(
   records,
-  rec_name,
+  rec_name = NULL,
   ts,
   pid,
   vars = NULL,
-  .capture_col = NULL
+  .capture_col = NULL,
+  .type = "direct",
+  .ts = NULL,
+  .pid = NULL
 )
 }
 \arguments{

@@ -15,11 +15,10 @@ calculate_formula(
   .rec_name = NULL,
   .delay = NULL,
   .line = NULL,
-  .exclude_na = FALSE,
   .require_all = FALSE,
   .lim = NA,
   .dont_require = NULL,
-  .cascaded = FALSE,
+  .cascaded = TRUE,
   .clip_sql = FALSE
 )
 }
@@ -34,8 +33,6 @@ calculate_formula(
 
 \item{.ts, .pid, .rec_name, .delay, .line}{If supplied, these will overwrite those of the given component.}
 
-\item{.exclude_na}{If \code{TRUE}, returns only rows where the result of the formula is not NA.}
-
 \item{.require_all}{If \code{TRUE}, returns only rows where all components to have been found according to their
 timestamps (even if their value is NA). If \code{.dont_require} is provided, \code{.require_all} is ignored.}
 
@@ -44,8 +41,8 @@ timestamps (even if their value is NA). If \code{.dont_require} is provided, \co
 \item{.dont_require}{If provided, causes formula to require all components (regardless of .require_all), except for
 those listed here.}
 
-\item{.cascaded}{If \code{TRUE}, each formula is computed in a separate, nested SELECT statement. This allows the result
-of the prior formula to be used in the following, at the potential cost of longer computation times.}
+\item{.cascaded}{If \code{TRUE} (default), each formula is computed in a separate, nested SELECT statement. This allows
+the result of the prior formula to be used in the following, at the potential cost of longer computation times.}
 
 \item{.clip_sql}{If \code{TRUE}, instead of lazy table it returns the SQL query as a SQL object (can be converted to
 character using \code{as.character()}), and also copies it to the clipboard.}

@@ -105,9 +105,10 @@ setup_phea <- function(connection, schema) {
 
 #' SQL table
 #'
-#' Produces lazy table object from the name of a SQL table in the preconfigured schema.
+#' Produces lazy table object of table `table` in the preconfigured schema.
 #'
-#' This function is a shorthand for `select * from def_schema.table;`.
+#' This function is a shorthand for `select * from def_schema.table;`. `def_schema` is the schema passed to
+#' `setup_phea()` previously.
 #'
 #' @export
 #' @param dbi_connection DBI-compatible SQL connection (e.g. produced by DBI::dbConnect).
@@ -675,5 +676,95 @@ calculate_formula <- function(components, fml = NULL, window = NA, export = NULL
   } else {
     return(board)
   }
+}
+
+
+# Plot phenotype --------------------------------------------------------------------------------------------------
+#' Plot a phenotype.
+#'
+#' Plots the result from `calculate_formula()` in an interactive timeline chart using `plotly`.
+#'
+#' Collects (downloads) the results and creates interactive timeline chart using the `plotly` library.
+#'
+#' @export
+#' @param board The object returned by `calculate_formula()`.
+#' @param pid Required. ID of the patient to be included in the chart.
+#' @param verbose If TRUE, will let you know how long it takes to `collect()` the data.
+#' @return Plot created by `plotly::plot_ly()` and `plotly::subplot()`.
+phea_plot <- function(board, pid, verbose = TRUE) {
+  make_step_chart_data <- function(board_data) {
+    union_all(
+      board_data |>
+        dplyr::arrange(pid, ts) |>
+        dplyr::group_by(pid, name) |>
+        dplyr::mutate(linha = row_number()) |>
+        dplyr::ungroup(),
+      board_data |>
+        dplyr::arrange(pid, ts) |>
+        dplyr::group_by(pid, name) |>
+        dplyr::mutate(linha = row_number()) |>
+        dplyr::mutate(ts = lead(ts)) |>
+        dplyr::ungroup()) |>
+      dplyr::arrange(pid, ts, linha)
+  }
+
+  make_plotly_chart <- function(board_lazy) {
+    if(verbose)
+      cat('Collecting lazy table, ')
+    board_data <- dplyr::collect(board_lazy)
+    if(verbose)
+      cat('done.\n')
+    
+    comp_board <- make_step_chart_data(board_data)
+    
+    chart_items <- comp_board |>
+      dplyr::select(name) |>
+      dplyr::distinct() |>
+      dplyr::pull()
+    
+    plot_args <- purrr::map(chart_items, \(chart_item) {
+      res_board <- comp_board |>
+        dplyr::filter(name == chart_item) |>
+        dplyr::filter(!is.na(value))
+      
+      if(nrow(res_board) > 0) {
+        res_plot <- res_board |>
+          plotly::plot_ly(
+            x = ~ts,
+            y = ~value,
+            type = 'scatter',
+            mode = 'lines',
+            name = chart_item) |>
+          plotly::layout(
+            legend = list(orientation = 'h'),
+            yaxis = list(
+              range = c(
+                min(res_board$value, na.rm = TRUE),
+                max(res_board$value, na.rm = TRUE)),
+              fixedrange = TRUE))
+        return(res_plot)
+      } else {
+        return(NULL)
+      }
+    })
+    
+    names(plot_args) <- chart_items
+    
+    plot_args <- plot_args |>
+      purrr::discard(is.null)
+    
+    plot_args <- c(plot_args, nrows = length(plot_args), shareX = TRUE)
+    return(
+      do.call(plotly::subplot, plot_args))
+  }
+  
+  board <- board |>
+    dplyr::filter(pid == local(pid))
+  
+  board_long <- board |>
+    tidyr::pivot_longer(
+      cols = !c(row_id, pid, ts, window))
+  
+  return(make_plotly_chart(board_long))
 }
 

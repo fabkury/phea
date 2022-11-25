@@ -7,7 +7,7 @@
 sql0(...)
 }
 \arguments{
-\item{...}{Character string, or vector of.}
+\item{...}{Arguments to be coerced to \code{character} and concatenated.}
 }
 \value{
 Lazy table corresponding to the query.

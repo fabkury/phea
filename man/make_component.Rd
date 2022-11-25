@@ -9,11 +9,15 @@ make_component(
   line = NA,
   delay = NA,
   window = Inf,
-  rec_name = NA
+  rec_name = NA,
+  .passthrough = FALSE,
+  .ts = NULL,
+  .pid = NULL
 )
 }
 \arguments{
-\item{input_source}{A record source, a component, or a lazy table.}
+\item{input_source}{A record source from \code{make_record_source()}, a component from \code{make_component()}, or a lazy
+table. If the latter case, \code{.ts} and \code{.pid} must be provided.}
 
 \item{line}{Interger. Which line to pick. 0 = skip no lines, 1 = skip one line, 2 = skip two lines, etc.}
 
@@ -24,6 +28,12 @@ date.}
 date.}
 
 \item{rec_name}{Character. If provided, overwrites the \code{rec_name} of the record source.}
+
+\item{.ts}{Unquoted character. If passing a lazy table to \code{input_source}, \code{.ts} is used as \code{ts} to buid a record
+source.}
+
+\item{.pid}{Unquoted character. If passing a lazy table to \code{input_source}, \code{.pid} is used as \code{pid} to buid a record
+source.}
 }
 \value{
 Phea component object.

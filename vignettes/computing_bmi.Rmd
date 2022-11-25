@@ -97,6 +97,13 @@ parentheses in the `bmi` formula. Either approach would be equivalent.
 
 `head_shot()` is a convenience function to peek into the first rows of the lazy table.  
   
+## Plot the phenotype result  
+`phea_plot()` creates an interactive chart using the `plotly` library. It requires specifying the ID of one patient.
+```{r, out.width="100%"}
+# Plot patient whose pid = 8012
+phea_plot(bmi, 8012)
+```
+
 The result `bmi` is a lazy table. Let us manipulate it further to produce a few aggregates:  
 ```{r, aggregates}
 # See summary statistics
