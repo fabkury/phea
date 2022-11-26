@@ -7,7 +7,7 @@ vignette: >
   %\VignetteEncoding{UTF-8}
 ---
 
-```{r, include = FALSE}
+```{r base, include = FALSE}
 library(knitr)
 opts_chunk$set(
   collapse = TRUE,
@@ -54,7 +54,7 @@ setup_phea(dbcon, 'cdm_new_york3')
 `calculate_formula()`.  
 We must specify which column (in the lazy table) is the timestamp, and which column is the patient ID. Notice that we
 don't use quotes "".  
-```{r, components}
+```{r components}
 # Weight records
 # Loinc 29463-7 Body weight, concept ID 3025315
 weight <- sqlt(measurement) |>
@@ -126,7 +126,9 @@ bmi |>
 ## Obtain SQL query that computes the phenotype  
 To see the SQL query underlying the phenotype, use `dbplyr::sql_render()`, or the `.clip_sql` option in
 `calculate_formula()`, or helper function `code_shot()`:  
-
+```{r, eval = FALSE}
+dbplyr::sql_render(bmi)
+```
 ```sql
 `r dbplyr::sql_render(bmi)`
 ```
