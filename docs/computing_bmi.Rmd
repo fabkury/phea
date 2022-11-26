@@ -78,6 +78,7 @@ selects the desired records using a SQL `WHERE` statement.
 Each component goes inside a `list` in the call to `calculate_formula()`. The names of the list items become 
 the names available to use in the formula. For example, if you want the `value_as_number` column from component
 `height`, use `height_value_as_number`.  
+  
 Notice that, because the body height records in cdm_new_york3 are in centimeters, we use a separate formula to produce
 `height_in_meters`.  
 ```{r, phenotype}
@@ -92,23 +93,22 @@ bmi <- calculate_formula(
 
 kable(head_shot(bmi, blind = TRUE))
 ```
-The conversion of centimeters to meters could also be done using `mutate()` before creating the component, or using
+The conversion from centimeters to meters could also be done using `mutate()` before creating the component, or using
 parentheses in the `bmi` formula. Either approach would be equivalent.  
 
 `head_shot()` is a convenience function to peek into the first rows of the lazy table.  
   
 ## Plot the phenotype result  
 `phea_plot()` creates an interactive chart using the `plotly` library. It requires specifying the ID of one patient.
-```{r, out.width="100%", eval = FALSE}
-# Plot patient whose pid = 8012
+```{r, out.width="100%", out.height = 500}
+# Plot BMI phenotype for patient whose pid = 2105
+# We don't need to plot column weight_value_as_number.
 bmi |>
   select(-weight_value_as_number) |>
-  phea_plot(pid = 8012)
+  phea_plot(pid = 2105)
 ```
-![](https://github.com/fabkury/phea/raw/main/vignettes/bmi%20plot%20trim.png)
-
 ## Computing aggregates from a phenotype result  
-The result `bmi` returned by `calculate_formula()` is a lazy table. Let us manipulate it further to produce a few aggregates:  
+The result `bmi` returned by `calculate_formula()` is a lazy table. We can manipulate it further to produce a few aggregates:  
 ```{r, aggregates}
 # See summary statistics
 bmi |>
