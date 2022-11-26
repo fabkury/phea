@@ -100,7 +100,7 @@ parentheses in the `bmi` formula. Either approach would be equivalent.
   
 ## Plot the phenotype result  
 `phea_plot()` creates an interactive chart using the `plotly` library. It requires specifying the ID of one patient.
-```{r, out.width="100%", out.height = 500}
+```{r p, out.width="100%", out.height = 500}
 # Plot BMI phenotype for patient whose pid = 2105
 # We don't need to plot column weight_value_as_number.
 bmi |>
@@ -126,8 +126,9 @@ bmi |>
 ## Obtain SQL query that computes the phenotype  
 To see the SQL query underlying the phenotype, use `dbplyr::sql_render()`, or the `.clip_sql` option in
 `calculate_formula()`, or helper function `code_shot()`:  
-```{r, sql_query}
-dbplyr::sql_render(bmi)
+
+```sql
+`r dbplyr::sql_render(bmi)`
 ```
 
 ```{r, include = FALSE}
