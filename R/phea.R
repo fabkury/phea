@@ -691,24 +691,24 @@ calculate_formula <- function(components, fml = NULL, window = NA, export = NULL
 #' @param pid Required. ID of the patient to be included in the chart.
 #' @param verbose If TRUE, will let you know how long it takes to `collect()` the data.
 #' @return Plot created by `plotly::plot_ly()` and `plotly::subplot()`.
-phea_plot <- function(board, pid, verbose = TRUE) {
-  make_step_chart_data <- function(board_data) {
-    union_all(
-      board_data |>
-        dplyr::arrange(pid, ts) |>
-        dplyr::group_by(pid, name) |>
-        dplyr::mutate(linha = row_number()) |>
-        dplyr::ungroup(),
-      board_data |>
-        dplyr::arrange(pid, ts) |>
-        dplyr::group_by(pid, name) |>
-        dplyr::mutate(linha = row_number()) |>
-        dplyr::mutate(ts = lead(ts)) |>
-        dplyr::ungroup()) |>
-      dplyr::arrange(pid, ts, linha)
-  }
-
+phea_plot <- function(board, pid, plot_title = NULL, verbose = TRUE) {
   make_plotly_chart <- function(board_lazy) {
+    make_step_chart_data <- function(board_data) {
+      union_all(
+        board_data |>
+          dplyr::arrange(pid, ts) |>
+          dplyr::group_by(pid, name) |>
+          dplyr::mutate(linha = row_number()) |>
+          dplyr::ungroup(),
+        board_data |>
+          dplyr::arrange(pid, ts) |>
+          dplyr::group_by(pid, name) |>
+          dplyr::mutate(linha = row_number()) |>
+          dplyr::mutate(ts = lead(ts)) |>
+          dplyr::ungroup()) |>
+        dplyr::arrange(pid, ts, linha)
+    }
+    
     if(verbose)
       cat('Collecting lazy table, ')
     board_data <- dplyr::collect(board_lazy)
@@ -727,25 +727,21 @@ phea_plot <- function(board, pid, verbose = TRUE) {
         dplyr::filter(name == chart_item) |>
         dplyr::filter(!is.na(value))
       
-      if(nrow(res_board) > 0) {
-        res_plot <- res_board |>
-          plotly::plot_ly(
-            x = ~ts,
-            y = ~value,
-            type = 'scatter',
-            mode = 'lines',
-            name = chart_item) |>
-          plotly::layout(
-            legend = list(orientation = 'h'),
-            yaxis = list(
-              range = c(
-                min(res_board$value, na.rm = TRUE),
-                max(res_board$value, na.rm = TRUE)),
-              fixedrange = TRUE))
-        return(res_plot)
-      } else {
-        return(NULL)
-      }
+      res_plot <- res_board |>
+        plotly::plot_ly(
+          x = ~ts,
+          y = ~value,
+          type = 'scatter',
+          mode = 'lines',
+          name = chart_item) |>
+        plotly::layout(
+          legend = list(orientation = 'h'),
+          yaxis = list(
+            range = c(
+              min(res_board$value, na.rm = TRUE),
+              max(res_board$value, na.rm = TRUE)),
+            fixedrange = TRUE))
+      return(res_plot)
     })
     
     names(plot_args) <- chart_items
@@ -753,9 +749,15 @@ phea_plot <- function(board, pid, verbose = TRUE) {
     plot_args <- plot_args |>
       purrr::discard(is.null)
     
-    plot_args <- c(plot_args, nrows = length(plot_args), shareX = TRUE)
-    return(
-      do.call(plotly::subplot, plot_args))
+    plot_args <- c(
+      plot_args,
+      nrows = length(plot_args),
+      shareX = TRUE,
+      titleX = FALSE)
+    
+    res_plot <- do.call(plotly::subplot, plot_args)
+    
+    return(res_plot)
   }
   
   board <- board |>
