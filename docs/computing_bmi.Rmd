@@ -105,7 +105,7 @@ bmi |>
   select(-weight_value_as_number) |>
   phea_plot(pid = 8012)
 ```
-![BMI phenotype plot](https://github.com/fabkury/phea/raw/main/vignettes/bmi%20plot%20trim.png)
+![](https://github.com/fabkury/phea/raw/main/vignettes/bmi%20plot%20trim.png)
 
 ## Computing aggregates from a phenotype result  
 The result `bmi` returned by `calculate_formula()` is a lazy table. Let us manipulate it further to produce a few aggregates:  
