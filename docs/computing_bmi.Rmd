@@ -81,7 +81,7 @@ the names available to use in the formula. For example, if you want the `value_a
   
 Notice that, because the body height records in cdm_new_york3 are in centimeters, we use a separate formula to produce
 `height_in_meters`.  
-```{r, phenotype}
+```{r phenotype}
 # BMI phenotype
 bmi <- calculate_formula(
   components = list(
@@ -100,7 +100,7 @@ parentheses in the `bmi` formula. Either approach would be equivalent.
   
 ## Plot the phenotype result  
 `phea_plot()` creates an interactive chart using the `plotly` library. It requires specifying the ID of one patient.
-```{r p, out.width="100%", out.height = 500}
+```{r plot, out.width="100%", out.height = 500}
 # Plot BMI phenotype for patient whose pid = 2105
 # We don't need to plot column weight_value_as_number.
 bmi |>
@@ -109,7 +109,7 @@ bmi |>
 ```
 ## Computing aggregates from a phenotype result  
 The result `bmi` returned by `calculate_formula()` is a lazy table. We can manipulate it further to produce a few aggregates:  
-```{r, aggregates}
+```{r aggregates}
 # See summary statistics
 bmi |>
   group_by(pid) |>
@@ -124,10 +124,9 @@ bmi |>
 ```
 
 ## Obtain SQL query that computes the phenotype  
-To see the SQL query underlying the phenotype, use `dbplyr::sql_render()`, or the `.clip_sql` option in
-`calculate_formula()`, or helper function `code_shot()`:  
+To see the SQL query underlying the phenotype, use helper function `code_shot()`, or `dbplyr::sql_render()`, or the `.clip_sql` option in `calculate_formula()`.  
 ```{r, eval = FALSE}
-dbplyr::sql_render(bmi)
+code_shot(bmi)
 ```
 ```sql
 `r dbplyr::sql_render(bmi)`

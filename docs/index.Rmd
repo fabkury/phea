@@ -195,7 +195,7 @@ For the sake of the example, let us suppose the phenotype that you want to compu
   
 The numeric value of hemoglobin A1c is located in column `value_as_number` in the record source. The call to 
 `calculate_formula()` is then:  
-```{r}
+```{r formula}
 phen <- calculate_formula(
   components = list(
     hemo_a1c = hemoglobin_component),
@@ -208,19 +208,22 @@ with the component you named `hemo_a1c` in the `list()` when you called `calcula
 
 Object `phen`, returned by `calculate_formula()`, is a lazy table in the `dplyr`/`dbplyr` framework. It can be materialized into a tibble by calling `dplyr::collect()`, or manipulated further using Phea or `dplyr`/`dbplyr`.
 
-```{r}
+```{r collect_head}
 dplyr::collect(head(phen)) |>
   knitr::kable()
 ```
 
-To obtain just the SQL code, `sql_render()` can be used, or the option `.clip_sql` in `calculate_formula()`, or helper function `code_shot()`:  
+To obtain just the SQL code, use the convenience function `code_shot()`, or the option `.clip_sql` in `calculate_formula()`, or `dbplyr::sql_render()`:  
 
+```{r code_shot, eval = FALSE}
+code_shot(phen)
+```
 ```sql
-`r as.character(invisible(dbplyr::sql_render(phen)))`
+`r code_shot(phen)`
 ```
 Multiple formulas can be computed at once:  
 
-```{r}
+```{r multiple_formulas}
 phen <- calculate_formula(
   components = list(
     hemo_a1c = hemoglobin_component),
@@ -233,7 +236,7 @@ dplyr::collect(head(phen)) |>
 ```
 
 If you need to use the result of one formula in the next one, set `.cascaded = TRUE`:  
-```{r}
+```{r cascaded}
 phen <- calculate_formula(
   components = list(
     hemo_a1c = hemoglobin_component),
@@ -250,7 +253,7 @@ So far the examples showed formulas with only one component. Suppose you would l
 `phen = sqrt([hemoglobin a1c]) * [patient's age at the time of measurement]`  
 
 To obtain the patient's age, we can collect the date of birth from table `person`, then create a component from it.
-```{r}
+```{r patient_age}
 person_records <- make_record_source(
   records = sqlt(person),
   ts = birth_datetime,
@@ -272,7 +275,7 @@ dplyr::collect(head(phen)) |> knitr::kable()
 
 Phea includes in the result all data points used in the formula computation. If other columns from the same rows are
 wanted, `export = ` can be used:  
-```{r}
+```{r export}
 phen <- calculate_formula(
   components = list(
     hemo_a1c = hemoglobin_component,
@@ -297,7 +300,7 @@ available.
 `line` causes records to be _skipped_ in reverse chronological order. `line = 0` (default) gives the most recent
 record available. `line = 1` skips 1 record, that is, gives the second most recent. `line = 2` skips 2 records, and so
 on.
-```{r}
+```{r line}
 hemoglobin_component <- make_component(
   input_source = hemoglobin_record_source)
 
@@ -320,7 +323,7 @@ dplyr::collect(head(phen)) |> knitr::kable()
 `delay` imposes a minimum time difference between the timestamp of the component and the timestamp of the phenotype.
 They are defined in SQL language. For example, `delay = '1 day'` gives the most recently available record that is at
 least 1 day older than the phenotype. If there are no such records, the value is empty.
-```{r}
+```{r delay}
 hemoglobin_component <- make_component(
   input_source = hemoglobin_record_source)
 
@@ -347,7 +350,7 @@ both are provided, `line` is considered and `delay` is ignored. `delay` is only 
 ## Author contact
 Contact Fabrício Kury at fab@kury.dev.  
 
-```{r, echo = FALSE}
+```{r disconnect, echo = FALSE}
 DBI::dbDisconnect(dbcon)
 ```
 
