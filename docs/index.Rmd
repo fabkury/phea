@@ -119,12 +119,9 @@ _November 1st:_
 At each point in time, the most recently available data is used, unless you specify otherwise when creating a
 component.  
 
-
-
 ## How to set up
-First, you need to provide Phea with your SQL connection. 
-**While Phea is not necessarily restricted to PostgreSQL, this is the only SQL flavor where it has been tested.**  
-```{r setup}
+First you need to connect to your relational server. **While Phea is not restricted to PostgreSQL, so far it has only been tested on PostgreSQL version 15.**  
+```{r sql_connection}
 library(phea)
 
 # Connect to SQL server
@@ -135,16 +132,16 @@ dbcon <- DBI::dbConnect(
     dbname = 'fort',
     user = cred$pg$user, # Credentials not declared in this file
     password = cred$pg$pass) # Credentials not declared in this file
-    
-# Setup Phea and define cdm_new_york3 as default schema.
+```
+
+Calling `setup_phea()` is optional, but it enables the use of convenience functions `sql0()` and `sqlt()`.  
+
+```{r phea_setup}
+# Setup Phea and define cdm_new_york3 as the default schema.
 setup_phea(
   connection = dbcon,
   schema = 'cdm_new_york3')
 ```
-
-`setup_phea()` will save `dbi_connection` and `def_schema` for use by functions `sql0()` and `sqlt()`. Most importantly,
-however, it will install two user-defined functions on the SQL server (`phea_coalesce_r_sfunc` and
-`phea_find_last_ignore_nulls`), if they are not already there.  
 
 ## How to compute a formula
 Each formula computation comes from combining three parts:  
@@ -153,21 +150,20 @@ Each formula computation comes from combining three parts:
 * One or more `components`  
 * One or more `formulas`  
 
-A `record source` is any SQL query that provides data you want to use. Its records are assigned a label `rec_name`. The
-`record source` is assumed to be a _long table_, that is, each row corresponds to one record. At a minimum, each row in
-a `record source` must have a patient identifier (`pid`) column and a timestamp (`ts`) column.   
+### Record sources
+A `record source` is any SQL query that provides a table with the data you want to use. For example, `select * from procedure_occurrence;`. It can be arbitrarily complex, with any number of clauses, subqueries, `JOIN`, `UNION`, etc. The `record source` is assumed to be a _long table_, that is each row corresponds to one record, and among the columns there is one that contains a patient identifier (`pid`) and one that contains a timestamp (`ts`).  
 
-For exemple, suppose you have an OMOP Common Data Model schema called `cdm_new_york3`, and you would like to compute a
-formula involving a patient's hemoglobin A1c level.  
- - Such hemoglobin records are in table `measurement` inside schema `cdm_new_york3`.  
- - They are identified by the OMOP CDM concept_id of `3004410` (corresponds to LOINC code `4548-4`, `Hemoglobin A1c/Hemoglobin.total in Blood`).  
- - The patient identifiers are in column `person_id`  
+For example, suppose you have an OMOP Common Data Model schema called `cdm_new_york3`, and you would like to compute a
+formula involving hemoglobin A1c levels.  
+
+ - Such hemoglobin A1c records are in table `MEASUREMENT` inside schema `cdm_new_york3`.  
+ - They are identified by the OMOP CDM concept ID `3004410`, corresponding to LOINC code `4548-4`, `Hemoglobin A1c/Hemoglobin.total in Blood`.  
+ - The patient identifiers are in column `person_id`.  
  - The timestamps are in column `measurement_datetime`.  
- - In the formula, we want to refer to this value as "hemo_a1c".  
 
-Let's create the record source:  
+That would constitute a record source. Let us create it in Phea:  
 
-```{r}
+```{r record_source}
 hemoglobin_query <- sql0('
   select * from cdm_new_york3.measurement
   where measurement_concept_id = 3004410
@@ -179,58 +175,49 @@ hemoglobin_record_source <- make_record_source(
   pid = person_id)
 ```
 
-A `component` is a specification of what records to pick from `record source`. If you just want the most recently
-available record, the default values need not be overriden:
+### Components
+A `component` is a specification of _what records_ to pick from `record source`. You provide a `record source` to function `make_component()`, and it returns a `component`. If the records you want to use in the formula are simply the most recently available at each point in time, just use the default values:  
 
-```{r}
-hemoglobin_component <- make_component(
-  input_source = hemoglobin_record_source)
+```{r component}
+hemoglobin_component <- make_component(hemoglobin_record_source)
 ```
 
-The `hemoglobin_component` can now be used to call `calculate_formula()`. For the sake of the example, let us suppose
-the phenotype `phen` that you want to compute is merely the square root of the patient's hemoglobin A1c level.  
+The `hemoglobin_component` can now be used to call `calculate_formula()`.  
+  
+The other records that can be picked by `make_component()` are:  
+ - **`line = N` (a.k.a. `lag(N)`): pick the (N+1)th most recent record.** `line = 1` gives the 2nd most recent record, `line = 2` the third, etc. If you ask for the 2nd most recent (`line = 1`), but the patient only has 1 instance of that record, the value is NULL.  
+ - **`delay = T`: pick the most recent record that is at least time distance `T` older than the phenotype date.** For example, if you put in a formula a diagnosis component with `delay('60 days')`, and a lab result component without `delay`, the result will include only the cases when the timestamp of the diagnosis is at least 60 days older than the timestamp of the lab result. If there is no such record, the value is NULL.  
 
-`phen = sqrt(hemoglobin A1c level)`  
-
-The numeric value hemoglobin A1c is located in column `value_as_number` within the record source. The call to 
-`calculate_formula()` is then:
-
-```{r}
-phen <- calculate_formula(
-  components = list(
-    hemo_a1c = hemoglobin_component),
-  fml = 'sqrt(hemo_a1c_value_as_number)')
-```
-
-Phea automatically recognizes that `hemo_a1c_value_as_number` means column `value_as_number` in the SQL table associated
-with component `hemo_a1c`.    
-
-Object `phen` is a lazy table in the `dplyr`/`dbplyr` framework. It can be materialized into a tibble by calling
-`collect()`, or manipulated further using Phea or `dplyr`/`dbplyr`.
-
-```{r}
-dplyr::collect(head(phen)) |> knitr::kable()
-```
-
-To obtain just the SQL code, `sql_render()` can be used, or the option `.clip_sql` in `calculate_formula()`:  
-
-```{r}
-dbplyr::sql_render(phen)
-```
-
-Notice that the result of the `sqrt(hemo_a1c_value_as_number)` is in column `value`. This can be changed by giving a
-name to the formula in the call to `calculate_formula()`:  
-
+## Calculate a formula  
+For the sake of the example, let us suppose the phenotype that you want to compute is merely the square root of the patient's hemoglobin A1c level.  
+  
+`a1c_sqrt = sqrt(hemoglobin A1c level)`  
+  
+The numeric value of hemoglobin A1c is located in column `value_as_number` in the record source. The call to 
+`calculate_formula()` is then:  
 ```{r}
 phen <- calculate_formula(
   components = list(
     hemo_a1c = hemoglobin_component),
   fml = list(
     a1c_sqrt = 'sqrt(hemo_a1c_value_as_number)'))
-
-dplyr::collect(head(phen)) |> knitr::kable()
 ```
 
+Phea automatically recognizes that `hemo_a1c_value_as_number` means column `value_as_number` in the SQL table associated
+with the component you named `hemo_a1c` in the `list()` when you called `calculate_formula()`. This is the syntax for accessing column values.    
+
+Object `phen`, returned by `calculate_formula()`, is a lazy table in the `dplyr`/`dbplyr` framework. It can be materialized into a tibble by calling `dplyr::collect()`, or manipulated further using Phea or `dplyr`/`dbplyr`.
+
+```{r}
+dplyr::collect(head(phen)) |>
+  knitr::kable()
+```
+
+To obtain just the SQL code, `sql_render()` can be used, or the option `.clip_sql` in `calculate_formula()`, or helper function `code_shot()`:  
+
+```sql
+`r as.character(invisible(dbplyr::sql_render(phen)))`
+```
 Multiple formulas can be computed at once:  
 
 ```{r}
@@ -241,7 +228,8 @@ phen <- calculate_formula(
     a1c_sqrt = 'sqrt(hemo_a1c_value_as_number)',
     a1c_cubed = 'hemo_a1c_value_as_number * hemo_a1c_value_as_number * hemo_a1c_value_as_number'))
 
-dplyr::collect(head(phen)) |> knitr::kable()
+dplyr::collect(head(phen)) |>
+  knitr::kable()
 ```
 
 If you need to use the result of one formula in the next one, set `.cascaded = TRUE`:  
