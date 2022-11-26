@@ -105,9 +105,10 @@ bmi |>
   select(-weight_value_as_number) |>
   phea_plot(pid = 8012)
 ```
-![BMI phenotype plot](https://github.com/fabkury/phea/raw/main/vignettes/bmi%20plot%202.png)
+![BMI phenotype plot](https://github.com/fabkury/phea/raw/main/vignettes/bmi%20plot%20trim.png)
 
-The result `bmi` is a lazy table. Let us manipulate it further to produce a few aggregates:  
+## Computing aggregates from a phenotype result  
+The result `bmi` returned by `calculate_formula()` is a lazy table. Let us manipulate it further to produce a few aggregates:  
 ```{r, aggregates}
 # See summary statistics
 bmi |>
@@ -122,8 +123,9 @@ bmi |>
   kable()
 ```
 
+## Obtain SQL query that computes the phenotype  
 To see the SQL query underlying the phenotype, use `dbplyr::sql_render()`, or the `.clip_sql` option in
-`calculate_formula()`:  
+`calculate_formula()`, or helper function `code_shot()`:  
 ```{r, sql_query}
 dbplyr::sql_render(bmi)
 ```

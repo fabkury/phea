@@ -4,7 +4,7 @@
 \alias{phea_plot}
 \title{Plot a phenotype.}
 \usage{
-phea_plot(board, pid, verbose = TRUE)
+phea_plot(board, pid, plot_title = NULL, verbose = TRUE)
 }
 \arguments{
 \item{board}{The object returned by \code{calculate_formula()}.}
