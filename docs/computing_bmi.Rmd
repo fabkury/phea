@@ -55,16 +55,16 @@ setup_phea(dbcon, 'cdm_new_york3')
 We must specify which column (in the lazy table) is the timestamp, and which column is the patient ID. Notice that we
 don't use quotes "".  
 ```{r components}
-# Weight records
-# Loinc 29463-7 Body weight, concept ID 3025315
+# Weight component
+# Loinc 29463-7 Body weight, OMOP concept ID 3025315
 weight <- sqlt(measurement) |>
   filter(measurement_concept_id == 3025315) |>
   make_component(
     .ts = measurement_datetime,
     .pid = person_id)
 
-# Height records
-# Loinc 8302-2 Body height, concept ID 3036277
+# Height component
+# Loinc 8302-2 Body height, OMOP concept ID 3036277
 height <- sqlt(measurement) |>
   filter(measurement_concept_id == 3036277) |>
   make_component(
