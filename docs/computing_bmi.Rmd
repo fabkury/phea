@@ -102,9 +102,9 @@ parentheses in the `bmi` formula. Either approach would be equivalent.
 `phea_plot()` creates an interactive chart using the `plotly` library. It requires specifying the ID of one patient.
 ```{r plot, out.width="100%", out.height = 500}
 # Plot BMI phenotype for patient whose pid = 2105
-# We don't need to plot column height_value_as_number.
 bmi |>
-  select(-height_value_as_number) |>
+  select(-height_value_as_number) |> # We don't need to plot column height_value_as_number
+  rename(weight_in_kg = weight_value_as_number) |> # Rename column
   phea_plot(pid = 2105)
 ```
 ## Computing aggregates from a phenotype result  
