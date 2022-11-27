@@ -692,38 +692,14 @@ calculate_formula <- function(components, fml = NULL, window = NA, export = NULL
 #' @param verbose If TRUE, will let you know how long it takes to `collect()` the data.
 #' @return Plot created by `plotly::plot_ly()` and `plotly::subplot()`.
 phea_plot <- function(board, pid, plot_title = NULL, verbose = TRUE) {
-  make_plotly_chart <- function(board_lazy) {
-    make_step_chart_data <- function(board_data) {
-      union_all(
-        board_data |>
-          dplyr::arrange(pid, ts) |>
-          dplyr::group_by(pid, name) |>
-          dplyr::mutate(linha = row_number()) |>
-          dplyr::ungroup(),
-        board_data |>
-          dplyr::arrange(pid, ts) |>
-          dplyr::group_by(pid, name) |>
-          dplyr::mutate(linha = row_number()) |>
-          dplyr::mutate(ts = lead(ts)) |>
-          dplyr::ungroup()) |>
-        dplyr::arrange(pid, ts, linha)
-    }
-    
-    if(verbose)
-      cat('Collecting lazy table, ')
-    board_data <- dplyr::collect(board_lazy)
-    if(verbose)
-      cat('done.\n')
-    
-    comp_board <- make_step_chart_data(board_data)
-    
-    chart_items <- comp_board |>
+  make_plotly_chart <- function(board_long) {
+    chart_items <- board_long |>
       dplyr::select(name) |>
       dplyr::distinct() |>
       dplyr::pull()
     
     plot_args <- purrr::map(chart_items, \(chart_item) {
-      res_board <- comp_board |>
+      res_board <- board_long |>
         dplyr::filter(name == chart_item) |>
         dplyr::filter(!is.na(value))
       
@@ -763,9 +739,36 @@ phea_plot <- function(board, pid, plot_title = NULL, verbose = TRUE) {
   board <- board |>
     dplyr::filter(pid == local(pid))
   
-  board_long <- board |>
+  if(verbose)
+    cat('Collecting lazy table, ')
+  board_data <- dplyr::collect(board)
+  if(verbose)
+    cat('done.\n')
+  
+  board_long <- board_data |>
     tidyr::pivot_longer(
       cols = !c(row_id, pid, ts, window))
+  
+  make_step_chart_data <- function(board_data) {
+    union_all(
+      
+      board_data |>
+        dplyr::arrange(pid, ts) |>
+        dplyr::group_by(pid, name) |>
+        dplyr::mutate(linha = row_number()) |>
+        dplyr::ungroup(),
+      
+      board_data |>
+        dplyr::arrange(pid, ts) |>
+        dplyr::group_by(pid, name) |>
+        dplyr::mutate(linha = row_number()) |>
+        dplyr::mutate(ts = lead(ts)) |>
+        dplyr::ungroup()) |>
+      
+      dplyr::arrange(pid, ts, linha)
+  }
+  
+  board_long <- make_step_chart_data(board_long)
   
   return(make_plotly_chart(board_long))
 }
