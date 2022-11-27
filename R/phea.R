@@ -549,15 +549,15 @@ calculate_formula <- function(components, fml = NULL, window = NA, export = NULL
   commands <- purrr::map2(names(components), components, produce_component) |> unlist()
   
   # Then, apply on the board.
-
   board <- dplyr::transmute(board,
     row_id = dplyr::sql('row_number() over ()'),
     pid, ts,
     !!!commands)
-
+  
   # Then fill the blanks downward with the last non-blank value.
   board <- board |>
     dbplyr::window_order(pid, ts) |>
+    dplyr::group_by(pid) |>
     tidyr::fill(!c(row_id, pid, ts))
 
 # Compute window --------------------------------------------------------------------------------------------------
