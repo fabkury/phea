@@ -554,7 +554,7 @@ calculate_formula <- function(components, fml = NULL, window = NA, export = NULL
     pid, ts,
     !!!commands)
   
-  # Then fill the blanks downward with the last non-blank value.
+  # Then fill the blanks downward with the last non-blank value, within the patient.
   board <- board |>
     dbplyr::window_order(pid, ts) |>
     dplyr::group_by(pid) |>

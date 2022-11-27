@@ -29,13 +29,13 @@ dbcon <- DBI::dbConnect(RPostgres::Postgres(),
 setup_phea(dbcon, 'cdm_new_york3')
 ```
 
-Say we want to find patients whose weight has dropped by more than 25% in the last 1 years to 2 years. The formula for the number we want is very simple:  
+Say we want to find patients whose weight has increased by more than 50% in the last 2 years to 3 years. The formula for the number we want is very simple:  
 
 `weight_drop = (weight_current - weight_previous) / weight_previous`  
 
-If `weight_drop` is ever -0.25 or smaller, that means a drop of 25% or bigger. But unlike in other formulas, here the component `weight_previous` is not the most recently available weight record for the given patient, at the given point in time.  
+If `weight_drop` is ever ≥0.5, that means an increase of ≥50%. But unlike in other formulas, here the component `weight_previous` is not the most recently available weight record for the given patient, at the given point in time.  
 
-While the _record source_ is the same as `weight_current`, the _component_ is different. When we call `make_component()`, we need to specify the time frame using the `delay` option, and optionally the `window` as well.  
+While the _record source_ is the same as `weight_current`, the _component_ is different. When we call `make_component()`, we need to specify the time frame using the `delay` option (and optionally the `window` as well).  
 
 ```{r delay}
 # Weight records
@@ -55,16 +55,18 @@ weight_previous = make_component(weight_record_source,
   window = '4 years')
 ```
 
-_`delay` will pick the most recent record that is **at least as old** as the specified amount of time._  
+_`delay` picks the most recent record that is **at least as old** as the specified amount of time._  
 
-_`window` imposes a **limit on how old** the record is allowed to be._  
+_`window` **limits how old** the record is allowed to be._  
 
 Both are expressed in SQL language, including the automatic parsing, by the server, of terms such as `'2 years'`, `'2.5 hours'`, `'1 week'`, etc.  
 
 If no such record exists for the patient, at the given point in time, the value is `NULL`.  
 
 ## Calculate the phenotype  
+
 Armed with the two components, we call `calculate_formula()`:  
+
 ```{r phenotype}
 phen <- calculate_formula(
   components = list(
@@ -73,12 +75,13 @@ phen <- calculate_formula(
   fml = list(
     weight_change = '(weight_current_value_as_number - weight_previous_value_as_number) /
       weight_previous_value_as_number',
-    weight_25p_increase = "case when weight_change >= 0.25 then 'yes' else 'no' end"),
+    weight_50p_increase = "case when weight_change >= 0.5 then 'yes' else 'no' end"),
   export = list(
     'weight_current_measurement_datetime',
     'weight_previous_measurement_datetime')) |>
   filter(!is.na(weight_change))
 ```
+
 ## Plot the phenotype result  
 ```{r, include = FALSE}
 # # Source:     SQL [?? x 3]
@@ -109,33 +112,30 @@ phen <- calculate_formula(
 # 10583 # 125 # 69 # 10
 # 5333 # 170 # 68
 ```
-```{r plot, out.width="100%", out.height = 500}
-# Plot phenotype for patient whose pid = 20198 
+
+## Filter patients whose increase is at least 50%  
+The `phen` object is a _lazy table_, which means it is a SQL query. We can manipulate it to obtain only the patients that had a ≥50% increase in body weight at least once in their history.  
+
+```{r random_patient_plot, out.width="100%", out.height = 500}
+patients_50p <- phen |>
+  filter(weight_change >= 0.5) |> # Only rows where increase is ≥50%
+  group_by(pid) |> # Group by patient ID
+  summarise(
+    first_50p_increase = min(ts, na.rm = TRUE)) |> # Keep timestamp of earliest increase of ≥50% for each patient
+  collect() # Execute query and download data from the server to local memory
+
+# Sample one patient at random, from among those with ≥50% weight increase at least once in their history.
+sample_patient <- sample(patients_50p$pid, 1)
+message('Sampled patient: ', sample_patient)
+
+# Plot the phenotype for the sampled patient.
 phen |>
   select(
     -weight_current_measurement_datetime,
     -weight_previous_measurement_datetime,
-    -weight_25p_increase) |>
-  phea_plot(pid = 20198)
+    -weight_50p_increase) |>
+  phea_plot(pid = sample_patient)
 ```
-
-```{r, eval = FALSE}
-weight_record_source$records |>
-  filter(person_id == 20198) |>
-  select(person_id, measurement_datetime, value_as_number) |>
-  arrange(person_id, measurement_datetime) |>
-  head_shot(1000)
-
-phen |>
-  filter(pid == 20198) |>
-  arrange(pid, ts) |>
-  head_shot(1000)
-
-weight_record_source$records |>
-  filter(measurement_id == 8401826) |>
-  head_shot()
-```
-## Compute aggregates of the phenotype result  
 
 ## Obtain the SQL query that computes the phenotype  
 To see the SQL query underlying the phenotype, use helper function `code_shot()`, or `dbplyr::sql_render()`, or the `.clip_sql` option in `calculate_formula()`.  
