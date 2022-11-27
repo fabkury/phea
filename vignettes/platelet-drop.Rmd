@@ -1,0 +1,161 @@
+---
+title: "Calculate drop in body weight"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Calculate drop in body weight}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+This vignette assumes a SQL server at `localhost` (we use PostgreSQL), with an OMOP Common Data Model v5.4 in schema `cdm_new_york3` containing patient records. The patient records shown in this example are synthetic data from [Synthea Patient Generator](https://github.com/synthetichealth/synthea).  
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+# kury - credenciais.R contains the cred$pg credentials.
+source(paste0(Sys.getenv("HOME"), '/Estudo/Tecnologia/R/espinha/credenciais.R'))
+```
+```{r setup}
+library(knitr)
+library(phea)
+suppressPackageStartupMessages(library(dplyr))
+
+# Connect to SQL server.
+dbcon <- DBI::dbConnect(RPostgres::Postgres(),
+    host = 'localhost', port = 7654,
+    dbname = 'fort', user = cred$pg$user, password = cred$pg$pass)
+
+# Provide the connection to Phea so we can use the sqlt() and sql0() shorthands.
+setup_phea(dbcon, 'cdm_new_york3')
+```
+
+Say we want to find patients whose weight has dropped by more than 25% in the last 1 years to 2 years. The formula for the number we want is very simple:  
+
+`weight_drop = (weight_current - weight_previous) / weight_previous`  
+
+If `weight_drop` is ever -0.25 or smaller, that means a drop of 25% or bigger. But unlike in other formulas, here the component `weight_previous` is not the most recently available weight record for the given patient, at the given point in time.  
+
+While the _record source_ is the same as `weight_current`, the _component_ is different. When we call `make_component()`, we need to specify the time frame using the `delay` option, and optionally the `window` as well.  
+
+```{r delay}
+# Weight records
+# Loinc 29463-7 Body weight, concept ID 3025315
+weight_record_source = sqlt(measurement) |>
+  filter(measurement_concept_id == 3025315) |>
+  make_record_source(
+    ts = measurement_datetime,
+    pid = person_id)
+
+# Most recent weight count record
+weight_current = make_component(weight_record_source)
+
+# weight count record at least 24 hours older than phenotype date, up to limit of 48 hours
+weight_previous = make_component(weight_record_source,
+  delay = '2 year',
+  window = '4 years')
+```
+
+_`delay` will pick the most recent record that is **at least as old** as the specified amount of time._  
+
+_`window` imposes a **limit on how old** the record is allowed to be._  
+
+Both are expressed in SQL language, including the automatic parsing, by the server, of terms such as `'2 years'`, `'2.5 hours'`, `'1 week'`, etc.  
+
+If no such record exists for the patient, at the given point in time, the value is `NULL`.  
+
+## Calculate the phenotype  
+Armed with the two components, we call `calculate_formula()`:  
+```{r phenotype}
+phen <- calculate_formula(
+  components = list(
+    weight_current = weight_current,
+    weight_previous = weight_previous),
+  fml = list(
+    weight_drop = '(weight_current_value_as_number - weight_previous_value_as_number) /
+      weight_previous_value_as_number',
+    weight_25p_drop = "case when weight_drop <= -0.25 then 'yes' else 'no' end")) |>
+  filter(!is.na(weight_drop))
+```
+## Plot the phenotype result  
+```{r, include = FALSE}
+# # Source:     SQL [?? x 3]
+# # Database:   postgres  [postgres@localhost:7654/fort]
+# # Ordered by: desc(uvals)
+#      pid   lines   uvals
+#    <int> <int64> <int64>
+#  1 10473      78      78
+#  2  6028      75      75
+#  3 11176      74      74
+#  4  5601      75      74
+#  5 21264      73      73
+#  6  4172      73      72
+#  7 14117      72      71
+#  8 20051      71      71
+#  9 10617      71      71
+# 10 19133      72      70
+
+	
+# person_id
+# linhas
+# dists
+# 1
+# 11872
+# 133
+# 81
+# 2
+# 22242
+# 158
+# 78
+# 3
+# 22906
+# 182
+# 76
+# 4
+# 4191
+# 141
+# 75
+# 5
+# 20198
+# 160
+# 73
+# 6
+# 5274
+# 136
+# 72
+# 7
+# 18843
+# 132
+# 71
+# 8
+# 1665
+# 162
+# 69
+# 9
+# 10583
+# 125
+# 69
+# 10
+# 5333
+# 170
+# 68
+```
+```{r plot, out.width="100%", out.height = 500}
+# Plot phenotype for patient whose pid = 20198 
+phen |>
+  select(-weight_25p_drop) |>
+  phea_plot(pid = 20198)
+```
+## Compute aggregates of the phenotype result  
+
+## Obtain the SQL query that computes the phenotype  
+To see the SQL query underlying the phenotype, use helper function `code_shot()`, or `dbplyr::sql_render()`, or the `.clip_sql` option in `calculate_formula()`.  
+```{r, eval = FALSE}
+code_shot(phen)
+```
+```sql
+`r code_shot(phen)`
+```
+
+```{r, include = FALSE}
+DBI::dbDisconnect(dbcon)
+```

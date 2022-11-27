@@ -525,18 +525,17 @@ calculate_formula <- function(components, fml = NULL, window = NA, export = NULL
     over_clause <- paste0('partition by "pid", "name" order by "ts"')
 
     # Give priority to access via *line*.
+    sql_start <- paste0('last_value(', columns_sql, ') over (', over_clause, ' ')
     if(!is.na(component$line)) {
       # TODO: Test if last_value() + find_last_ignore_nulls() has better performance than just find_last_ignore_nulls().
-      sql_txts <- paste0('last_value(', columns_sql, ') over (', over_clause,
-        ' rows between unbounded preceding and ', component$line, ' preceding)')
+      sql_txts <- paste0(sql_start,
+        'rows between unbounded preceding and ', component$line, ' preceding)')
     } else {
       # Otherwise, produce access via *delay*.
-      range_start_clause <- ifelse(component$comp_window == Inf,
-        'range between unbounded preceding',
-        paste0('range between \'', component$comp_window, '\'::interval preceding'))
-
-      sql_txts <- paste0('last_value(', columns_sql, ') over (', over_clause, ' ',
-        range_start_clause, ' and \'', component$delay, '\'::interval preceding', ')')
+      sql_txts <- paste0(sql_start, 'range between ',
+        ifelse(component$comp_window == Inf, 'unbounded',
+          paste0('\'', component$comp_window, '\'::interval')), ' preceding ',
+        'and \'', component$delay, '\'::interval preceding)')
     }
 
     commands <- purrr::map2(component_columns, sql_txts,
@@ -550,6 +549,7 @@ calculate_formula <- function(components, fml = NULL, window = NA, export = NULL
   commands <- purrr::map2(names(components), components, produce_component) |> unlist()
   
   # Then, apply on the board.
+
   board <- dplyr::transmute(board,
     row_id = dplyr::sql('row_number() over ()'),
     pid, ts,
