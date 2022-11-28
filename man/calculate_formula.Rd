@@ -18,6 +18,7 @@ calculate_formula(
   .require_all = FALSE,
   .lim = NA,
   .dont_require = NULL,
+  .filter = NULL,
   .cascaded = TRUE,
   .clip_sql = FALSE
 )
@@ -40,6 +41,9 @@ timestamps (even if their value is NA). If \code{.dont_require} is provided, \co
 
 \item{.dont_require}{If provided, causes formula to require all components (regardless of .require_all), except for
 those listed here.}
+
+\item{.filter}{Character string or list of strings. Logical conditions to satisfy. These go into the SQL \code{WHERE}
+clause. Only rows satisfying all conditions provided will be returned.}
 
 \item{.cascaded}{If \code{TRUE} (default), each formula is computed in a separate, nested SELECT statement. This allows
 the result of the prior formula to be used in the following, at the potential cost of longer computation times.}

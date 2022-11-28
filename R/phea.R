@@ -21,16 +21,12 @@ if(!exists('.pheaglobalenv'))
 keep_row_by <- function(lazy_tbl, by, partition, win_fn = 'min') {
   if(!win_fn %in% c('min', 'max'))
     stop("win_fn must be 'min' or 'max'.")
-  if(class(substitute(by)) == 'name')
-    by_name <- deparse(substitute(by))
-  else
-    by_name <- by
   partition_txt <- paste0(partition, collapse = '", "')
-  sql_txt <- paste0(win_fn, '("', by_name, '") over (partition by "', partition_txt, '")')
+  sql_txt <- paste0(win_fn, '("', by, '") over (partition by "', partition_txt, '")')
   res <- lazy_tbl |>
     dplyr::mutate(
       phea_calc_var = dplyr::sql(sql_txt)) |>
-    dplyr::filter(!!rlang::sym(by_name) == phea_calc_var) |>
+    dplyr::filter(!!rlang::sym(by) == phea_calc_var) |>
     dplyr::select(-phea_calc_var)
   res
 }
@@ -314,11 +310,13 @@ make_record_source <- function(records, rec_name = NULL, ts, pid, vars = NULL, .
 #' @param .cascaded If `TRUE` (default), each formula is computed in a separate, nested SELECT statement. This allows
 #' the result of the prior formula to be used in the following, at the potential cost of longer computation times.
 #' @param .clip_sql If `TRUE`, instead of lazy table it returns the SQL query as a SQL object (can be converted to
-#' character using `as.character()`), and also copies it to the clipboard.
+#' character using `as.character()`), and also copies it to the clipboard.  
+#' @param .filter Character string or list of strings. Logical conditions to satisfy. These go into the SQL `WHERE`
+#' clause. Only rows satisfying all conditions provided will be returned.  
 #' @return Lazy table with result of formula or formulas.
 calculate_formula <- function(components, fml = NULL, window = NA, export = NULL, add_components = NULL,
   .ts = NULL, .pid = NULL, .rec_name = NULL, .delay = NULL, .line = NULL,
-  .require_all = FALSE, .lim = NA, .dont_require = NULL,
+  .require_all = FALSE, .lim = NA, .dont_require = NULL, .filter = NULL,
   .cascaded = TRUE, .clip_sql = FALSE) {
 # Prepare ---------------------------------------------------------------------------------------------------------
   # TODO: Improve the logic regarding these two variables below.
@@ -426,9 +424,30 @@ calculate_formula <- function(components, fml = NULL, window = NA, export = NULL
     # If no formula, no composed_names to export from it.
     g_vars <- NULL
   }
+  
+  # Read input filter or filters
+  if(!is.null(.filter)) {
+    # Extract components from filters.
+    filter_vars <- unlist(.filter) |>
+      stringr::str_match_all('([A-z][A-z0-9_]+)') |>
+      unlist() |> unique()
+    
+    # Filter bogus matches (eg. SQL keywords in the formula) by keeping only the composed_names that can possibly come from
+    # the given combination of record sources and components.
+    filter_vars <- filter_vars[filter_vars %in% var_map$composed_name]
+  } else {
+    # If no filter, no composed_names to export from it.
+    filter_vars <- NULL
+  }
 
+  # Add variables required by the filters.
+  g_vars <- c(g_vars, filter_vars)
+  
   # Add variables requested to export.
   g_vars <- c(g_vars, export)
+  
+  # Remove duplicates in case of any, just in case.
+  g_vars <- unique(g_vars)
   
   # Filter the variable map to contain only what we'll need.
   var_map <- dplyr::filter(var_map, composed_name %in% g_vars) |>
@@ -523,11 +542,10 @@ calculate_formula <- function(components, fml = NULL, window = NA, export = NULL
     }
 
     over_clause <- paste0('partition by "pid", "name" order by "ts"')
-
-    # Give priority to access via *line*.
     sql_start <- paste0('last_value(', columns_sql, ') over (', over_clause, ' ')
+    
     if(!is.na(component$line)) {
-      # TODO: Test if last_value() + find_last_ignore_nulls() has better performance than just find_last_ignore_nulls().
+      # Give priority to access via *line*.
       sql_txts <- paste0(sql_start,
         'rows between unbounded preceding and ', component$line, ' preceding)')
     } else {
@@ -594,6 +612,12 @@ calculate_formula <- function(components, fml = NULL, window = NA, export = NULL
   } else {
     board <- board |>
       dplyr::filter(row_id == ts_row)
+  }
+  
+  if(!is.null(.filter)) {
+    sql_txt <- paste0('(', paste0(.filter, collapse = ') AND ('), ')')
+    board <- board |>
+      filter(sql(sql_txt))
   }
 
   # Clean temporary variables used for computing the formula and the window.

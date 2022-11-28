@@ -1,0 +1,229 @@
+---
+title: "Find myocardial infarction in obese patients"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Calculate drop in body weight}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+_This vignette assumes a SQL server at `localhost` (we use PostgreSQL), with an OMOP Common Data Model v5.4 in schema `cdm_new_york3` containing patient records. The patient records shown in this example are synthetic data from [Synthea Patient Generator](https://github.com/synthetichealth/synthea)._  
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+library(knitr)
+# kury - credenciais.R contains the cred$pg credentials.
+source(paste0(Sys.getenv("HOME"), '/Estudo/Tecnologia/R/espinha/credenciais.R'))
+```
+```{r setup}
+library(phea)
+suppressPackageStartupMessages(library(dplyr))
+
+# Connect to SQL server.
+dbcon <- DBI::dbConnect(RPostgres::Postgres(),
+    host = 'localhost', port = 7654,
+    dbname = 'fort', user = cred$pg$user, password = cred$pg$pass)
+
+# Provide the connection to Phea so we can use the sqlt() and sql0() shorthands.
+setup_phea(dbcon, 'cdm_new_york3')
+```
+
+How to find patients who had an acute myocardial infarction (AMI) when they were clinically obese (body mass index, BMI > 30)?  
+
+A patient can have multiple myocardial infarctions, and their weight can change over time. In this example we are only interested in cases where the AMI happened while the patient's BMI was known to be > 30.  
+
+The problem is, we cannot go back in time and measure the BMI of the patient on the day the AMI happened. Maybe someone did measure the patient's weight on that day, but maybe not. Maybe the only weight measurement available for that person is from 3 years before that day. Or maybe the AMI happened between two weight measurements, one giving BMI > 30 hence obesity, another giving BMI < 30 hence no obesity. Which one do you pick?  
+
+Here, we will pick whichever combination of records is _closest in time to each other_. Say a patient:  
+
+ - was weighed on day 1 and found to be obese,  
+ - then the next available weight measurement is from day 120 and he was NOT obese anymore,  
+ - and that patient had an AMI on day 40,  
+...that means that on day 40, the closest weight record was the one from day 1, which said the patient was obese. So, that was a case of an AMI happening while a patient was known to be obese. That would not be the case had the AMI been on day 90, for example.  
+
+```{r, eval = FALSE}
+# At each point in time, we only know the data available up to that point.  
+# 
+#  - If the patient is 1.8 meters tall and weighs 90 kg on May 1st, his BMI is `r round(90/1.8^2, 1)`, and he is not obese.  
+#  - If on September 1st a new body weight measurement is made and he weighs 100 kg, his BMI becomes `r round(100/1.8^2, 1)`, and he is obese.  
+#  - Therefore, on August 31st, that patient was considered not obese, then starting from September 1st, he was considered obese.  
+# 
+# Here is a formula to define what we are looking for:  
+# `phenotype = has_ami AND bmi > 30`  
+#   
+# Notice the `AND` operator. This is a Boolean formula, therefore _all components must resolve to a Boolean value._
+#   
+# `has_ami`: TRUE if the date of the AMI is known (i.e. AMI happened) and it is after the BMI date.    
+```
+
+## Calculate body mass index  
+Let us first compute body mass index like in [another vignette](https://fabkury.github.io/phea/computing_bmi.html).  
+```{r components}
+potential_person_ids <- sqlt(condition_occurrence) |>
+  filter(condition_concept_id == 4329847) |>
+  select(person_id) |>
+  distinct()
+
+# Weight component
+# Loinc 29463-7 Body weight, OMOP concept ID 3025315
+weight_component <- sqlt(measurement) |>
+  filter(measurement_concept_id == 3025315) |>
+  make_component(
+    .ts = measurement_datetime,
+    .pid = person_id)
+
+# Height component
+# Loinc 8302-2 Body height, OMOP concept ID 3036277
+height_component <- sqlt(measurement) |>
+  filter(measurement_concept_id == 3036277) |>
+  make_component(
+    .ts = measurement_datetime,
+    .pid = person_id)
+
+# Acute myocardial infarction (AMI) component
+# SNOMED 22298006 Myocardial infarction, OMOP concept ID 4329847
+ami_component <- sqlt(condition_occurrence) |>
+  filter(condition_concept_id == 4329847) |>
+  make_component(
+    .ts = condition_start_datetime,
+    .pid = person_id)
+
+# AMI in obese patient
+ami_obese <- calculate_formula(
+  components = list(
+    weight = weight_component,
+    height = height_component,
+    ami = ami_component),
+  fml = list(
+    height_in_meters = 'height_value_as_number / 100',
+    bmi = 'weight_value_as_number / (height_in_meters * height_in_meters)',
+    ami_obese = 'bmi > 30'),
+  export = c(
+    'height_measurement_datetime',
+    'weight_measurement_datetime'),
+  .filter = 'ami_condition_start_datetime is not null')
+
+# Keep only the smallest window for each patient:
+ami_obese |>
+  keep_row_by('window', 'pid')
+```
+
+## Add myocardial infarction  
+We create an AMI component from table `CONDITION_OCCURRENCE`.  
+```{r ami_component}
+ami_component <- sqlt(condition_occurrence) |>
+  filter(condition_concept_id == )
+```
+
+_`delay` picks the most recent record that is **at least as old** as the specified amount of time._  
+
+_`window` **limits how old** the record is allowed to be._  
+
+Both are expressed in SQL language, including the automatic parsing, by the server, of terms such as `'2 years'`, `'2.5 hours'`, `'1 week'`, etc.  
+
+If no such record exists for the patient, at the given point in time, the value is `NULL`.  
+
+## Adding patient age  
+To facilitate interpretation of our phenotype, let us add the age of the patient in the results. We create a component from table `PERSON` using `birth_datetime` as the timestamp.   
+```{r, age}
+age_component <- sqlt(person) |>
+  make_component(
+    .ts = birth_datetime,
+    .pid = person_id)
+```
+When you supply a lazy table to `make_component()`, it silently creates a record source from it, then uses that record source to create a component. You must provide varibales `.ts` e `.pid` for that.  
+
+## Calculate the phenotype  
+Armed with the components, we call `calculate_formula()`:  
+
+```{r phenotype}
+phen <- calculate_formula(
+  components = list(
+    person = age_component,
+    weight_current = weight_current,
+    weight_previous = weight_previous),
+  fml = list(
+    patient_age = 'extract(year from age(ts, person_birth_datetime))',
+    weight_change = '(weight_current_value_as_number - weight_previous_value_as_number) /
+      weight_previous_value_as_number'),
+  export = list(
+    'weight_current_measurement_datetime',
+    'weight_previous_measurement_datetime'))
+```
+
+```{r, include = FALSE}
+# # Source:     SQL [?? x 3]
+# # Database:   postgres  [postgres@localhost:7654/fort]
+# # Ordered by: desc(uvals)
+#      pid   lines   uvals
+#    <int> <int64> <int64>
+#  1 10473      78      78
+#  2  6028      75      75
+#  3 11176      74      74
+#  4  5601      75      74
+#  5 21264      73      73
+#  6  4172      73      72
+#  7 14117      72      71
+#  8 20051      71      71
+#  9 10617      71      71
+# 10 19133      72      70
+
+# person_id # linhas # dists # 1
+# 11872 # 133 # 81 # 2
+# 22242 # 158 # 78 # 3
+# 22906 # 182 # 76 # 4
+# 4191 # 141 # 75 # 5
+# 20198 # 160 # 73 # 6
+# 5274 # 136 # 72 # 7
+# 18843 # 132 # 71 # 8
+# 1665 # 162 # 69 # 9
+# 10583 # 125 # 69 # 10
+# 5333 # 170 # 68
+```
+
+## Filter patients whose increase is at least 50%  
+The `phen` object is a _lazy table_, which means it is a SQL query. We can manipulate it to obtain only the patients that had a ≥50% increase in body weight at least once in their history.  
+```{r summary}
+summary_per_patient <- phen |>
+  filter(weight_change >= 0.5) |> # Only rows where increase is ≥50%
+  group_by(pid) |> # Group by patient ID
+  summarise(
+    # Keep timestamp of earliest increase of ≥50% for the patient
+    date_at_first_50p_incr = min(ts, na.rm = TRUE),
+    # Keep patient age at earliest increase of ≥50%
+    age_at_first_50p_incr = min(patient_age, na.rm = TRUE)) |> 
+  collect() # Execute query and download data from the server to local memory
+
+kable(head(summary_per_patient, 6))
+```
+As you can see, very young patients (kids) exhibit pairs of body weight measurements 2 to 3 years apart showing an increase of 50% or more.  
+
+Let us pick a patient at random and plot their results:  
+```{r random_patient_plot, out.width="100%", out.height = 500}
+# Sample one patient at random, from among those with ≥50% weight increase at least once in their history.
+sample_patient <- sample(summary_per_patient$pid, 1)
+message('Sampled patient: ', sample_patient)
+  
+# Plot the phenotype for the sampled patient.
+phen |>
+  select(
+    -weight_current_measurement_datetime,
+    -weight_previous_measurement_datetime,
+    -person_birth_datetime) |>
+  phea_plot(pid = sample_patient)
+```
+Notice that the chart for `weight_previous_value_as_number` tracks `weight_current_measurement_datetime`, but 2-3 years behind.  
+
+## Obtain the SQL query that computes the phenotype  
+To see the SQL query underlying the phenotype, use helper function `code_shot()`, or `dbplyr::sql_render()`, or the `.clip_sql` option in `calculate_formula()`.  
+```{r, eval = FALSE}
+code_shot(phen)
+```
+```sql
+`r code_shot(phen)`
+```
+
+```{r, include = FALSE}
+DBI::dbDisconnect(dbcon)
+```
