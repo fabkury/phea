@@ -12,7 +12,6 @@ calculate_formula(
   add_components = NULL,
   .ts = NULL,
   .pid = NULL,
-  .rec_name = NULL,
   .delay = NULL,
   .line = NULL,
   .require_all = FALSE,
@@ -24,7 +23,8 @@ calculate_formula(
 )
 }
 \arguments{
-\item{components}{List of components, component, record source, or lazy table.}
+\item{components}{A list of components, a record source, or a lazy table. If a record source or lazy table is
+provided, a default component will be made from it.}
 
 \item{fml}{Formula or list of formulas.}
 
@@ -32,7 +32,7 @@ calculate_formula(
 
 \item{add_components}{Additional components. Used mostly in case components is not a list of components.}
 
-\item{.ts, .pid, .rec_name, .delay, .line}{If supplied, these will overwrite those of the given component.}
+\item{.ts, .pid, .delay, .line}{If supplied, these will overwrite those of the given component.}
 
 \item{.require_all}{If \code{TRUE}, returns only rows where all components to have been found according to their
 timestamps (even if their value is NA). If \code{.dont_require} is provided, \code{.require_all} is ignored.}

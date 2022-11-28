@@ -27,8 +27,6 @@ date.}
 \item{window}{Character. Time interval in SQL language. Maximum time difference between phenotype date and component
 date.}
 
-\item{rec_name}{Character. If provided, overwrites the \code{rec_name} of the record source.}
-
 \item{.ts}{Unquoted character. If passing a lazy table to \code{input_source}, \code{.ts} is used as \code{ts} to buid a record
 source.}
 

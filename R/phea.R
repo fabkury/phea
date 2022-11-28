@@ -147,7 +147,6 @@ sql0 <- function(...) {
 #' date.
 #' @param window Character. Time interval in SQL language. Maximum time difference between phenotype date and component
 #' date.
-#' @param rec_name Character. If provided, overwrites the `rec_name` of the record source.
 #' @param .ts Unquoted character. If passing a lazy table to `input_source`, `.ts` is used as `ts` to buid a record
 #' source.
 #' @param .pid Unquoted character. If passing a lazy table to `input_source`, `.pid` is used as `pid` to buid a record
@@ -203,9 +202,6 @@ make_component <- function(input_source, line = NA, delay = NA, window = Inf, re
   
   if(!is.na(window))
     component$comp_window <- window
-
-  # if(!is.na(rec_name))
-  #   component$rec_source$rec_name <- name
 
   if(!is.na(.passthrough))
     component$.passthrough <- .passthrough
@@ -297,11 +293,12 @@ make_record_source <- function(records, rec_name = NULL, ts, pid, vars = NULL, .
 #' according to their timestamps.
 #'
 #' @export
-#' @param components List of components, component, record source, or lazy table.
+#' @param components A list of components, a record source, or a lazy table. If a record source or lazy table is 
+#' provided, a default component will be made from it.
 #' @param fml Formula or list of formulas.
 #' @param export List of additional variables to export.
 #' @param add_components Additional components. Used mostly in case components is not a list of components.
-#' @param .ts,.pid,.rec_name,.delay,.line If supplied, these will overwrite those of the given component.
+#' @param .ts,.pid,.delay,.line If supplied, these will overwrite those of the given component.
 #' @param .require_all If `TRUE`, returns only rows where all components to have been found according to their
 #' timestamps (even if their value is NA). If `.dont_require` is provided, `.require_all` is ignored.
 #' @param .lim Maximum number of rows to return. This is imposed before the calculation of the formula.
@@ -315,7 +312,7 @@ make_record_source <- function(records, rec_name = NULL, ts, pid, vars = NULL, .
 #' clause. Only rows satisfying all conditions provided will be returned.  
 #' @return Lazy table with result of formula or formulas.
 calculate_formula <- function(components, fml = NULL, window = NA, export = NULL, add_components = NULL,
-  .ts = NULL, .pid = NULL, .rec_name = NULL, .delay = NULL, .line = NULL,
+  .ts = NULL, .pid = NULL, .delay = NULL, .line = NULL,
   .require_all = FALSE, .lim = NA, .dont_require = NULL, .filter = NULL,
   .cascaded = TRUE, .clip_sql = FALSE) {
 # Prepare ---------------------------------------------------------------------------------------------------------
@@ -333,9 +330,6 @@ calculate_formula <- function(components, fml = NULL, window = NA, export = NULL
       input_source = components,
       .ts = ts,
       .pid = pid)
-
-    if(!is.null(.rec_name))
-      new_component$rec_source$rec_name <- .rec_name
 
     ts_name <- deparse(substitute(.ts))
     if(ts_name != 'NULL')
