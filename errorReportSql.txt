@@ -1,0 +1,27 @@
+DBMS:
+postgresql
+
+Error:
+org.postgresql.util.PSQLException: ERROR: current transaction is aborted, commands ignored until end of transaction block
+
+SQL:
+select * from measurement
+
+R version:
+R version 4.2.2 (2022-10-31 ucrt)
+
+Platform:
+x86_64-w64-mingw32
+
+Attached base packages:
+- stats
+- graphics
+- grDevices
+- utils
+- datasets
+- methods
+- base
+
+Other attached packages:
+- dplyr (1.0.10)
+- phea (0.2.0.0000)

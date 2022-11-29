@@ -4,7 +4,7 @@ if(!exists('.pheaglobalenv'))
   .pheaglobalenv <- new.env(parent=emptyenv())
 
 
-# Functions -------------------------------------------------------------------------------------------------------
+# Keep row by -----------------------------------------------------------------------------------------------------
 #' Keep [first] row by [window function]
 #'
 #' Keeps the row containing the group-wise maximum or minimum.
@@ -14,19 +14,24 @@ if(!exists('.pheaglobalenv'))
 #'
 #' @export
 #' @param lazy_tbl Lazy table to be filtered.
-#' @param by Column to filter rows by. Can be quoted or unquoted.
-#' @param partition Character. Variable or vector of variables to define the partition.
-#' @param win_fn "min" or "max". Which window function to use to filter rows.
+#' @param by Column to pick rows by.
+#' @param partition Character vector. Variable or variables to define the partition.
+#' @param pick_last Logical. If `TRUE`, will pick the last row, instead of first.
 #' @return Lazy table with filtered rows.
-keep_row_by <- function(lazy_tbl, by, partition, win_fn = 'min') {
-  if(!win_fn %in% c('min', 'max'))
-    stop("win_fn must be 'min' or 'max'.")
-  partition_txt <- paste0(partition, collapse = '", "')
-  sql_txt <- paste0(win_fn, '("', by, '") over (partition by "', partition_txt, '")')
+keep_row_by <- function(lazy_tbl, by, partition, pick_last = FALSE) {
+  # sql_txt <- paste0(ifelse(use_max, 'max', 'min'), '("', by, '") ',
+  #   'over (partition by "', paste0(partition, collapse = '", "'), '")')
+  if(pick_last)
+    sql_txt <- paste0('cume_dist() over (partition by "', 
+      paste0(partition, collapse = '", "'), '" order by "', by, '")')
+  else
+    sql_txt <- paste0('row_number() over (partition by "', 
+      paste0(partition, collapse = '", "'), '" order by "', by, '")')
+
   res <- lazy_tbl |>
     dplyr::mutate(
       phea_calc_var = dplyr::sql(sql_txt)) |>
-    dplyr::filter(!!rlang::sym(by) == phea_calc_var) |>
+    dplyr::filter(phea_calc_var == 1) |>
     dplyr::select(-phea_calc_var)
   res
 }
@@ -710,6 +715,7 @@ calculate_formula <- function(components, fml = NULL, window = NA, export = NULL
 #' @param verbose If TRUE, will let you know how long it takes to `collect()` the data.
 #' @return Plot created by `plotly::plot_ly()` and `plotly::subplot()`.
 phea_plot <- function(board, pid, plot_title = NULL, verbose = TRUE) {
+  browser()
   make_plotly_chart <- function(board_long) {
     chart_items <- board_long |>
       dplyr::select(name) |>
