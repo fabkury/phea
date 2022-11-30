@@ -9,6 +9,7 @@ vignette: >
   _This vignette assumes a SQL server at `localhost` (we use PostgreSQL), with data in OMOP Common Data Model v5.4 format in schema `cdm_new_york3`. The patient records shown in this example are synthetic data from [Synthea(TM) Patient Generator](https://github.com/synthetichealth/synthea)._  
 ```{r, results = 'hide', include = FALSE}
 library(knitr)
+options(scipen = 5e5)
 knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
 source(paste0(Sys.getenv("HOME"), '/Estudo/Tecnologia/R/espinha/credenciais.R')) # contains cred$pg
 ```
@@ -34,11 +35,16 @@ Case A.
 Case B.
 
  - Increase in serum creatinine (SCr) to ≥1.5 times baseline within 7 days;  
+ 
+Case C.
+
+ - Two GFR measurements, at least 3 but less than 5 months apart, showing value < 60 ml/min/1.73m².
 
 Here's how we compute it:  
 
  - In a., for every measurement of SCr, we check if we can find another one, within the prior 48 hours, where the value is smaller by a margin ≥ 0.3 mg/dL.
  - In b. it is similar, but with a 7-day window instead of 48 hours, and the check is whether the values exhibit a ratio of ≥ 1.5, instead of a difference of ≥ 0.3.  
+ - In c., for every measurement of GFR that is < 60, we look to see if there is one more inside the 3-to-5 months window.  
 
 In both cases, we will normalize the unit of measurement of serum creatinine to md/dL prior to computing formulas. We could also use formulas for that, and the result would be the same.  
 
@@ -75,18 +81,20 @@ scr_record_source <- make_record_source(scr_records,
 ### Glomerular filtration rate  
 We collect GFR records from `MEASUREMENT`.
 ```{r gfr_records}
-# GFR codes used: 
+# GFR codes used:
 # Loinc 77147-7 Glomerular filtration rate/1.73 sq M.predicted [Volume Rate/Area] in Serum, Plasma or Blood by Creatinine-based formula (MDRD)
 # OMOP CDM concept ID 46236952 
-gfr_record_source <- sqlt(measurement) |>
-  filter(measurement_concept_id == 46236952) |>
-  make_record_source(
+gfr_records <- sqlt(measurement) |>
+  filter(measurement_concept_id == 46236952)
+
+gfr_record_source <- make_record_source(gfr_records,
     ts = measurement_datetime,
     pid = person_id)
 ```
 
 ## Calculate the phenotype  
-Formula `scr_03_criteria` contains the logic of case A (difference ≥0.3 mg/dL), while `scr_15_criteria` contains case B (ratio ≥1.5).  
+Formula `scr_case_a` contains the logic of case A (difference ≥0.3 mg/dL), `scr_case_b` contains case B (ratio ≥1.5), and `gfr_case_c` contains case C (two GFRs under 60 within 3-5 months).  
+  
 **Notice we use 48 days instead of 48 hours, and 7 months instead of 7 days. This is just to make a visually meaningful example out of the limited data that is produced by Synthea(TM). Those time intervals can be changed to "48 hours" and "7 days" to produce the real phenotype.**  
 ```{r phenotype}
 scr_change <- calculate_formula(
@@ -106,39 +114,44 @@ scr_change <- calculate_formula(
     gfr = make_component(gfr_record_source),
     
     # Glomerular filtration rate 3 to 5 months older than phenotype date
-    gfr_3mo = make_component(gfr_record_source,
-      delay = '3 months', window = '5 months')),
+    gfr_prior = make_component(gfr_record_source,
+      delay = '3 months', window = '5 months', .delay_fn = 'min')),
     
   fml = list(
-    scr_03_criteria = 'scr_value_as_number - scr_48h_min_value_as_number >= 0.3',
+    scr_case_a = 'scr_value_as_number - scr_48h_min_value_as_number >= 0.3',
     
-    scr_15_criteria = 'scr_value_as_number / scr_7d_min_value_as_number >= 1.5',
+    scr_case_b = 'scr_value_as_number / scr_7d_min_value_as_number >= 1.5',
     
-    gfr_criteria = 'gfr_value_as_number < 60 AND gfr_3mo_value_as_number < 60'),
+    gfr_case_c = 'gfr_value_as_number < 60 AND gfr_prior_value_as_number < 60'),
   
   export = c(
     'scr_measurement_datetime',
     'scr_48h_min_measurement_datetime',
     'scr_7d_min_measurement_datetime',
     'gfr_measurement_datetime',
-    'gfr_3mo_measurement_datetime')
+    'gfr_prior_measurement_datetime'),
+  
+  .cascaded = FALSE, # Because we don't need to use results of prior formulas inside other formulas.
 )
 
 ```
-```{r, eval = FALSE, include = FALSE}
-head_shot(scr_change, 100)
+
+Let us take a small peek at 15 rows from the phenotype results.  
+```{r}
+head_shot(scr_change, 15) |>
+  kable()
 ```
 
 ## Plot the phenotype for a random patient  
-For demonstration purposes, let's pick an "interesting" patient. By "interesting" I just mean a patient with high variation in TRUE/FALSE values among the three criteria.  
+For demonstration purposes, let us pick an "interesting" patient. By "interesting" I just mean a patient who at different times was `TRUE` and `FALSE` in each of the three criteria. A patient with variability in their timeline.   
 ```{r filter}
 # Find an "interesting" case to plot: patients with each criteria at times TRUE, at times FALSE
 patients <- scr_change |>
   group_by(pid) |>
   summarise(
-    n_03 = n_distinct(scr_03_criteria),
-    n_15 = n_distinct(scr_15_criteria),
-    n_gfr = n_distinct(gfr_criteria)) |>
+    n_03 = n_distinct(scr_case_a),
+    n_15 = n_distinct(scr_case_b),
+    n_gfr = n_distinct(gfr_case_c)) |>
   mutate(sort_variable = n_03 + n_15 + n_gfr) |>
   arrange(desc(sort_variable)) |>
   head(20) |>
@@ -146,24 +159,18 @@ patients <- scr_change |>
   pull()
 
 random_patient <- sample(patients, 1)
+
 message('Sampled patient: ', random_patient)
 ```
 
+Then we plot all data for the chosen patient (pid = ``r random_patient``).  
 ```{r plot, out.width="100%", out.height = 1200}
 scr_change |>
   select(-ends_with('datetime')) |>
   phea_plot(random_patient)
 ```
 
-And below is the data that went into the plot.  
-
-```{r plot_data}
-scr_change |>
-  filter(pid == random_patient) |>
-  collect() |>
-  arrange(ts) |>
-  kable()
-```
+_At the end of this report I include a large table with all the data for this patient, directly from the record sources, for maximum verification._  
 
 ## Obtain the SQL query that computes the phenotype  
 To see the SQL query underlying the phenotype, use helper function `code_shot()`, or `dbplyr::sql_render()`, or the `.clip_sql` option in `calculate_formula()`.  
@@ -173,6 +180,52 @@ code_shot(scr_change)
 ```sql
 `r code_shot(scr_change)`
 ```
+
+## See the raw data that went into `calculate_formula()` 
+Sometimes the best way to check a result is to manually, painstakingly go over the data. Below I print all rows from the record sources for the patient that was plotted above.  
+
+#### Serum creatinine records  
+```{r plot_data_scr}
+scr_records |>
+  filter(person_id == random_patient) |>
+  collect() |>
+  arrange(measurement_datetime) |>
+  select(measurement_id, person_id, measurement_datetime, value_as_number, unit_source_value) |>
+  kable()
+```
+
+#### Glomerular filtrarion rate records
+```{r plot_data_gfr}
+gfr_records |>
+  filter(person_id == random_patient) |>
+  collect() |>
+  arrange(measurement_datetime) |>
+  select(measurement_id, person_id, measurement_datetime, value_as_number, unit_source_value) |>
+  kable()
+```
+
+## Produce _change events_ for Atlas  
+One approach to use Phea's results inside Atlas is to produce novel records (e.g. new rows in `OBSERVATION` or `MEASUREMENT`) using custom concept IDs, then ETL those back into the dataset.  
+
+Below I illustrate how to do it with case A, assuming the new records will go into `MEASUREMENT`. Notice I put the difference inside `value_as_number`, just in case.    
+```{r change_events}
+case_a_custom_concept_id <- 2000000001
+# Case A: SCr increase by >=0.3 over 48 hours
+data_for_etl <- scr_change |>
+  filter(scr_case_a) |> # Keep only rows where case A was TRUE
+  transmute(
+    measurement_datetime = ts,
+    person_id = pid,
+    value_as_number = scr_value_as_number - scr_48h_min_value_as_number,
+    measurement_concept_id = case_a_custom_concept_id)
+
+head_shot(data_for_etl) |>
+  kable()
+```
+
+### Author contact  
+Fabrício Kury -- Please be always welcome to reach me at fab@kury.dev.  
+
 ```{r, include = FALSE}
 DBI::dbDisconnect(dbcon)
 ```

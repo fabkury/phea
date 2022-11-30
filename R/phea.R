@@ -730,7 +730,6 @@ calculate_formula <- function(components, fml = NULL, window = NA, export = NULL
 #' @param verbose If TRUE, will let you know how long it takes to `collect()` the data.
 #' @return Plot created by `plotly::plot_ly()` and `plotly::subplot()`.
 phea_plot <- function(board, pid, plot_title = NULL, verbose = TRUE) {
-  
   make_plotly_chart <- function(board_long) {
     chart_items <- board_long |>
       dplyr::select(name) |>
@@ -750,6 +749,7 @@ phea_plot <- function(board, pid, plot_title = NULL, verbose = TRUE) {
           mode = 'lines',
           name = chart_item) |>
         plotly::layout(
+          dragmode = 'pan',
           legend = list(orientation = 'h'),
           yaxis = list(
             range = c(
