@@ -12,7 +12,7 @@ library(knitr)
 knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
 source(paste0(Sys.getenv("HOME"), '/Estudo/Tecnologia/R/espinha/credenciais.R')) # contains cred$pg
 ```
-```{r setup, print = FALSE}
+```{r setup, message = FALSE}
 library(phea)
 library(dplyr)
 
@@ -37,24 +37,25 @@ Case B.
 
 Here's how we compute it:  
 
- - In a., for every measurement of SCr, we check if we can find another one, within in the prior 48 hours, where the value is smaller by a margin >= 0.3 mg/dL.
- - In b. it is similar, but with a 7-day window instead of 48 hours, and the check is whether the values exhibit a ratio of >= 1.5, instead of a difference of >= 0.3.  
+ - In a., for every measurement of SCr, we check if we can find another one, within the prior 48 hours, where the value is smaller by a margin ≥ 0.3 mg/dL.
+ - In b. it is similar, but with a 7-day window instead of 48 hours, and the check is whether the values exhibit a ratio of ≥ 1.5, instead of a difference of ≥ 0.3.  
 
-In both cases, we will normalize the unit of measurement of SCr to md/dL prior to computing formulas. We could also use formulas to convert the units, and the result would be the same.  
+In both cases, we will normalize the unit of measurement of serum creatinine to md/dL prior to computing formulas. We could also use formulas for that, and the result would be the same.  
 
 ## Create components  
 ### Serum creatinine  
 We collect SCr records from `MEASUREMENT` and convert the units to mg/dL.  
 ```{r scr_records}
-# 3051825 38483-4 Creatinine [Mass/volume] in Blood
-# 3016723 2160-0 Creatinine [Mass/volume] in Serum or Plasma
+# Serum creatinine codes used: 
+# Loinc 38483-4 Creatinine [Mass/volume] in Blood, OMOP CDM concept ID 3051825
+# Loinc 2160-0 Creatinine [Mass/volume] in Serum or Plasma, OMOP CDM concept ID 3016723
 
-# "A" records: Unit is 'mg/dL'
+# "A" records: Unit is 'mg/dL'.
 scr_records_a <- sqlt(measurement) |>
   filter(measurement_concept_id %in% c(3051825, 3016723) &&
     unit_source_value == 'mg/dL')
 
-# "B" records: Unit is 'µmol/L', but we convert to 'mg/dL'
+# "B" records: Unit is 'µmol/L', but we convert to 'mg/dL'.
 scr_records_b <- sqlt(measurement) |>
   filter(measurement_concept_id %in% c(3051825, 3016723) &&
     unit_source_value == 'µmol/L') |>
@@ -62,10 +63,10 @@ scr_records_b <- sqlt(measurement) |>
     value_as_number = value_as_number / 88.42,
     unit_source_value = 'mg/dL')
 
-# Combine all available serum creatinine records
+# Combine all available serum creatinine records.
 scr_records <- union_all(scr_records_a, scr_records_b)
 
-# Make a record source
+# Make a record source.
 scr_record_source <- make_record_source(scr_records,
   ts = measurement_datetime,
   pid = person_id)
@@ -74,8 +75,9 @@ scr_record_source <- make_record_source(scr_records,
 ### Glomerular filtration rate  
 We collect GFR records from `MEASUREMENT`.
 ```{r gfr_records}
-## GFR
-# 46236952 77147-7 Glomerular filtration rate/1.73 sq M.predicted [Volume Rate/Area] in Serum, Plasma or Blood by Creatinine-based formula (MDRD)
+# GFR codes used: 
+# Loinc 77147-7 Glomerular filtration rate/1.73 sq M.predicted [Volume Rate/Area] in Serum, Plasma or Blood by Creatinine-based formula (MDRD)
+# OMOP CDM concept ID 46236952 
 gfr_record_source <- sqlt(measurement) |>
   filter(measurement_concept_id == 46236952) |>
   make_record_source(
@@ -84,8 +86,8 @@ gfr_record_source <- sqlt(measurement) |>
 ```
 
 ## Calculate the phenotype  
-Formula `scr_03_criteria` contains the logic of case A (difference >= 0.3 mg/dL), while `scr_15_criteria` contains case B (ratio >= 1.5).  
-**Notice we use 48 days, instead of 48 hours, and 7 months instead of 7 days. This is just to make a visually meaningful example out of the limited data that is produced by Synthea(TM). Those time intervals can be changed to "48 hours" and "7 days" to produce the real phenotype.  
+Formula `scr_03_criteria` contains the logic of case A (difference ≥0.3 mg/dL), while `scr_15_criteria` contains case B (ratio ≥1.5).  
+**Notice we use 48 days instead of 48 hours, and 7 months instead of 7 days. This is just to make a visually meaningful example out of the limited data that is produced by Synthea(TM). Those time intervals can be changed to "48 hours" and "7 days" to produce the real phenotype.**  
 ```{r phenotype}
 scr_change <- calculate_formula(
   components = list(
@@ -127,44 +129,50 @@ scr_change <- calculate_formula(
 head_shot(scr_change, 100)
 ```
 
-```{r filter ami, eval = FALSE, include = FALSE}
-# Keep only patients who had meaningful change
-ami_patients <- ami_obese |>
-  filter(has_ami) |>
+## Plot the phenotype for a random patient  
+For demonstration purposes, let's pick an "interesting" patient. By "interesting" I just mean a patient with high variation in TRUE/FALSE values among the three criteria.  
+```{r filter}
+# Find an "interesting" case to plot: patients with each criteria at times TRUE, at times FALSE
+patients <- scr_change |>
+  group_by(pid) |>
+  summarise(
+    n_03 = n_distinct(scr_03_criteria),
+    n_15 = n_distinct(scr_15_criteria),
+    n_gfr = n_distinct(gfr_criteria)) |>
+  mutate(sort_variable = n_03 + n_15 + n_gfr) |>
+  arrange(desc(sort_variable)) |>
+  head(20) |>
   select(pid) |>
-  distinct() |>
   pull()
 
-ami_obese <- ami_obese |>
-  filter(pid %in% local(ami_patients))
-
-head_shot(ami_obese) |>
-  kable()
-```
-
-## Plot the phenotype for a random patient
-```{r, eval = FALSE, include = FALSE}
-ami_obese_patients <- ami_obese |>
-  filter(ami_obese) |>
-  select(pid) |>
-  distinct() |>
-  pull()
-
-random_patient <- sample(ami_obese_patients, 1)
+random_patient <- sample(patients, 1)
 message('Sampled patient: ', random_patient)
 ```
+
 ```{r plot, out.width="100%", out.height = 1200}
 scr_change |>
   select(-ends_with('datetime')) |>
-  phea_plot(22444)
+  phea_plot(random_patient)
+```
+
+And below is the data that went into the plot.  
+
+```{r plot_data}
+scr_change |>
+  filter(pid == random_patient) |>
+  collect() |>
+  arrange(ts) |>
+  kable()
 ```
 
 ## Obtain the SQL query that computes the phenotype  
 To see the SQL query underlying the phenotype, use helper function `code_shot()`, or `dbplyr::sql_render()`, or the `.clip_sql` option in `calculate_formula()`.  
-```{r, eval = FALSE, include = FALSE}
-code_shot(ami_obese)
+```{r, eval = FALSE}
+code_shot(scr_change)
 ```
-
+```sql
+`r code_shot(scr_change)`
+```
 ```{r, include = FALSE}
 DBI::dbDisconnect(dbcon)
 ```
