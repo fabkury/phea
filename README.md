@@ -15,6 +15,7 @@ To learn how to use, please see:
  - [Getting started with Phea](https://fabkury.github.io/phea/): A little bit more explanations about the intuition behind Phea.   
  - [Calculate increase in body weight over the past 2-3 years](https://fabkury.github.io/phea/weight-increase.html): Using Phea to calculate change in values over time.  
  - [Find acute myocardial infarction in obese patients](https://fabkury.github.io/phea/obese_ami.html): Using Phea to find acute myocardial infarctions happening _while_ a patient was obese, considering a person can go in and out of obesity over time.  
+ - [Find increase in serum creatinine or low glomerular filtration rate](https://fabkury.github.io/phea/aki.html): Using Phea to find laboratory manifestations of kidney injury.  
   
 By Fabrício Kury  
 Author contact: github@kury.dev
