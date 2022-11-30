@@ -1,23 +1,19 @@
 ---
-  title: "Acute kidney injury lab presentation"
+title: "Acute kidney injury lab presentation"
 output: rmarkdown::html_vignette
 vignette: >
   %\VignetteIndexEntry{Acute kidney injury labs}
-%\VignetteEngine{knitr::rmarkdown}
-%\VignetteEncoding{UTF-8}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
 ---
   _This vignette assumes a SQL server at `localhost` (we use PostgreSQL), with data in OMOP Common Data Model v5.4 format in schema `cdm_new_york3`. The patient records shown in this example are synthetic data from [Synthea(TM) Patient Generator](https://github.com/synthetichealth/synthea)._  
 ```{r, results = 'hide', include = FALSE}
-knitr::opts_chunk$set(
-  collapse = TRUE,
-  comment = "#>"
-)
 library(knitr)
-# kury - credenciais.R contains the cred$pg credentials.
-source(paste0(Sys.getenv("HOME"), '/Estudo/Tecnologia/R/espinha/credenciais.R'))
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
+source(paste0(Sys.getenv("HOME"), '/Estudo/Tecnologia/R/espinha/credenciais.R')) # contains cred$pg
 ```
 ```{r setup, print = FALSE}
-# library(phea)
+library(phea)
 library(dplyr)
 
 # Connect to SQL server.
@@ -29,55 +25,106 @@ dbcon <- DBI::dbConnect(RPostgres::Postgres(),
 setup_phea(dbcon, 'cdm_new_york3')
 ```
 
-Identify:  
+In this vignette we identify:  
 
- a. Increase in SCr by ≥0.3 mg/dl (≥26.5 µmol/l) within 48 hours;  
- a. Increase in SCr to ≥1.5 times baseline within 7 days;  
+Case A.  
+
+ - Increase in serum creatinine (SCr) by ≥0.3 mg/dL (≥26.5 µmol/L) within 48 hours;  
+ 
+Case B.
+
+ - Increase in serum creatinine (SCr) to ≥1.5 times baseline within 7 days;  
+
+Here's how we compute it:  
+
+ - In a., for every measurement of SCr, we check if we can find another one, within in the prior 48 hours, where the value is smaller by a margin >= 0.3 mg/dL.
+ - In b. it is similar, but with a 7-day window instead of 48 hours, and the check is whether the values exhibit a ratio of >= 1.5, instead of a difference of >= 0.3.  
+
+In both cases, we will normalize the unit of measurement of SCr to md/dL prior to computing formulas. We could also use formulas to convert the units, and the result would be the same.  
 
 ## Create components  
-
-```{r components}
+### Serum creatinine  
+We collect SCr records from `MEASUREMENT` and convert the units to mg/dL.  
+```{r scr_records}
 # 3051825 38483-4 Creatinine [Mass/volume] in Blood
 # 3016723 2160-0 Creatinine [Mass/volume] in Serum or Plasma
-scr_record_source <- sqlt(measurement) |>
-  filter(measurement_concept_id %in% c(3051825, 3016723)) |>
+
+# "A" records: Unit is 'mg/dL'
+scr_records_a <- sqlt(measurement) |>
+  filter(measurement_concept_id %in% c(3051825, 3016723) &&
+    unit_source_value == 'mg/dL')
+
+# "B" records: Unit is 'µmol/L', but we convert to 'mg/dL'
+scr_records_b <- sqlt(measurement) |>
+  filter(measurement_concept_id %in% c(3051825, 3016723) &&
+    unit_source_value == 'µmol/L') |>
+  mutate( # Convert µmol/L to mg/dL
+    value_as_number = value_as_number / 88.42,
+    unit_source_value = 'mg/dL')
+
+# Combine all available serum creatinine records into a single record source.
+scr_record_source <- union_all(scr_records_a, scr_records_b) |>
   make_record_source(
     ts = measurement_datetime,
     pid = person_id)
+```
 
+### Glomerular filtration rate  
+We collect GFR records from `MEASUREMENT`.
+```{r gfr_records}
+## GFR
 # 46236952 77147-7 Glomerular filtration rate/1.73 sq M.predicted [Volume Rate/Area] in Serum, Plasma or Blood by Creatinine-based formula (MDRD)
-gfr_component <- sqlt(measurement) |>
+gfr_record_source <- sqlt(measurement) |>
   filter(measurement_concept_id == 46236952) |>
-  make_component(
-    .ts = measurement_datetime,
-    .pid = person_id)
-
+  make_record_source(
+    ts = measurement_datetime,
+    pid = person_id)
 ```
 
 ## Calculate the phenotype  
-
+Formula `scr_03_criteria` contains the logic of case A (difference >= 0.3 mg/dL), while `scr_15_criteria` contains case B (ratio >= 1.5).  
 ```{r phenotype}
 scr_change <- calculate_formula(
   components = list(
-    current_scr = make_component(scr_record_source),
-    min_03_scr = make_component(scr_record_source,
-      window = '4 years',
-      .delay_fn = 'min'),
-    min_15_scr = make_component(scr_record_source,
-      window = '6 years',
-      .delay_fn = 'min')),
+    # Current SCr
+    scr = make_component(scr_record_source),
+    
+    # Minimum value within 48-hour window
+    scr_48h_min = make_component(scr_record_source,
+      window = '48 days', .delay_fn = 'min'),
+    
+    # Minimum value within 7-day window
+    scr_7d_min = make_component(scr_record_source,
+      window = '7 months', .delay_fn = 'min'),
+    
+    # Current glomerular filtration rate (GFR)
+    gfr = make_component(gfr_record_source),
+    
+    # Glomerular filtration rate 3 to 5 months older than phenotype date
+    gfr_3mo = make_component(gfr_record_source,
+      delay = '3 months', window = '5 months')),
+    
   fml = list(
-    scr_03_change = 'current_scr_value_as_number - min_03_scr_value_as_number >= 0.3',
-    scr_15_change = 'current_scr_value_as_number / min_15_scr_value_as_number >= 1.5'),
+    scr_03_criteria = 'scr_value_as_number - scr_48h_min_value_as_number >= 0.3',
+    
+    scr_15_criteria = 'scr_value_as_number / scr_7d_min_value_as_number >= 1.5',
+    
+    gfr_criteria = 'gfr_value_as_number < 60 AND gfr_3mo_value_as_number < 60'),
+  
   export = c(
-    'min_03_scr_measurement_datetime',
-    'min_15_scr_measurement_datetime')
-  )
+    'scr_measurement_datetime',
+    'scr_48h_min_measurement_datetime',
+    'scr_7d_min_measurement_datetime',
+    'gfr_measurement_datetime',
+    'gfr_3mo_measurement_datetime')
 )
 
-head_shot(scr_change, 1000)
 ```
-```{r filter ami}
+```{r, eval = FALSE, include = FALSE}
+head_shot(scr_change, 100)
+```
+
+```{r filter ami, eval = FALSE, include = FALSE}
 # Keep only patients who had meaningful change
 ami_patients <- ami_obese |>
   filter(has_ami) |>
@@ -91,28 +138,9 @@ ami_obese <- ami_obese |>
 head_shot(ami_obese) |>
   kable()
 ```
-## Keep only the records closest to each other  
-Phea will compute `ami_obese` for all points in time in each patient. If a patient has a single AMI event, but had his body weight and height measured on 6 different dates, that is 7 computations of `ami_obese`, unless the date of the AMI coincides with one of the dates of the body measurements.  
-
-Since we want to consider only the body measurements made closest in time to the AMI event, we can filter the rows by the `window`.  
-
-Phea returns the `window` alongside each phenotype calculation. The `window` is the time distance between the oldest record, and the most recent one, that went into the phenotype calculation.  
-
-Therefore, in each patient, for each AMI event, whichever row has the smallest `window`, that row is using the body measurements that are closest possible, in time, to the AMI event.  
-
-
-```{r, eval = FALSE}
-# Keep only the smallest window for each patient:
-ami_obese_f <- ami_obese |>
-  filter(has_ami & has_bmi) |>
-  keep_row_by('window', c('pid', 'ami_condition_start_datetime'))
-
-head_shot(ami_obese_f) |>
-  kable()
-```
 
 ## Plot the phenotype for a random patient
-```{r, eval = FALSE}
+```{r, eval = FALSE, include = FALSE}
 ami_obese_patients <- ami_obese |>
   filter(ami_obese) |>
   select(pid) |>
@@ -123,20 +151,15 @@ random_patient <- sample(ami_obese_patients, 1)
 message('Sampled patient: ', random_patient)
 ```
 ```{r plot, out.width="100%", out.height = 1200}
-ami_obese |>
-  select(
-    -height_value_as_number,
-    -ami_condition_start_datetime) |>
-  phea_plot(pid = random_patient)
+scr_change |>
+  select(-ends_with('datetime')) |>
+  phea_plot(22444)
 ```
 
 ## Obtain the SQL query that computes the phenotype  
 To see the SQL query underlying the phenotype, use helper function `code_shot()`, or `dbplyr::sql_render()`, or the `.clip_sql` option in `calculate_formula()`.  
-```{r, eval = FALSE}
+```{r, eval = FALSE, include = FALSE}
 code_shot(ami_obese)
-```
-```sql
-<!-- `r code_shot(ami_obese)` -->
 ```
 
 ```{r, include = FALSE}
