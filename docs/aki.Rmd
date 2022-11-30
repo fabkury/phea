@@ -62,11 +62,13 @@ scr_records_b <- sqlt(measurement) |>
     value_as_number = value_as_number / 88.42,
     unit_source_value = 'mg/dL')
 
-# Combine all available serum creatinine records into a single record source.
-scr_record_source <- union_all(scr_records_a, scr_records_b) |>
-  make_record_source(
-    ts = measurement_datetime,
-    pid = person_id)
+# Combine all available serum creatinine records
+scr_records <- union_all(scr_records_a, scr_records_b)
+
+# Make a record source
+scr_record_source <- make_record_source(scr_records,
+  ts = measurement_datetime,
+  pid = person_id)
 ```
 
 ### Glomerular filtration rate  
@@ -83,6 +85,7 @@ gfr_record_source <- sqlt(measurement) |>
 
 ## Calculate the phenotype  
 Formula `scr_03_criteria` contains the logic of case A (difference >= 0.3 mg/dL), while `scr_15_criteria` contains case B (ratio >= 1.5).  
+**Notice we use 48 days, instead of 48 hours, and 7 months instead of 7 days. This is just to make a visually meaningful example out of the limited data that is produced by Synthea(TM). Those time intervals can be changed to "48 hours" and "7 days" to produce the real phenotype.  
 ```{r phenotype}
 scr_change <- calculate_formula(
   components = list(
