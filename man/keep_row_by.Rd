@@ -4,16 +4,16 @@
 \alias{keep_row_by}
 \title{Keep \link{first} row by \link{window function}}
 \usage{
-keep_row_by(lazy_tbl, by, partition, win_fn = "min")
+keep_row_by(lazy_tbl, by, partition, pick_last = FALSE)
 }
 \arguments{
 \item{lazy_tbl}{Lazy table to be filtered.}
 
-\item{by}{Column to filter rows by. Can be quoted or unquoted.}
+\item{by}{Column to pick rows by.}
 
-\item{partition}{Character. Variable or vector of variables to define the partition.}
+\item{partition}{Character vector. Variable or variables to define the partition.}
 
-\item{win_fn}{"min" or "max". Which window function to use to filter rows.}
+\item{pick_last}{Logical. If \code{TRUE}, will pick the last row, instead of first.}
 }
 \value{
 Lazy table with filtered rows.

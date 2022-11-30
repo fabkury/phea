@@ -68,7 +68,7 @@ scr_change <- calculate_formula(
       .delay_fn = 'min')),
   fml = list(
     scr_03_change = 'current_scr_value_as_number - min_03_scr_value_as_number >= 0.3',
-    scr_15_change = 'current_scr_value_as_number / min_15_scr_value_as_number >= 1.3'),
+    scr_15_change = 'current_scr_value_as_number / min_15_scr_value_as_number >= 1.5'),
   export = c(
     'min_03_scr_measurement_datetime',
     'min_15_scr_measurement_datetime')

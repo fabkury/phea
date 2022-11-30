@@ -8,11 +8,13 @@ make_component(
   input_source,
   line = NA,
   delay = NA,
-  window = Inf,
+  window = NA,
   rec_name = NA,
   .passthrough = FALSE,
   .ts = NULL,
-  .pid = NULL
+  .pid = NULL,
+  .delay_fn = "last_value",
+  .ts_fn = NULL
 )
 }
 \arguments{
