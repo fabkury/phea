@@ -1,0 +1,144 @@
+---
+  title: "Acute kidney injury lab presentation"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Acute kidney injury labs}
+%\VignetteEngine{knitr::rmarkdown}
+%\VignetteEncoding{UTF-8}
+---
+  _This vignette assumes a SQL server at `localhost` (we use PostgreSQL), with data in OMOP Common Data Model v5.4 format in schema `cdm_new_york3`. The patient records shown in this example are synthetic data from [Synthea(TM) Patient Generator](https://github.com/synthetichealth/synthea)._  
+```{r, results = 'hide', include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+library(knitr)
+# kury - credenciais.R contains the cred$pg credentials.
+source(paste0(Sys.getenv("HOME"), '/Estudo/Tecnologia/R/espinha/credenciais.R'))
+```
+```{r setup, print = FALSE}
+# library(phea)
+library(dplyr)
+
+# Connect to SQL server.
+dbcon <- DBI::dbConnect(RPostgres::Postgres(),
+  host = 'localhost', port = 7654, dbname = 'fort',
+  user = cred$pg$user, password = cred$pg$pass)
+
+# Call setup_phea so we can use sqlt() and sql0().
+setup_phea(dbcon, 'cdm_new_york3')
+```
+
+Identify:  
+
+ a. Increase in SCr by ≥0.3 mg/dl (≥26.5 µmol/l) within 48 hours;  
+ a. Increase in SCr to ≥1.5 times baseline within 7 days;  
+
+## Create components  
+
+```{r components}
+# 3051825 38483-4 Creatinine [Mass/volume] in Blood
+# 3016723 2160-0 Creatinine [Mass/volume] in Serum or Plasma
+scr_record_source <- sqlt(measurement) |>
+  filter(measurement_concept_id %in% c(3051825, 3016723)) |>
+  make_record_source(
+    ts = measurement_datetime,
+    pid = person_id)
+
+# 46236952 77147-7 Glomerular filtration rate/1.73 sq M.predicted [Volume Rate/Area] in Serum, Plasma or Blood by Creatinine-based formula (MDRD)
+gfr_component <- sqlt(measurement) |>
+  filter(measurement_concept_id == 46236952) |>
+  make_component(
+    .ts = measurement_datetime,
+    .pid = person_id)
+
+```
+
+## Calculate the phenotype  
+
+```{r phenotype}
+scr_change <- calculate_formula(
+  components = list(
+    current_scr = make_component(scr_record_source),
+    min_03_scr = make_component(scr_record_source,
+      window = '4 years',
+      .delay_fn = 'min'),
+    min_15_scr = make_component(scr_record_source,
+      window = '6 years',
+      .delay_fn = 'min')),
+  fml = list(
+    scr_03_change = 'current_scr_value_as_number - min_03_scr_value_as_number >= 0.3',
+    scr_15_change = 'current_scr_value_as_number / min_15_scr_value_as_number >= 1.3'),
+  export = c(
+    'min_03_scr_measurement_datetime',
+    'min_15_scr_measurement_datetime')
+  )
+)
+
+head_shot(scr_change, 1000)
+```
+```{r filter ami}
+# Keep only patients who had meaningful change
+ami_patients <- ami_obese |>
+  filter(has_ami) |>
+  select(pid) |>
+  distinct() |>
+  pull()
+
+ami_obese <- ami_obese |>
+  filter(pid %in% local(ami_patients))
+
+head_shot(ami_obese) |>
+  kable()
+```
+## Keep only the records closest to each other  
+Phea will compute `ami_obese` for all points in time in each patient. If a patient has a single AMI event, but had his body weight and height measured on 6 different dates, that is 7 computations of `ami_obese`, unless the date of the AMI coincides with one of the dates of the body measurements.  
+
+Since we want to consider only the body measurements made closest in time to the AMI event, we can filter the rows by the `window`.  
+
+Phea returns the `window` alongside each phenotype calculation. The `window` is the time distance between the oldest record, and the most recent one, that went into the phenotype calculation.  
+
+Therefore, in each patient, for each AMI event, whichever row has the smallest `window`, that row is using the body measurements that are closest possible, in time, to the AMI event.  
+
+
+```{r, eval = FALSE}
+# Keep only the smallest window for each patient:
+ami_obese_f <- ami_obese |>
+  filter(has_ami & has_bmi) |>
+  keep_row_by('window', c('pid', 'ami_condition_start_datetime'))
+
+head_shot(ami_obese_f) |>
+  kable()
+```
+
+## Plot the phenotype for a random patient
+```{r, eval = FALSE}
+ami_obese_patients <- ami_obese |>
+  filter(ami_obese) |>
+  select(pid) |>
+  distinct() |>
+  pull()
+
+random_patient <- sample(ami_obese_patients, 1)
+message('Sampled patient: ', random_patient)
+```
+```{r plot, out.width="100%", out.height = 1200}
+ami_obese |>
+  select(
+    -height_value_as_number,
+    -ami_condition_start_datetime) |>
+  phea_plot(pid = random_patient)
+```
+
+## Obtain the SQL query that computes the phenotype  
+To see the SQL query underlying the phenotype, use helper function `code_shot()`, or `dbplyr::sql_render()`, or the `.clip_sql` option in `calculate_formula()`.  
+```{r, eval = FALSE}
+code_shot(ami_obese)
+```
+```sql
+<!-- `r code_shot(ami_obese)` -->
+```
+
+```{r, include = FALSE}
+DBI::dbDisconnect(dbcon)
+```

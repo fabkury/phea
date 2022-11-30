@@ -157,24 +157,13 @@ sql0 <- function(...) {
 #' @param .pid Unquoted character. If passing a lazy table to `input_source`, `.pid` is used as `pid` to buid a record
 #' source.
 #' @return Phea component object.
-make_component <- function(input_source, line = NA, delay = NA, window = Inf, rec_name = NA,
-  .passthrough = FALSE, .ts = NULL, .pid = NULL) {
+make_component <- function(input_source, line = NA, delay = NA, window = NA, rec_name = NA,
+  .passthrough = FALSE, .ts = NULL, .pid = NULL, .delay_fn = 'last_value', .ts_fn = NULL) {
   component <- list()
 
   if(isTRUE(attr(input_source, 'phea') == 'component')) {
     # rec_source is actually a component.
     component <- input_source
-    
-    # Overwrite if provided.
-    if(!is.na(line))
-      component$line <- line
-    
-    if(!is.na(delay)) {
-      component$delay <- delay
-      # If the user tries to apply a delay, erase the line if not provided.
-      if(is.na(line))
-        component$line <- NA
-    }
   } else {
     if(isTRUE(attr(input_source, 'phea') == 'record_source')) {
       component$rec_source <- input_source
@@ -196,7 +185,7 @@ make_component <- function(input_source, line = NA, delay = NA, window = Inf, re
       }
     }
       
-    if(is.na(line) && is.na(delay))
+    if(is.na(line) && is.na(delay) && is.na(window))
       line <- 0
     
     component$line <- line
@@ -205,12 +194,31 @@ make_component <- function(input_source, line = NA, delay = NA, window = Inf, re
     component$.passthrough <- .passthrough
   }
   
+  # Overwrite if provided.
+  if(!is.na(line))
+    component$line <- line
+  
+  if(!is.na(delay) || !is.na(window)) {
+    component$delay <- delay
+    # If the user tries to apply a delay or a window, erase the line if not provided.
+    if(is.na(line))
+      component$line <- NA
+  }
+  
   if(!is.na(window))
     component$comp_window <- window
 
   if(!is.na(.passthrough))
     component$.passthrough <- .passthrough
 
+  if(!is.na(.delay_fn))
+    component$delay_fn <- .delay_fn
+  
+  if(!is.null(.ts_fn))
+    component$ts_fn <- .ts_fn
+  else
+    component$ts_fn <- component$delay_fn
+  
   attr(component, 'phea') <- 'component'
 
   component
@@ -496,8 +504,8 @@ calculate_formula <- function(components, fml = NULL, window = NA, export = NULL
       dplyr::pull(column) |>
       unique()
 
-    if(!is.na(component$delay) && !is.na(component$line)) {
-      stop(paste0('Component ', comp_name, ': line and delay simultaneously is not implemented.'))
+    if((!is.na(component$delay) || !is.na(component$comp_window)) && !is.na(component$line)) {
+      stop(paste0('Component ', comp_name, ': line and delay (or window) simultaneously is not implemented.'))
       new_records <- make_component(component,
         line = NA,
         delay = component$delay,
@@ -541,18 +549,25 @@ calculate_formula <- function(components, fml = NULL, window = NA, export = NULL
     }
 
     over_clause <- paste0('partition by "pid", "name" order by "ts"')
-    sql_start <- paste0('last_value(', columns_sql, ') over (', over_clause, ' ')
     
     if(!is.na(component$line)) {
       # Give priority to access via *line*.
+      sql_start <- paste0('last_value(', columns_sql, ') over (', over_clause, ' ')
+      
       sql_txts <- paste0(sql_start,
         'rows between unbounded preceding and ', component$line, ' preceding)')
     } else {
       # Otherwise, produce access via *delay*.
+      use_delay_fn <- rep(component$delay_fn, length(columns))
+      use_delay_fn[columns == 'ts'] <- component$ts_fn
+      
+      sql_start <- paste0(use_delay_fn, '(', columns_sql, ') over (', over_clause, ' ')
+      
       sql_txts <- paste0(sql_start, 'range between ',
-        ifelse(component$comp_window == Inf, 'unbounded',
+        ifelse(is.na(component$comp_window), 'unbounded',
           paste0('\'', component$comp_window, '\'::interval')), ' preceding ',
-        'and \'', component$delay, '\'::interval preceding)')
+        'and \'', ifelse(is.na(component$delay), '0 days', component$delay),
+        '\'::interval preceding)')
     }
 
     commands <- purrr::map2(component_columns, sql_txts,
