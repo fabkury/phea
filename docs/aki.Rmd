@@ -12,6 +12,7 @@ library(knitr)
 options(scipen = 5e5)
 knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
 source(paste0(Sys.getenv("HOME"), '/Estudo/Tecnologia/R/espinha/credenciais.R')) # contains cred$pg
+source(paste0(Sys.getenv("HOME"), '/Estudo/Tecnologia/R/wrap/wrap.R')) # contains cred$pg
 ```
 ```{r setup, message = FALSE}
 library(phea)
@@ -194,7 +195,7 @@ scr_records |>
   kable()
 ```
 
-#### Glomerular filtrarion rate records
+#### Glomerular filtration rate records
 ```{r plot_data_gfr}
 gfr_records |>
   filter(person_id == random_patient) |>
@@ -204,7 +205,7 @@ gfr_records |>
   kable()
 ```
 
-## Produce _change events_ for Atlas  
+## Produce events for Atlas  
 One approach to use Phea's results inside Atlas is to produce novel records (e.g. new rows in `OBSERVATION` or `MEASUREMENT`) using custom concept IDs, then ETL those back into the dataset.  
 
 Below I illustrate how to do it with case A, assuming the new records will go into `MEASUREMENT`. Notice I put the difference inside `value_as_number`, just in case.    

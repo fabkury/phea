@@ -1,0 +1,940 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+
+<meta charset="utf-8" />
+<meta name="generator" content="pandoc" />
+<meta http-equiv="X-UA-Compatible" content="IE=EDGE" />
+
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+
+
+
+<title>Stress-testing Phea</title>
+
+<script>// Pandoc 2.9 adds attributes on both header and div. We remove the former (to
+// be compatible with the behavior of Pandoc < 2.8).
+document.addEventListener('DOMContentLoaded', function(e) {
+  var hs = document.querySelectorAll("div.section[class*='level'] > :first-child");
+  var i, h, a;
+  for (i = 0; i < hs.length; i++) {
+    h = hs[i];
+    if (!/^h[1-6]$/i.test(h.tagName)) continue;  // it should be a header h1-h6
+    a = h.attributes;
+    while (a.length > 0) h.removeAttribute(a[0].name);
+  }
+});
+</script>
+
+<style type="text/css">
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+span.underline{text-decoration: underline;}
+div.column{display: inline-block; vertical-align: top; width: 50%;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+</style>
+
+
+
+<style type="text/css">
+code {
+white-space: pre;
+}
+.sourceCode {
+overflow: visible;
+}
+</style>
+<style type="text/css" data-origin="pandoc">
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+{ counter-reset: source-line 0; }
+pre.numberSource code > span
+{ position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+{ content: counter(source-line);
+position: relative; left: -1em; text-align: right; vertical-align: baseline;
+border: none; display: inline-block;
+-webkit-touch-callout: none; -webkit-user-select: none;
+-khtml-user-select: none; -moz-user-select: none;
+-ms-user-select: none; user-select: none;
+padding: 0 4px; width: 4em;
+color: #aaaaaa;
+}
+pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa; padding-left: 4px; }
+div.sourceCode
+{ }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+code span.al { color: #ff0000; font-weight: bold; } 
+code span.an { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.at { color: #7d9029; } 
+code span.bn { color: #40a070; } 
+code span.bu { color: #008000; } 
+code span.cf { color: #007020; font-weight: bold; } 
+code span.ch { color: #4070a0; } 
+code span.cn { color: #880000; } 
+code span.co { color: #60a0b0; font-style: italic; } 
+code span.cv { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.do { color: #ba2121; font-style: italic; } 
+code span.dt { color: #902000; } 
+code span.dv { color: #40a070; } 
+code span.er { color: #ff0000; font-weight: bold; } 
+code span.ex { } 
+code span.fl { color: #40a070; } 
+code span.fu { color: #06287e; } 
+code span.im { color: #008000; font-weight: bold; } 
+code span.in { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.kw { color: #007020; font-weight: bold; } 
+code span.op { color: #666666; } 
+code span.ot { color: #007020; } 
+code span.pp { color: #bc7a00; } 
+code span.sc { color: #4070a0; } 
+code span.ss { color: #bb6688; } 
+code span.st { color: #4070a0; } 
+code span.va { color: #19177c; } 
+code span.vs { color: #4070a0; } 
+code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } 
+</style>
+<script>
+// apply pandoc div.sourceCode style to pre.sourceCode instead
+(function() {
+  var sheets = document.styleSheets;
+  for (var i = 0; i < sheets.length; i++) {
+    if (sheets[i].ownerNode.dataset["origin"] !== "pandoc") continue;
+    try { var rules = sheets[i].cssRules; } catch (e) { continue; }
+    var j = 0;
+    while (j < rules.length) {
+      var rule = rules[j];
+      // check if there is a div.sourceCode rule
+      if (rule.type !== rule.STYLE_RULE || rule.selectorText !== "div.sourceCode") {
+        j++;
+        continue;
+      }
+      var style = rule.style.cssText;
+      // check if color or background-color is set
+      if (rule.style.color === '' && rule.style.backgroundColor === '') {
+        j++;
+        continue;
+      }
+      // replace div.sourceCode by a pre.sourceCode rule
+      sheets[i].deleteRule(j);
+      sheets[i].insertRule('pre.sourceCode{' + style + '}', j);
+    }
+  }
+})();
+</script>
+
+
+
+
+<style type="text/css">body {
+background-color: #fff;
+margin: 1em auto;
+max-width: 700px;
+overflow: visible;
+padding-left: 2em;
+padding-right: 2em;
+font-family: "Open Sans", "Helvetica Neue", Helvetica, Arial, sans-serif;
+font-size: 14px;
+line-height: 1.35;
+}
+#TOC {
+clear: both;
+margin: 0 0 10px 10px;
+padding: 4px;
+width: 400px;
+border: 1px solid #CCCCCC;
+border-radius: 5px;
+background-color: #f6f6f6;
+font-size: 13px;
+line-height: 1.3;
+}
+#TOC .toctitle {
+font-weight: bold;
+font-size: 15px;
+margin-left: 5px;
+}
+#TOC ul {
+padding-left: 40px;
+margin-left: -1.5em;
+margin-top: 5px;
+margin-bottom: 5px;
+}
+#TOC ul ul {
+margin-left: -2em;
+}
+#TOC li {
+line-height: 16px;
+}
+table {
+margin: 1em auto;
+border-width: 1px;
+border-color: #DDDDDD;
+border-style: outset;
+border-collapse: collapse;
+}
+table th {
+border-width: 2px;
+padding: 5px;
+border-style: inset;
+}
+table td {
+border-width: 1px;
+border-style: inset;
+line-height: 18px;
+padding: 5px 5px;
+}
+table, table th, table td {
+border-left-style: none;
+border-right-style: none;
+}
+table thead, table tr.even {
+background-color: #f7f7f7;
+}
+p {
+margin: 0.5em 0;
+}
+blockquote {
+background-color: #f6f6f6;
+padding: 0.25em 0.75em;
+}
+hr {
+border-style: solid;
+border: none;
+border-top: 1px solid #777;
+margin: 28px 0;
+}
+dl {
+margin-left: 0;
+}
+dl dd {
+margin-bottom: 13px;
+margin-left: 13px;
+}
+dl dt {
+font-weight: bold;
+}
+ul {
+margin-top: 0;
+}
+ul li {
+list-style: circle outside;
+}
+ul ul {
+margin-bottom: 0;
+}
+pre, code {
+background-color: #f7f7f7;
+border-radius: 3px;
+color: #333;
+white-space: pre-wrap; 
+}
+pre {
+border-radius: 3px;
+margin: 5px 0px 10px 0px;
+padding: 10px;
+}
+pre:not([class]) {
+background-color: #f7f7f7;
+}
+code {
+font-family: Consolas, Monaco, 'Courier New', monospace;
+font-size: 85%;
+}
+p > code, li > code {
+padding: 2px 0px;
+}
+div.figure {
+text-align: center;
+}
+img {
+background-color: #FFFFFF;
+padding: 2px;
+border: 1px solid #DDDDDD;
+border-radius: 3px;
+border: 1px solid #CCCCCC;
+margin: 0 5px;
+}
+h1 {
+margin-top: 0;
+font-size: 35px;
+line-height: 40px;
+}
+h2 {
+border-bottom: 4px solid #f7f7f7;
+padding-top: 10px;
+padding-bottom: 2px;
+font-size: 145%;
+}
+h3 {
+border-bottom: 2px solid #f7f7f7;
+padding-top: 10px;
+font-size: 120%;
+}
+h4 {
+border-bottom: 1px solid #f7f7f7;
+margin-left: 8px;
+font-size: 105%;
+}
+h5, h6 {
+border-bottom: 1px solid #ccc;
+font-size: 105%;
+}
+a {
+color: #0033dd;
+text-decoration: none;
+}
+a:hover {
+color: #6666ff; }
+a:visited {
+color: #800080; }
+a:visited:hover {
+color: #BB00BB; }
+a[href^="http:"] {
+text-decoration: underline; }
+a[href^="https:"] {
+text-decoration: underline; }
+
+code > span.kw { color: #555; font-weight: bold; } 
+code > span.dt { color: #902000; } 
+code > span.dv { color: #40a070; } 
+code > span.bn { color: #d14; } 
+code > span.fl { color: #d14; } 
+code > span.ch { color: #d14; } 
+code > span.st { color: #d14; } 
+code > span.co { color: #888888; font-style: italic; } 
+code > span.ot { color: #007020; } 
+code > span.al { color: #ff0000; font-weight: bold; } 
+code > span.fu { color: #900; font-weight: bold; } 
+code > span.er { color: #a61717; background-color: #e3d2d2; } 
+</style>
+
+
+
+
+</head>
+
+<body>
+
+
+
+
+<h1 class="title toc-ignore">Stress-testing Phea</h1>
+
+
+
+<p><em>This vignette assumes a SQL server at <code>localhost</code> (we
+use PostgreSQL), with data in OMOP Common Data Model v5.4 format in
+schema <code>cdm_new_york3</code>. The patient records shown in this
+example are synthetic data from <a href="https://github.com/synthetichealth/synthea">Synthea(TM) Patient
+Generator</a>.</em></p>
+<div class="sourceCode" id="cb1"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(phea)</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(dplyr)</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="co"># Connect to SQL server.</span></span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a>dbcon <span class="ot">&lt;-</span> DBI<span class="sc">::</span><span class="fu">dbConnect</span>(RPostgres<span class="sc">::</span><span class="fu">Postgres</span>(),</span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a>  <span class="at">host =</span> <span class="st">&#39;localhost&#39;</span>, <span class="at">port =</span> <span class="dv">7654</span>, <span class="at">dbname =</span> <span class="st">&#39;fort&#39;</span>,</span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a>  <span class="at">user =</span> cred<span class="sc">$</span>pg<span class="sc">$</span>user, <span class="at">password =</span> cred<span class="sc">$</span>pg<span class="sc">$</span>pass)</span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a><span class="co"># Call setup_phea so we can use sqlt() and sql0().</span></span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a><span class="fu">setup_phea</span>(dbcon, <span class="st">&#39;cdm_new_york3&#39;</span>)</span></code></pre></div>
+<p>How complex can a phenotype be in Phea? And how does performance
+change as you increase the complexity? Do the queries ever become
+<strong>too complex</strong>?</p>
+<p>In this vignette we perform two stress tests:</p>
+<ol style="list-style-type: lower-alpha">
+<li>Compute formulas with 1 to 200 components.<br />
+</li>
+<li>Compute a formula, use it as a component in another formula, repeat
+that consecutively 1 to 200 times.</li>
+</ol>
+<p>The phenotypes we will compute here not relevant. We just want to
+test Phea.</p>
+<div id="the-dataset" class="section level2">
+<h2>The dataset</h2>
+<p>We will be using table <code>MEASUREMENT</code> from
+<code>cdm_new_york3</code>. For context, let us measure the size of that
+table.</p>
+<div class="sourceCode" id="cb2"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>size_stats <span class="ot">&lt;-</span> <span class="fu">sqlt</span>(measurement) <span class="sc">|&gt;</span></span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>() <span class="sc">|&gt;</span></span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">summarise</span>(</span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a>    <span class="at">rows =</span> <span class="fu">n</span>(),</span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a>    <span class="at">patients =</span> <span class="fu">n_distinct</span>(person_id)) <span class="sc">|&gt;</span></span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">collect</span>()</span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a><span class="fu">wrap</span>(measurement_summary, {</span>
+<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a>  <span class="fu">sql0</span>(<span class="st">&#39;</span></span>
+<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a><span class="st">    select measurement_concept_id as concept_id, concept_code, concept_name, vocabulary_id,</span></span>
+<span id="cb2-11"><a href="#cb2-11" aria-hidden="true" tabindex="-1"></a><span class="st">      count(*) as records, count(distinct person_id) as patients</span></span>
+<span id="cb2-12"><a href="#cb2-12" aria-hidden="true" tabindex="-1"></a><span class="st">    from cdm_new_york3.measurement a</span></span>
+<span id="cb2-13"><a href="#cb2-13" aria-hidden="true" tabindex="-1"></a><span class="st">    inner join cdm_new_york3.concept b</span></span>
+<span id="cb2-14"><a href="#cb2-14" aria-hidden="true" tabindex="-1"></a><span class="st">    on a.measurement_concept_id = b.concept_id</span></span>
+<span id="cb2-15"><a href="#cb2-15" aria-hidden="true" tabindex="-1"></a><span class="st">    group by measurement_concept_id, concept_code, concept_name, vocabulary_id</span></span>
+<span id="cb2-16"><a href="#cb2-16" aria-hidden="true" tabindex="-1"></a><span class="st">    order by patients desc, records desc&#39;</span>) <span class="sc">|&gt;</span></span>
+<span id="cb2-17"><a href="#cb2-17" aria-hidden="true" tabindex="-1"></a>  <span class="fu">collect</span>()</span>
+<span id="cb2-18"><a href="#cb2-18" aria-hidden="true" tabindex="-1"></a>})</span></code></pre></div>
+<p><code>MEASUREMENT</code> has 9,668,839 rows and 23,065 patients.</p>
+<p>Let’s see the most popular concepts in <code>MEASUREMENT</code>.</p>
+<div class="sourceCode" id="cb3"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="fu">head</span>(measurement_summary, <span class="dv">10</span>) <span class="sc">|&gt;</span></span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">kable</span>()</span></code></pre></div>
+<table>
+<colgroup>
+<col width="9%" />
+<col width="11%" />
+<col width="52%" />
+<col width="11%" />
+<col width="6%" />
+<col width="7%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th align="right">concept_id</th>
+<th align="left">concept_code</th>
+<th align="left">concept_name</th>
+<th align="left">vocabulary_id</th>
+<th align="right">records</th>
+<th align="right">patients</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="right">43055141</td>
+<td align="left">72514-3</td>
+<td align="left">Pain severity - 0-10 verbal numeric rating [Score] -
+Reported</td>
+<td align="left">LOINC</td>
+<td align="right">548651</td>
+<td align="right">23046</td>
+</tr>
+<tr class="even">
+<td align="right">3000963</td>
+<td align="left">718-7</td>
+<td align="left">Hemoglobin [Mass/volume] in Blood</td>
+<td align="left">LOINC</td>
+<td align="right">98650</td>
+<td align="right">23044</td>
+</tr>
+<tr class="odd">
+<td align="right">3009744</td>
+<td align="left">786-4</td>
+<td align="left">MCHC [Mass/volume] by Automated count</td>
+<td align="left">LOINC</td>
+<td align="right">98245</td>
+<td align="right">23044</td>
+</tr>
+<tr class="even">
+<td align="right">3020416</td>
+<td align="left">789-8</td>
+<td align="left">Erythrocytes [#/volume] in Blood by Automated
+count</td>
+<td align="left">LOINC</td>
+<td align="right">98245</td>
+<td align="right">23044</td>
+</tr>
+<tr class="odd">
+<td align="right">3023599</td>
+<td align="left">787-2</td>
+<td align="left">MCV [Entitic volume] by Automated count</td>
+<td align="left">LOINC</td>
+<td align="right">98245</td>
+<td align="right">23044</td>
+</tr>
+<tr class="even">
+<td align="right">3024929</td>
+<td align="left">777-3</td>
+<td align="left">Platelets [#/volume] in Blood by Automated count</td>
+<td align="left">LOINC</td>
+<td align="right">98245</td>
+<td align="right">23044</td>
+</tr>
+<tr class="odd">
+<td align="right">3000905</td>
+<td align="left">6690-2</td>
+<td align="left">Leukocytes [#/volume] in Blood by Automated count</td>
+<td align="left">LOINC</td>
+<td align="right">98245</td>
+<td align="right">23044</td>
+</tr>
+<tr class="even">
+<td align="right">3012030</td>
+<td align="left">785-6</td>
+<td align="left">MCH [Entitic mass] by Automated count</td>
+<td align="left">LOINC</td>
+<td align="right">98245</td>
+<td align="right">23044</td>
+</tr>
+<tr class="odd">
+<td align="right">3025315</td>
+<td align="left">29463-7</td>
+<td align="left">Body weight</td>
+<td align="left">LOINC</td>
+<td align="right">470537</td>
+<td align="right">23042</td>
+</tr>
+<tr class="even">
+<td align="right">3023314</td>
+<td align="left">4544-3</td>
+<td align="left">Hematocrit [Volume Fraction] of Blood by Automated
+count</td>
+<td align="left">LOINC</td>
+<td align="right">94026</td>
+<td align="right">23042</td>
+</tr>
+</tbody>
+</table>
+<p>That is the data we will use to benchmark Phea.</p>
+<p>We will be picking rows starting from the first, so, to reduce bias,
+let’s shuffle them.</p>
+<div class="sourceCode" id="cb4"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Shuffle the rows</span></span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a><span class="fu">set.seed</span>(<span class="dv">42</span>)</span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>measurement_summary <span class="ot">&lt;-</span> measurement_summary[<span class="fu">sample</span>(<span class="dv">1</span><span class="sc">:</span><span class="fu">nrow</span>(measurement_summary)),]</span></code></pre></div>
+</div>
+<div id="stress-test-a-formulas-with-many-components" class="section level2">
+<h2>Stress-test A: formulas with many components</h2>
+<p>For each run of test A, we will pick N concepts, build a component
+for each (C<sub>1</sub> to C<sub>n</sub>), and compute the following
+formula:</p>
+<p><strong>P = C<sub>1</sub><sup>value_as_number</sup> +
+C<sub>2</sub><sup>value_as_number</sup> +
+C<sub>2</sub><sup>value_as_number</sup> + … +
+C<sub>n</sub><sup>value_as_number</sup></strong></p>
+<p>In other words, we will just add up the <code>value_as_number</code>
+of each component. <em>We do not want to put a <code>NULL</code> into
+that sum, because it would cause the entire result to collapse to
+<code>NULL</code>. This is because any number plus <code>NULL</code>
+equals to <code>NULL</code>. To circumvent that, we will use a
+<code>coalesce()</code>. If a component C<sub>x</sub> is
+<code>NULL</code>, the number <code>0</code> will be used
+instead.</em></p>
+<p>From the finalized phenotype, we will just count the rows, unique
+patients, and sum the result (across patients). This is just to force
+the SQL server to compute the phenotype entirely, for all patients, so
+we can measure how long it takes.</p>
+<p>In each run, we use library <code>tictoc</code> to measure time
+performance.</p>
+<div class="sourceCode" id="cb5"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(tictoc)</span></code></pre></div>
+<div id="functions-used-for-the-test" class="section level3">
+<h3>Functions used for the test</h3>
+<p>Function <code>produce_N_components(N)</code> produces <code>N</code>
+components using the first <code>N</code> rows of
+<code>measurement_summary</code>.</p>
+<div class="sourceCode" id="cb6"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>produce_N_components <span class="ot">&lt;-</span> <span class="cf">function</span>(N) {</span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>  make_test_component <span class="ot">&lt;-</span> <span class="cf">function</span>(i) {</span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>    concept_id <span class="ot">&lt;-</span> measurement_summary<span class="sc">$</span>concept_id[i]</span>
+<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a>    records <span class="ot">&lt;-</span> <span class="fu">sqlt</span>(measurement) <span class="sc">|&gt;</span></span>
+<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a>      <span class="fu">filter</span>(measurement_concept_id <span class="sc">==</span> <span class="fu">local</span>(concept_id))</span>
+<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a>    component <span class="ot">&lt;-</span> <span class="fu">make_component</span>(records,</span>
+<span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a>      <span class="at">.ts =</span> measurement_datetime,</span>
+<span id="cb6-8"><a href="#cb6-8" aria-hidden="true" tabindex="-1"></a>      <span class="at">.pid =</span> person_id)</span>
+<span id="cb6-9"><a href="#cb6-9" aria-hidden="true" tabindex="-1"></a>    <span class="fu">return</span>(component)</span>
+<span id="cb6-10"><a href="#cb6-10" aria-hidden="true" tabindex="-1"></a>  }</span>
+<span id="cb6-11"><a href="#cb6-11" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Pick the first N lab tests</span></span>
+<span id="cb6-12"><a href="#cb6-12" aria-hidden="true" tabindex="-1"></a>  components <span class="ot">&lt;-</span> <span class="fu">lapply</span>(<span class="dv">1</span><span class="sc">:</span>N, make_test_component)</span>
+<span id="cb6-13"><a href="#cb6-13" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb6-14"><a href="#cb6-14" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Their names will be simply &quot;C&lt;sub&gt;n&lt;/sub&gt;&quot;</span></span>
+<span id="cb6-15"><a href="#cb6-15" aria-hidden="true" tabindex="-1"></a>  <span class="fu">names</span>(components) <span class="ot">&lt;-</span> <span class="fu">paste0</span>(<span class="st">&#39;c&#39;</span>, <span class="dv">1</span><span class="sc">:</span><span class="fu">length</span>(components))</span>
+<span id="cb6-16"><a href="#cb6-16" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb6-17"><a href="#cb6-17" aria-hidden="true" tabindex="-1"></a>  <span class="fu">return</span>(components)</span>
+<span id="cb6-18"><a href="#cb6-18" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div>
+<p>Function <code>run_test_a(N)</code> runs Test A using <code>N</code>
+components.</p>
+<div class="sourceCode" id="cb7"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>run_test_a <span class="ot">&lt;-</span> <span class="cf">function</span>(N) {</span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">wrap</span>(<span class="fu">paste0</span>(<span class="st">&#39;test_a_N&#39;</span>, N), <span class="at">by_name =</span> <span class="cn">TRUE</span>, <span class="at">pass_val =</span> <span class="cn">TRUE</span>, <span class="at">ovr =</span> T, {</span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a>    components <span class="ot">&lt;-</span> <span class="fu">produce_N_components</span>(N)</span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a>    formula_string <span class="ot">&lt;-</span> <span class="fu">paste0</span>(<span class="st">&#39;coalesce(&#39;</span>, <span class="fu">names</span>(components), <span class="st">&#39;_value_as_number, 0)&#39;</span>, <span class="at">collapse =</span> <span class="st">&#39; + &#39;</span>)</span>
+<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a>    <span class="fu">tic</span>()</span>
+<span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a>    phen <span class="ot">&lt;-</span> <span class="fu">calculate_formula</span>(</span>
+<span id="cb7-9"><a href="#cb7-9" aria-hidden="true" tabindex="-1"></a>      <span class="at">components =</span> components,</span>
+<span id="cb7-10"><a href="#cb7-10" aria-hidden="true" tabindex="-1"></a>      <span class="at">fml =</span> <span class="fu">list</span>(<span class="at">test_a =</span> formula_string))</span>
+<span id="cb7-11"><a href="#cb7-11" aria-hidden="true" tabindex="-1"></a>    phea_time <span class="ot">&lt;-</span> <span class="fu">toc</span>(<span class="at">quiet =</span> <span class="cn">TRUE</span>)</span>
+<span id="cb7-12"><a href="#cb7-12" aria-hidden="true" tabindex="-1"></a>    phea_time <span class="ot">&lt;-</span> phea_time<span class="sc">$</span>toc <span class="sc">-</span> phea_time<span class="sc">$</span>tic</span>
+<span id="cb7-13"><a href="#cb7-13" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb7-14"><a href="#cb7-14" aria-hidden="true" tabindex="-1"></a>    <span class="fu">tic</span>()</span>
+<span id="cb7-15"><a href="#cb7-15" aria-hidden="true" tabindex="-1"></a>    result <span class="ot">&lt;-</span> phen <span class="sc">|&gt;</span></span>
+<span id="cb7-16"><a href="#cb7-16" aria-hidden="true" tabindex="-1"></a>      <span class="fu">group_by</span>() <span class="sc">|&gt;</span></span>
+<span id="cb7-17"><a href="#cb7-17" aria-hidden="true" tabindex="-1"></a>      <span class="fu">summarise</span>(</span>
+<span id="cb7-18"><a href="#cb7-18" aria-hidden="true" tabindex="-1"></a>        <span class="at">rows =</span> <span class="fu">n</span>(),</span>
+<span id="cb7-19"><a href="#cb7-19" aria-hidden="true" tabindex="-1"></a>        <span class="at">patients =</span> <span class="fu">n_distinct</span>(pid),</span>
+<span id="cb7-20"><a href="#cb7-20" aria-hidden="true" tabindex="-1"></a>        <span class="at">test_a_sum =</span> <span class="fu">sum</span>(test_a<span class="sc">/</span><span class="dv">100000</span>, <span class="at">na.rm =</span> <span class="cn">TRUE</span>)) <span class="sc">|&gt;</span></span>
+<span id="cb7-21"><a href="#cb7-21" aria-hidden="true" tabindex="-1"></a>      <span class="fu">collect</span>()</span>
+<span id="cb7-22"><a href="#cb7-22" aria-hidden="true" tabindex="-1"></a>    query_time <span class="ot">&lt;-</span> <span class="fu">toc</span>(<span class="at">quiet =</span> <span class="cn">TRUE</span>)</span>
+<span id="cb7-23"><a href="#cb7-23" aria-hidden="true" tabindex="-1"></a>    query_time <span class="ot">&lt;-</span> query_time<span class="sc">$</span>toc <span class="sc">-</span> query_time<span class="sc">$</span>tic</span>
+<span id="cb7-24"><a href="#cb7-24" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb7-25"><a href="#cb7-25" aria-hidden="true" tabindex="-1"></a>    result_rows <span class="ot">&lt;-</span> result<span class="sc">$</span>rows</span>
+<span id="cb7-26"><a href="#cb7-26" aria-hidden="true" tabindex="-1"></a>    result_patients <span class="ot">&lt;-</span> result<span class="sc">$</span>patients</span>
+<span id="cb7-27"><a href="#cb7-27" aria-hidden="true" tabindex="-1"></a>    test_a_sum <span class="ot">&lt;-</span> result<span class="sc">$</span>test_a_sum</span>
+<span id="cb7-28"><a href="#cb7-28" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb7-29"><a href="#cb7-29" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Compute component stats</span></span>
+<span id="cb7-30"><a href="#cb7-30" aria-hidden="true" tabindex="-1"></a>    input_rows <span class="ot">&lt;-</span> <span class="fu">lapply</span>(components, \(x) <span class="fu">summarise</span>(x<span class="sc">$</span>rec_source<span class="sc">$</span>records, <span class="at">rows =</span> <span class="fu">n</span>()) <span class="sc">|&gt;</span> <span class="fu">pull</span>(<span class="st">&#39;rows&#39;</span>)) <span class="sc">|&gt;</span></span>
+<span id="cb7-31"><a href="#cb7-31" aria-hidden="true" tabindex="-1"></a>      purrr<span class="sc">::</span><span class="fu">reduce</span>(<span class="st">`</span><span class="at">+</span><span class="st">`</span>)</span>
+<span id="cb7-32"><a href="#cb7-32" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb7-33"><a href="#cb7-33" aria-hidden="true" tabindex="-1"></a>    input_patients <span class="ot">&lt;-</span> <span class="fu">lapply</span>(components, \(x) <span class="fu">select</span>(x<span class="sc">$</span>rec_source<span class="sc">$</span>records, person_id)) <span class="sc">|&gt;</span></span>
+<span id="cb7-34"><a href="#cb7-34" aria-hidden="true" tabindex="-1"></a>      purrr<span class="sc">::</span><span class="fu">reduce</span>(union_all) <span class="sc">|&gt;</span></span>
+<span id="cb7-35"><a href="#cb7-35" aria-hidden="true" tabindex="-1"></a>      <span class="fu">summarise</span>(<span class="at">patients =</span> <span class="fu">n_distinct</span>(person_id)) <span class="sc">|&gt;</span></span>
+<span id="cb7-36"><a href="#cb7-36" aria-hidden="true" tabindex="-1"></a>      <span class="fu">pull</span>(<span class="st">&#39;patients&#39;</span>)</span>
+<span id="cb7-37"><a href="#cb7-37" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb7-38"><a href="#cb7-38" aria-hidden="true" tabindex="-1"></a>    phen_head <span class="ot">&lt;-</span> <span class="fu">head</span>(phen, <span class="dv">5</span>) <span class="sc">|&gt;</span> <span class="fu">collect</span>()</span>
+<span id="cb7-39"><a href="#cb7-39" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb7-40"><a href="#cb7-40" aria-hidden="true" tabindex="-1"></a>    res <span class="ot">&lt;-</span> <span class="fu">tibble</span>(</span>
+<span id="cb7-41"><a href="#cb7-41" aria-hidden="true" tabindex="-1"></a>      <span class="at">N =</span> N,</span>
+<span id="cb7-42"><a href="#cb7-42" aria-hidden="true" tabindex="-1"></a>      </span>
+<span id="cb7-43"><a href="#cb7-43" aria-hidden="true" tabindex="-1"></a>      <span class="at">input_rows =</span> input_rows,</span>
+<span id="cb7-44"><a href="#cb7-44" aria-hidden="true" tabindex="-1"></a>      <span class="at">result_rows =</span> result_rows,</span>
+<span id="cb7-45"><a href="#cb7-45" aria-hidden="true" tabindex="-1"></a>      <span class="at">test_a_sum =</span> test_a_sum,</span>
+<span id="cb7-46"><a href="#cb7-46" aria-hidden="true" tabindex="-1"></a>      </span>
+<span id="cb7-47"><a href="#cb7-47" aria-hidden="true" tabindex="-1"></a>      <span class="at">input_patients =</span> input_patients,</span>
+<span id="cb7-48"><a href="#cb7-48" aria-hidden="true" tabindex="-1"></a>      <span class="at">result_patients =</span> result_patients,</span>
+<span id="cb7-49"><a href="#cb7-49" aria-hidden="true" tabindex="-1"></a>      </span>
+<span id="cb7-50"><a href="#cb7-50" aria-hidden="true" tabindex="-1"></a>      <span class="at">phea_time =</span> phea_time,</span>
+<span id="cb7-51"><a href="#cb7-51" aria-hidden="true" tabindex="-1"></a>      <span class="at">query_time =</span> query_time,</span>
+<span id="cb7-52"><a href="#cb7-52" aria-hidden="true" tabindex="-1"></a>      </span>
+<span id="cb7-53"><a href="#cb7-53" aria-hidden="true" tabindex="-1"></a>      <span class="at">pps_query =</span> input_patients<span class="sc">/</span>query_time,</span>
+<span id="cb7-54"><a href="#cb7-54" aria-hidden="true" tabindex="-1"></a>      <span class="at">rps_query =</span> input_rows<span class="sc">/</span>query_time,</span>
+<span id="cb7-55"><a href="#cb7-55" aria-hidden="true" tabindex="-1"></a>      </span>
+<span id="cb7-56"><a href="#cb7-56" aria-hidden="true" tabindex="-1"></a>      <span class="at">phen_head =</span> <span class="fu">list</span>(phen_head)</span>
+<span id="cb7-57"><a href="#cb7-57" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb7-58"><a href="#cb7-58" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb7-59"><a href="#cb7-59" aria-hidden="true" tabindex="-1"></a>    <span class="fu">return</span>(res)</span>
+<span id="cb7-60"><a href="#cb7-60" aria-hidden="true" tabindex="-1"></a>  })</span>
+<span id="cb7-61"><a href="#cb7-61" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb7-62"><a href="#cb7-62" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-63"><a href="#cb7-63" aria-hidden="true" tabindex="-1"></a>print_test_a_results <span class="ot">&lt;-</span> <span class="cf">function</span>() {</span>
+<span id="cb7-64"><a href="#cb7-64" aria-hidden="true" tabindex="-1"></a>  <span class="fu">lapply</span>(test_runs, \(x) <span class="fu">select</span>(x, <span class="sc">-</span>phen_head)) <span class="sc">|&gt;</span></span>
+<span id="cb7-65"><a href="#cb7-65" aria-hidden="true" tabindex="-1"></a>    <span class="fu">bind_rows</span>() <span class="sc">|&gt;</span></span>
+<span id="cb7-66"><a href="#cb7-66" aria-hidden="true" tabindex="-1"></a>      <span class="fu">kable</span>()</span>
+<span id="cb7-67"><a href="#cb7-67" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb7-68"><a href="#cb7-68" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-69"><a href="#cb7-69" aria-hidden="true" tabindex="-1"></a>test_runs <span class="ot">=</span> <span class="fu">list</span>()</span></code></pre></div>
+</div>
+<div id="test-a-run-n-1" class="section level3">
+<h3>Test A, run N = 1</h3>
+<div class="sourceCode" id="cb8"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a>test_runs[[<span class="fu">length</span>(test_runs)<span class="sc">+</span><span class="dv">1</span>]] <span class="ot">&lt;-</span> <span class="fu">run_test_a</span>(<span class="dv">1</span>)</span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 12/01 12:39 Saving &#39;test_a_N1&#39; to &#39;../sai/rds/test_a_N1.qs&#39;.</span></span>
+<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a>test_runs[[<span class="fu">length</span>(test_runs)]]<span class="sc">$</span>phen_head[[<span class="dv">1</span>]] <span class="sc">|&gt;</span></span>
+<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">kable</span>()</span></code></pre></div>
+<table>
+<thead>
+<tr class="header">
+<th align="right">row_id</th>
+<th align="right">pid</th>
+<th align="left">ts</th>
+<th align="left">window</th>
+<th align="right">c1_value_as_number</th>
+<th align="right">test_a</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="right">1</td>
+<td align="right">6</td>
+<td align="left">2011-07-13</td>
+<td align="left">00:00:00</td>
+<td align="right">NA</td>
+<td align="right">0</td>
+</tr>
+<tr class="even">
+<td align="right">2</td>
+<td align="right">6</td>
+<td align="left">2014-07-30</td>
+<td align="left">00:00:00</td>
+<td align="right">NA</td>
+<td align="right">0</td>
+</tr>
+<tr class="odd">
+<td align="right">3</td>
+<td align="right">17</td>
+<td align="left">2021-12-26</td>
+<td align="left">00:00:00</td>
+<td align="right">NA</td>
+<td align="right">0</td>
+</tr>
+<tr class="even">
+<td align="right">4</td>
+<td align="right">26</td>
+<td align="left">2017-11-05</td>
+<td align="left">00:00:00</td>
+<td align="right">NA</td>
+<td align="right">0</td>
+</tr>
+<tr class="odd">
+<td align="right">5</td>
+<td align="right">28</td>
+<td align="left">2017-04-28</td>
+<td align="left">00:00:00</td>
+<td align="right">NA</td>
+<td align="right">0</td>
+</tr>
+</tbody>
+</table>
+<p>As it appears, there are many NAs in <code>value_as_number</code> in
+our table <code>MEASUREMENT</code>. But that is not an issue.</p>
+<p>How was the performance? Let’s see.</p>
+<div class="sourceCode" id="cb9"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="fu">print_test_a_results</span>()</span></code></pre></div>
+<table>
+<colgroup>
+<col width="2%" />
+<col width="10%" />
+<col width="11%" />
+<col width="10%" />
+<col width="13%" />
+<col width="14%" />
+<col width="9%" />
+<col width="10%" />
+<col width="9%" />
+<col width="9%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th align="right">N</th>
+<th align="right">input_rows</th>
+<th align="right">result_rows</th>
+<th align="right">test_a_sum</th>
+<th align="right">input_patients</th>
+<th align="right">result_patients</th>
+<th align="right">phea_time</th>
+<th align="right">query_time</th>
+<th align="right">pps_query</th>
+<th align="right">rps_query</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="right">1</td>
+<td align="right">12869</td>
+<td align="right">12869</td>
+<td align="right">0</td>
+<td align="right">5136</td>
+<td align="right">5136</td>
+<td align="right">0.42</td>
+<td align="right">0.55</td>
+<td align="right">9338.182</td>
+<td align="right">23398.18</td>
+</tr>
+</tbody>
+</table>
+<p>With N = 1 (a single component), Phea took 0.42 seconds to assemble
+the phenotype, and the SQL server took 0.55 seconds to run the query.
+That is 23,398 input rows per second of query time.</p>
+</div>
+<div id="test-a-run-n-5" class="section level3">
+<h3>Test A, run N = 5</h3>
+<div class="sourceCode" id="cb10"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a>test_runs[[<span class="fu">length</span>(test_runs)<span class="sc">+</span><span class="dv">1</span>]] <span class="ot">&lt;-</span> <span class="fu">run_test_a</span>(<span class="dv">5</span>)</span>
+<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 12/01 12:39 Saving &#39;test_a_N5&#39; to &#39;../sai/rds/test_a_N5.qs&#39;.</span></span>
+<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a>test_runs[[<span class="fu">length</span>(test_runs)]]<span class="sc">$</span>phen_head[[<span class="dv">1</span>]] <span class="sc">|&gt;</span></span>
+<span id="cb10-4"><a href="#cb10-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">kable</span>()</span></code></pre></div>
+<table style="width:100%;">
+<colgroup>
+<col width="5%" />
+<col width="3%" />
+<col width="8%" />
+<col width="6%" />
+<col width="14%" />
+<col width="14%" />
+<col width="14%" />
+<col width="14%" />
+<col width="14%" />
+<col width="5%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th align="right">row_id</th>
+<th align="right">pid</th>
+<th align="left">ts</th>
+<th align="left">window</th>
+<th align="right">c1_value_as_number</th>
+<th align="right">c2_value_as_number</th>
+<th align="right">c3_value_as_number</th>
+<th align="right">c4_value_as_number</th>
+<th align="right">c5_value_as_number</th>
+<th align="right">test_a</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="right">1</td>
+<td align="right">4</td>
+<td align="left">2015-04-23</td>
+<td align="left">00:00:00</td>
+<td align="right">NA</td>
+<td align="right">NA</td>
+<td align="right">NA</td>
+<td align="right">NA</td>
+<td align="right">NA</td>
+<td align="right">0.0</td>
+</tr>
+<tr class="even">
+<td align="right">2</td>
+<td align="right">6</td>
+<td align="left">2011-07-13</td>
+<td align="left">00:00:00</td>
+<td align="right">NA</td>
+<td align="right">NA</td>
+<td align="right">NA</td>
+<td align="right">NA</td>
+<td align="right">NA</td>
+<td align="right">0.0</td>
+</tr>
+<tr class="odd">
+<td align="right">3</td>
+<td align="right">6</td>
+<td align="left">2014-07-30</td>
+<td align="left">00:00:00</td>
+<td align="right">NA</td>
+<td align="right">NA</td>
+<td align="right">NA</td>
+<td align="right">NA</td>
+<td align="right">NA</td>
+<td align="right">0.0</td>
+</tr>
+<tr class="even">
+<td align="right">4</td>
+<td align="right">14</td>
+<td align="left">2021-02-08</td>
+<td align="left">00:00:00</td>
+<td align="right">NA</td>
+<td align="right">3.5</td>
+<td align="right">NA</td>
+<td align="right">NA</td>
+<td align="right">NA</td>
+<td align="right">3.5</td>
+</tr>
+<tr class="odd">
+<td align="right">5</td>
+<td align="right">14</td>
+<td align="left">2022-03-01</td>
+<td align="left">00:00:00</td>
+<td align="right">NA</td>
+<td align="right">5.0</td>
+<td align="right">NA</td>
+<td align="right">NA</td>
+<td align="right">NA</td>
+<td align="right">5.0</td>
+</tr>
+</tbody>
+</table>
+<p>With N = 5 (five components), Phea took 1.1 sec to assemble the
+phenotype, and the SQL server took 2.95 sec to run the query. That is
+23,955 input rows per second of query time.</p>
+</div>
+<div id="test-a-runs-n-10-to-n-200" class="section level3">
+<h3>Test A, runs N = 10 to N = 200</h3>
+<p>Now that we have a grip on how Test A works, let’s run it for N = 10
+to 50, increasing 10 at a time.</p>
+<div class="sourceCode" id="cb11"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a><span class="co"># N &lt;- 10</span></span>
+<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a><span class="co"># N_max &lt;- 50</span></span>
+<span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a><span class="co"># while(N &lt;= N_max) {</span></span>
+<span id="cb11-4"><a href="#cb11-4" aria-hidden="true" tabindex="-1"></a><span class="co">#   test_runs[[length(test_runs)+1]] &lt;- run_test_a(N)</span></span>
+<span id="cb11-5"><a href="#cb11-5" aria-hidden="true" tabindex="-1"></a><span class="co">#   N &lt;- N + 10</span></span>
+<span id="cb11-6"><a href="#cb11-6" aria-hidden="true" tabindex="-1"></a><span class="co"># }</span></span></code></pre></div>
+</div>
+<div id="test-a-results" class="section level3">
+<h3>Test A results</h3>
+<div class="sourceCode" id="cb12"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a><span class="fu">print_test_a_results</span>()</span></code></pre></div>
+<table>
+<colgroup>
+<col width="2%" />
+<col width="10%" />
+<col width="11%" />
+<col width="10%" />
+<col width="13%" />
+<col width="14%" />
+<col width="9%" />
+<col width="10%" />
+<col width="9%" />
+<col width="9%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th align="right">N</th>
+<th align="right">input_rows</th>
+<th align="right">result_rows</th>
+<th align="right">test_a_sum</th>
+<th align="right">input_patients</th>
+<th align="right">result_patients</th>
+<th align="right">phea_time</th>
+<th align="right">query_time</th>
+<th align="right">pps_query</th>
+<th align="right">rps_query</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="right">1</td>
+<td align="right">12869</td>
+<td align="right">12869</td>
+<td align="right">0.000000</td>
+<td align="right">5136</td>
+<td align="right">5136</td>
+<td align="right">0.42</td>
+<td align="right">0.55</td>
+<td align="right">9338.182</td>
+<td align="right">23398.18</td>
+</tr>
+<tr class="even">
+<td align="right">5</td>
+<td align="right">70666</td>
+<td align="right">65512</td>
+<td align="right">3.527114</td>
+<td align="right">9548</td>
+<td align="right">9548</td>
+<td align="right">1.10</td>
+<td align="right">2.95</td>
+<td align="right">3236.610</td>
+<td align="right">23954.58</td>
+</tr>
+</tbody>
+</table>
+<p>A few takeaways from the results:</p>
+<ul>
+<li>Time time Phea needs for assembling the query is negligible in
+practice.<br />
+</li>
+<li>Query time increases about linearly with the number of input rows.
+The number of rows processed per second does not change with the number
+of components.</li>
+</ul>
+</div>
+<div id="author-contact" class="section level3">
+<h3>Author contact</h3>
+<p>Fabrício Kury<br />
+2022/Dec/01<br />
+Be always welcome to reach me at <a href="mailto:fab@kury.dev" class="email">fab@kury.dev</a>.</p>
+</div>
+</div>
+
+
+
+<!-- code folding -->
+
+
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+  (function () {
+    var script = document.createElement("script");
+    script.type = "text/javascript";
+    script.src  = "https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML";
+    document.getElementsByTagName("head")[0].appendChild(script);
+  })();
+</script>
+
+</body>
+</html>

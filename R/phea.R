@@ -103,7 +103,6 @@ setup_phea <- function(connection, schema) {
 
 
 # sqlt & sql0 -----------------------------------------------------------------------------------------------------
-
 #' SQL table
 #'
 #' Produces lazy table object of table `table` in the preconfigured schema.
@@ -116,6 +115,8 @@ setup_phea <- function(connection, schema) {
 #' @param schema Schema to be used by default in `sqlt()`.
 #' @return Lazy table equal to `select * from def_schema.table;`.
 sqlt <- function(table) {
+  if(!exists('con', envir = .pheaglobalenv))
+    stop('SQL connection not found. Please call setup_phea() before sqlt().')
   dplyr::tbl(.pheaglobalenv$con,
     dbplyr::in_schema(.pheaglobalenv$schema,
       deparse(substitute(table))))
@@ -590,7 +591,8 @@ calculate_formula <- function(components, fml = NULL, window = NA, export = NULL
   board <- board |>
     dbplyr::window_order(pid, ts) |>
     dplyr::group_by(pid) |>
-    tidyr::fill(!c(row_id, pid, ts))
+    tidyr::fill(!c(row_id, pid, ts)) |>
+    ungroup()
 
 # Compute window --------------------------------------------------------------------------------------------------
   # The front (most recent point) of the window is column ts of the current line. The back (oldest point) is the
