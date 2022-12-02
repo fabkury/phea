@@ -13,9 +13,10 @@ To learn how to use, please see:
 
  - [Computing body mass index](https://fabkury.github.io/phea/computing_bmi.html): A very brief look at how Phea works.   
  - [Getting started with Phea](https://fabkury.github.io/phea/): A little bit more explanations about the intuition behind Phea.   
- - [Calculate increase in body weight over the past 2-3 years](https://fabkury.github.io/phea/weight-increase.html): Using Phea to calculate change in values over time.  
- - [Find acute myocardial infarction in obese patients](https://fabkury.github.io/phea/obese_ami.html): Using Phea to find acute myocardial infarctions happening _while_ a patient was obese, considering a person can go in and out of obesity over time.  
- - [Find increase in serum creatinine or low glomerular filtration rate](https://fabkury.github.io/phea/aki.html): Using Phea to find laboratory manifestations of kidney injury.  
+ - [Calculate increase in body weight over the past 2-3 years](https://fabkury.github.io/phea/weight-increase.html): Calculating change in values over time.  
+ - [Find acute myocardial infarction in obese patients](https://fabkury.github.io/phea/obese_ami.html): Finding acute myocardial infarctions happening _while_ a patient was obese, considering a person can go in and out of obesity over time.  
+ - [Find increase in serum creatinine or low glomerular filtration rate](https://fabkury.github.io/phea/aki.html): Finding laboratory manifestations of kidney injury.  
+ - [Stress-testing Phea, test A](https://fabkury.github.io/phea/stress_test_a.html): Compute formulas with up to 150 variables, each coming from a different SQL query.  
   
 By Fabrício Kury  
 Author contact: github@kury.dev
