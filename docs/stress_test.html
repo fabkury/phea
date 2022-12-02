@@ -628,7 +628,7 @@ components.</p>
 <div id="test-a-run-n-1" class="section level3">
 <h3>Test A, run N = 1</h3>
 <div class="sourceCode" id="cb8"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a>test_runs[[<span class="fu">length</span>(test_runs)<span class="sc">+</span><span class="dv">1</span>]] <span class="ot">&lt;-</span> <span class="fu">run_test_a</span>(<span class="dv">1</span>)</span>
-<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 12/01 12:39 Saving &#39;test_a_N1&#39; to &#39;../sai/rds/test_a_N1.qs&#39;.</span></span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 12/01 12:47 Saving &#39;test_a_N1&#39; to &#39;../sai/rds/test_a_N1.qs&#39;.</span></span>
 <span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a>test_runs[[<span class="fu">length</span>(test_runs)]]<span class="sc">$</span>phen_head[[<span class="dv">1</span>]] <span class="sc">|&gt;</span></span>
 <span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">kable</span>()</span></code></pre></div>
 <table>
@@ -724,21 +724,21 @@ our table <code>MEASUREMENT</code>. But that is not an issue.</p>
 <td align="right">0</td>
 <td align="right">5136</td>
 <td align="right">5136</td>
-<td align="right">0.42</td>
-<td align="right">0.55</td>
-<td align="right">9338.182</td>
-<td align="right">23398.18</td>
+<td align="right">0.6</td>
+<td align="right">0.65</td>
+<td align="right">7901.538</td>
+<td align="right">19798.46</td>
 </tr>
 </tbody>
 </table>
-<p>With N = 1 (a single component), Phea took 0.42 seconds to assemble
-the phenotype, and the SQL server took 0.55 seconds to run the query.
-That is 23,398 input rows per second of query time.</p>
+<p>With N = 1 (a single component), Phea took 0.6 seconds to assemble
+the phenotype, and the SQL server took 0.65 seconds to run the query.
+That is 19,798 input rows per second of query time.</p>
 </div>
 <div id="test-a-run-n-5" class="section level3">
 <h3>Test A, run N = 5</h3>
 <div class="sourceCode" id="cb10"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a>test_runs[[<span class="fu">length</span>(test_runs)<span class="sc">+</span><span class="dv">1</span>]] <span class="ot">&lt;-</span> <span class="fu">run_test_a</span>(<span class="dv">5</span>)</span>
-<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 12/01 12:39 Saving &#39;test_a_N5&#39; to &#39;../sai/rds/test_a_N5.qs&#39;.</span></span>
+<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 12/01 12:47 Saving &#39;test_a_N5&#39; to &#39;../sai/rds/test_a_N5.qs&#39;.</span></span>
 <span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a>test_runs[[<span class="fu">length</span>(test_runs)]]<span class="sc">$</span>phen_head[[<span class="dv">1</span>]] <span class="sc">|&gt;</span></span>
 <span id="cb10-4"><a href="#cb10-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">kable</span>()</span></code></pre></div>
 <table style="width:100%;">
@@ -831,35 +831,47 @@ That is 23,398 input rows per second of query time.</p>
 </tr>
 </tbody>
 </table>
-<p>With N = 5 (five components), Phea took 1.1 sec to assemble the
-phenotype, and the SQL server took 2.95 sec to run the query. That is
-23,955 input rows per second of query time.</p>
+<p>With N = 5 (five components), Phea took 1.27 sec to assemble the
+phenotype, and the SQL server took 3.51 sec to run the query. That is
+20,133 input rows per second of query time.</p>
 </div>
 <div id="test-a-runs-n-10-to-n-200" class="section level3">
 <h3>Test A, runs N = 10 to N = 200</h3>
 <p>Now that we have a grip on how Test A works, let’s run it for N = 10
 to 50, increasing 10 at a time.</p>
-<div class="sourceCode" id="cb11"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a><span class="co"># N &lt;- 10</span></span>
-<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a><span class="co"># N_max &lt;- 50</span></span>
-<span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a><span class="co"># while(N &lt;= N_max) {</span></span>
-<span id="cb11-4"><a href="#cb11-4" aria-hidden="true" tabindex="-1"></a><span class="co">#   test_runs[[length(test_runs)+1]] &lt;- run_test_a(N)</span></span>
-<span id="cb11-5"><a href="#cb11-5" aria-hidden="true" tabindex="-1"></a><span class="co">#   N &lt;- N + 10</span></span>
-<span id="cb11-6"><a href="#cb11-6" aria-hidden="true" tabindex="-1"></a><span class="co"># }</span></span></code></pre></div>
+<div class="sourceCode" id="cb11"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a>N <span class="ot">&lt;-</span> <span class="dv">10</span></span>
+<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a>N_max <span class="ot">&lt;-</span> <span class="dv">120</span></span>
+<span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a><span class="cf">while</span>(N <span class="sc">&lt;=</span> N_max) {</span>
+<span id="cb11-4"><a href="#cb11-4" aria-hidden="true" tabindex="-1"></a>  test_runs[[<span class="fu">length</span>(test_runs)<span class="sc">+</span><span class="dv">1</span>]] <span class="ot">&lt;-</span> <span class="fu">run_test_a</span>(N)</span>
+<span id="cb11-5"><a href="#cb11-5" aria-hidden="true" tabindex="-1"></a>  N <span class="ot">&lt;-</span> N <span class="sc">+</span> <span class="dv">10</span></span>
+<span id="cb11-6"><a href="#cb11-6" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb11-7"><a href="#cb11-7" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 12/01 12:48 Saving &#39;test_a_N10&#39; to &#39;../sai/rds/test_a_N10.qs&#39;.</span></span>
+<span id="cb11-8"><a href="#cb11-8" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 12/01 12:49 Saving &#39;test_a_N20&#39; to &#39;../sai/rds/test_a_N20.qs&#39;.</span></span>
+<span id="cb11-9"><a href="#cb11-9" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 12/01 12:52 Saving &#39;test_a_N30&#39; to &#39;../sai/rds/test_a_N30.qs&#39;.</span></span>
+<span id="cb11-10"><a href="#cb11-10" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 12/01 12:57 Saving &#39;test_a_N40&#39; to &#39;../sai/rds/test_a_N40.qs&#39;.</span></span>
+<span id="cb11-11"><a href="#cb11-11" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 12/01 13:05 Saving &#39;test_a_N50&#39; to &#39;../sai/rds/test_a_N50.qs&#39;.</span></span>
+<span id="cb11-12"><a href="#cb11-12" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 12/01 13:17 Saving &#39;test_a_N60&#39; to &#39;../sai/rds/test_a_N60.qs&#39;.</span></span>
+<span id="cb11-13"><a href="#cb11-13" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 12/01 13:41 Saving &#39;test_a_N70&#39; to &#39;../sai/rds/test_a_N70.qs&#39;.</span></span>
+<span id="cb11-14"><a href="#cb11-14" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 12/01 14:10 Saving &#39;test_a_N80&#39; to &#39;../sai/rds/test_a_N80.qs&#39;.</span></span>
+<span id="cb11-15"><a href="#cb11-15" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 12/01 14:47 Saving &#39;test_a_N90&#39; to &#39;../sai/rds/test_a_N90.qs&#39;.</span></span>
+<span id="cb11-16"><a href="#cb11-16" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 12/01 15:30 Saving &#39;test_a_N100&#39; to &#39;../sai/rds/test_a_N100.qs&#39;.</span></span>
+<span id="cb11-17"><a href="#cb11-17" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 12/01 16:33 Saving &#39;test_a_N110&#39; to &#39;../sai/rds/test_a_N110.qs&#39;.</span></span>
+<span id="cb11-18"><a href="#cb11-18" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 12/01 18:10 Saving &#39;test_a_N120&#39; to &#39;../sai/rds/test_a_N120.qs&#39;.</span></span></code></pre></div>
 </div>
 <div id="test-a-results" class="section level3">
 <h3>Test A results</h3>
 <div class="sourceCode" id="cb12"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a><span class="fu">print_test_a_results</span>()</span></code></pre></div>
-<table>
+<table style="width:100%;">
 <colgroup>
-<col width="2%" />
+<col width="3%" />
+<col width="9%" />
 <col width="10%" />
 <col width="11%" />
-<col width="10%" />
 <col width="13%" />
-<col width="14%" />
+<col width="13%" />
+<col width="8%" />
 <col width="9%" />
 <col width="10%" />
-<col width="9%" />
 <col width="9%" />
 </colgroup>
 <thead>
@@ -884,33 +896,173 @@ to 50, increasing 10 at a time.</p>
 <td align="right">0.000000</td>
 <td align="right">5136</td>
 <td align="right">5136</td>
-<td align="right">0.42</td>
-<td align="right">0.55</td>
-<td align="right">9338.182</td>
-<td align="right">23398.18</td>
+<td align="right">0.60</td>
+<td align="right">0.65</td>
+<td align="right">7901.538462</td>
+<td align="right">19798.4615</td>
 </tr>
 <tr class="even">
 <td align="right">5</td>
 <td align="right">70666</td>
 <td align="right">65512</td>
-<td align="right">3.527114</td>
+<td align="right">3.527766</td>
 <td align="right">9548</td>
 <td align="right">9548</td>
-<td align="right">1.10</td>
-<td align="right">2.95</td>
-<td align="right">3236.610</td>
-<td align="right">23954.58</td>
+<td align="right">1.27</td>
+<td align="right">3.51</td>
+<td align="right">2720.227920</td>
+<td align="right">20132.7635</td>
+</tr>
+<tr class="odd">
+<td align="right">10</td>
+<td align="right">205855</td>
+<td align="right">161848</td>
+<td align="right">4.448484</td>
+<td align="right">17673</td>
+<td align="right">17673</td>
+<td align="right">1.80</td>
+<td align="right">9.33</td>
+<td align="right">1894.212219</td>
+<td align="right">22063.7728</td>
+</tr>
+<tr class="even">
+<td align="right">20</td>
+<td align="right">576122</td>
+<td align="right">377717</td>
+<td align="right">11.227056</td>
+<td align="right">20867</td>
+<td align="right">20867</td>
+<td align="right">3.43</td>
+<td align="right">33.41</td>
+<td align="right">624.573481</td>
+<td align="right">17243.9988</td>
+</tr>
+<tr class="odd">
+<td align="right">30</td>
+<td align="right">1118468</td>
+<td align="right">439926</td>
+<td align="right">975.024883</td>
+<td align="right">23052</td>
+<td align="right">23052</td>
+<td align="right">5.31</td>
+<td align="right">121.89</td>
+<td align="right">189.121339</td>
+<td align="right">9176.0440</td>
+</tr>
+<tr class="even">
+<td align="right">40</td>
+<td align="right">1536740</td>
+<td align="right">574185</td>
+<td align="right">1743.766676</td>
+<td align="right">23053</td>
+<td align="right">23053</td>
+<td align="right">7.36</td>
+<td align="right">234.73</td>
+<td align="right">98.210710</td>
+<td align="right">6546.8411</td>
+</tr>
+<tr class="odd">
+<td align="right">50</td>
+<td align="right">1797319</td>
+<td align="right">574973</td>
+<td align="right">3383.888609</td>
+<td align="right">23053</td>
+<td align="right">23053</td>
+<td align="right">8.21</td>
+<td align="right">348.40</td>
+<td align="right">66.168198</td>
+<td align="right">5158.7801</td>
+</tr>
+<tr class="even">
+<td align="right">60</td>
+<td align="right">2153072</td>
+<td align="right">575304</td>
+<td align="right">3766.408692</td>
+<td align="right">23053</td>
+<td align="right">23053</td>
+<td align="right">9.88</td>
+<td align="right">612.95</td>
+<td align="right">37.609919</td>
+<td align="right">3512.6389</td>
+</tr>
+<tr class="odd">
+<td align="right">70</td>
+<td align="right">3539828</td>
+<td align="right">637087</td>
+<td align="right">5422.104483</td>
+<td align="right">23053</td>
+<td align="right">23053</td>
+<td align="right">11.50</td>
+<td align="right">1275.44</td>
+<td align="right">18.074547</td>
+<td align="right">2775.3779</td>
+</tr>
+<tr class="even">
+<td align="right">80</td>
+<td align="right">3568517</td>
+<td align="right">637385</td>
+<td align="right">5485.384420</td>
+<td align="right">23053</td>
+<td align="right">23053</td>
+<td align="right">13.41</td>
+<td align="right">1570.22</td>
+<td align="right">14.681382</td>
+<td align="right">2272.6223</td>
+</tr>
+<tr class="odd">
+<td align="right">90</td>
+<td align="right">3752685</td>
+<td align="right">662496</td>
+<td align="right">7690.769654</td>
+<td align="right">23056</td>
+<td align="right">23056</td>
+<td align="right">17.58</td>
+<td align="right">2017.33</td>
+<td align="right">11.428968</td>
+<td align="right">1860.2237</td>
+</tr>
+<tr class="even">
+<td align="right">100</td>
+<td align="right">3809544</td>
+<td align="right">662546</td>
+<td align="right">7708.443055</td>
+<td align="right">23056</td>
+<td align="right">23056</td>
+<td align="right">18.21</td>
+<td align="right">2382.96</td>
+<td align="right">9.675362</td>
+<td align="right">1598.6605</td>
+</tr>
+<tr class="odd">
+<td align="right">110</td>
+<td align="right">4590107</td>
+<td align="right">682669</td>
+<td align="right">8057.542099</td>
+<td align="right">23059</td>
+<td align="right">23059</td>
+<td align="right">20.65</td>
+<td align="right">3477.47</td>
+<td align="right">6.630970</td>
+<td align="right">1319.9559</td>
+</tr>
+<tr class="even">
+<td align="right">120</td>
+<td align="right">5279300</td>
+<td align="right">709685</td>
+<td align="right">10483.965374</td>
+<td align="right">23059</td>
+<td align="right">23059</td>
+<td align="right">21.91</td>
+<td align="right">5483.32</td>
+<td align="right">4.205299</td>
+<td align="right">962.7926</td>
 </tr>
 </tbody>
 </table>
 <p>A few takeaways from the results:</p>
 <ul>
 <li>Time time Phea needs for assembling the query is negligible in
-practice.<br />
-</li>
-<li>Query time increases about linearly with the number of input rows.
-The number of rows processed per second does not change with the number
-of components.</li>
+practice.</li>
 </ul>
 </div>
 <div id="author-contact" class="section level3">

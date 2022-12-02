@@ -732,51 +732,6 @@ calculate_formula <- function(components, fml = NULL, window = NA, export = NULL
 #' @param verbose If TRUE, will let you know how long it takes to `collect()` the data.
 #' @return Plot created by `plotly::plot_ly()` and `plotly::subplot()`.
 phea_plot <- function(board, pid, plot_title = NULL, verbose = TRUE) {
-  make_plotly_chart <- function(board_long) {
-    chart_items <- board_long |>
-      dplyr::select(name) |>
-      dplyr::distinct() |>
-      dplyr::pull()
-    
-    plot_args <- purrr::map(chart_items, \(chart_item) {
-      res_board <- board_long |>
-        dplyr::filter(name == chart_item) |>
-        dplyr::filter(!is.na(value))
-      
-      res_plot <- res_board |>
-        plotly::plot_ly(
-          x = ~ts,
-          y = ~value,
-          type = 'scatter',
-          mode = 'lines',
-          name = chart_item) |>
-        plotly::layout(
-          dragmode = 'pan',
-          legend = list(orientation = 'h'),
-          yaxis = list(
-            range = c(
-              min(res_board$value, na.rm = TRUE),
-              max(res_board$value, na.rm = TRUE)),
-            fixedrange = TRUE))
-      return(res_plot)
-    })
-    
-    names(plot_args) <- chart_items
-    
-    plot_args <- plot_args |>
-      purrr::discard(is.null)
-    
-    plot_args <- c(
-      plot_args,
-      nrows = length(plot_args),
-      shareX = TRUE,
-      titleX = FALSE)
-    
-    res_plot <- do.call(plotly::subplot, plot_args)
-    
-    return(res_plot)
-  }
-  
   board <- board |>
     dplyr::filter(pid == local(pid))
   
@@ -784,33 +739,57 @@ phea_plot <- function(board, pid, plot_title = NULL, verbose = TRUE) {
     cat('Collecting lazy table, ')
   board_data <- dplyr::collect(board)
   if(verbose)
-    cat('done.\n')
+    cat('done. (turn this message off with `verbose = FALSE`)\n')
   
-  board_long <- board_data |>
-    tidyr::pivot_longer(
-      cols = !c(row_id, pid, ts, window))
+  chart_items <- setdiff(colnames(board_data), c('row_id', 'pid', 'ts', 'window'))
   
-  make_step_chart_data <- function(board_data) {
-    union_all(
-      
-      board_data |>
-        dplyr::arrange(pid, ts) |>
-        dplyr::group_by(pid, name) |>
-        dplyr::mutate(linha = row_number()) |>
+  make_one_chart <- function(chart_item) {
+    chart_data <- board_data |>
+      select(ts, value = !!chart_item)
+    
+    # Make step chart
+    chart_data <- chart_data |>
+      dplyr::arrange(ts) |>
+      dplyr::mutate(line = row_number())
+    
+    chart_data <- union_all(
+      chart_data |>
         dplyr::ungroup(),
-      
-      board_data |>
-        dplyr::arrange(pid, ts) |>
-        dplyr::group_by(pid, name) |>
-        dplyr::mutate(linha = row_number()) |>
+      chart_data |>
         dplyr::mutate(ts = lead(ts)) |>
         dplyr::ungroup()) |>
-      
-      dplyr::arrange(pid, ts, linha)
+      dplyr::arrange(ts, line)
+    #
+    
+    range_start <- min(chart_data$value, na.rm = TRUE)
+    range_end <- max(chart_data$value, na.rm = TRUE)
+    
+    res_plot <- chart_data |>
+      plotly::plot_ly(
+        x = ~ts,
+        y = ~value,
+        type = 'scatter',
+        mode = 'lines',
+        name = chart_item) |>
+      plotly::layout(
+        dragmode = 'pan',
+        legend = list(orientation = 'h'),
+        yaxis = list(
+          range = c(range_start, range_end),
+          fixedrange = TRUE))
+    
+    return(res_plot)
   }
   
-  board_long <- make_step_chart_data(board_long)
+  plots <- sapply(chart_items, make_one_chart, simplify = FALSE, USE.NAMES = TRUE)
   
-  return(make_plotly_chart(board_long))
+  subplot_args <- c(plots,
+    nrows = length(plots),
+    shareX = TRUE,
+    titleX = FALSE)
+  
+  res <- do.call(plotly::subplot, subplot_args)
+  
+  return(res)
 }
 
