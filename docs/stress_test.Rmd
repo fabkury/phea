@@ -38,6 +38,10 @@ setup_phea(dbcon, 'cdm_new_york3')
 
 How complex can a phenotype be in Phea? And how does performance change as you increase the complexity? Do the queries ever become **too complex**?  
 
+Especifically, we talk about two dimensions of complexity:
+
+ a. How many components you can put into one formula.
+ a. 
 In this vignette we perform two stress tests:  
 
  a. Compute formulas with 1 to 200 components.  
@@ -236,6 +240,7 @@ while(N <= N_max) {
 print_test_a_results()
 ```
 
+Let's look at those numbers with a plot.
 A few takeaways from the results:  
 
  - Time time Phea needs for assembling the query is negligible in practice.  

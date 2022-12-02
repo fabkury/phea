@@ -96,9 +96,10 @@ code_shot <- function(lazy_tbl, clip = TRUE) {
 #' @export
 #' @param connection DBI-compatible SQL connection (e.g. produced by DBI::dbConnect).
 #' @param schema Schema to be used by default in `sqlt()`.
-setup_phea <- function(connection, schema) {
+setup_phea <- function(connection, schema, .verbose = TRUE) {
   assign('con', connection, envir = .pheaglobalenv)
   assign('schema', schema, envir = .pheaglobalenv)
+  assign('verbose', .verbose, envir = .pheaglobalenv)
 }
 
 
@@ -606,6 +607,7 @@ calculate_formula <- function(components, fml = NULL, window = NA, export = NULL
       window = ts - dplyr::sql(sql_ts_least),
       ts_row = dplyr::sql('last_value(row_id) over (partition by "pid", "ts")'))
 
+# Keep the most complete computations -----------------------------------------------------------------------------
   # Keep only the most complete computation in each timestamp. The most recent computation is the last one in each
   # timestamp. 'max(row_id) over (partition by "pid", "ts")' could find the row with the largest (most complete) row_id
   # in each timestamp, but last_value() in this context gives the same result
@@ -629,6 +631,7 @@ calculate_formula <- function(components, fml = NULL, window = NA, export = NULL
       dplyr::filter(row_id == ts_row)
   }
   
+# Filter and calculate --------------------------------------------------------------------------------------------
   if(!is.null(.filter)) {
     sql_txt <- paste0('(', paste0(.filter, collapse = ') AND ('), ')')
     board <- board |>
@@ -638,8 +641,7 @@ calculate_formula <- function(components, fml = NULL, window = NA, export = NULL
   # Clean temporary variables used for computing the formula and the window.
   board <- board |>
     dplyr::select(row_id, pid, ts, window, !!!g_vars)
-
-# Filter and calculate --------------------------------------------------------------------------------------------
+  
   # Impose the time window, if any.
   if(!is.na(window))
     board <- dplyr::filter(board,
@@ -707,6 +709,7 @@ calculate_formula <- function(components, fml = NULL, window = NA, export = NULL
   # Write attributes used to communicate internally in Phea.
   attr(board, 'phea') <- 'phenotype'
   attr(board, 'phea_res_vars') <- res_vars
+  attr(board, 'phea_out_vars') <- g_vars
   
   if(.clip_sql) {
     sql_txt <- dbplyr::sql_render(board)
@@ -730,10 +733,14 @@ calculate_formula <- function(components, fml = NULL, window = NA, export = NULL
 #' @param pid Required. ID of the patient to be included in the chart.
 #' @param exclude Optional. Names of columns to not plot.
 #' @param verbose If TRUE, will let you know how long it takes to `collect()` the data.
-#' @return Plot created by `plotly::plot_ly()` and `plotly::subplot()`.
-phea_plot <- function(board, pid, plot_title = NULL, exclude = NULL, verbose = TRUE) {
+#' @return Plot created by `plotly::plot_ly()` within `plotly::subplot()`.
+phea_plot <- function(board, pid, plot_title = NULL, exclude = NULL, verbose = NULL) {
   board <- board |>
     dplyr::filter(pid == local(pid))
+  
+  # If not provided, use global default set by setup_phea().
+  if(is.null(verbose))
+    verbose <- .pheaglobalenv$verbose
   
   if(verbose)
     cat('Collecting lazy table, ')
@@ -742,39 +749,42 @@ phea_plot <- function(board, pid, plot_title = NULL, exclude = NULL, verbose = T
     cat('done. (turn this message off with `verbose = FALSE`)\n')
   
   # Plot all columns except some.
-  chart_items <- setdiff(colnames(board_data), c('row_id', 'pid', 'ts', 'window'))
+  if(all(c('row_id', 'pid', 'ts', 'window') %in% colnames(board_data))) {
+    # The board has the base columns of a phenotype result. Remove them.
+    chart_items <- setdiff(colnames(board_data), c('row_id', 'pid', 'ts', 'window'))
+  }
   
   if(!is.null(exclude))
     chart_items <- setdiff(chart_items, exclude)
   
-  make_one_chart <- function(chart_item) {
+  make_chart <- function(chart_item) {
     chart_data <- board_data |>
       select(ts, value = !!chart_item)
     
-    # Make step chart
-    chart_data <- chart_data |>
-      dplyr::arrange(ts) |>
-      dplyr::mutate(line = row_number())
-    
-    chart_data <- union_all(
-      chart_data |>
-        dplyr::ungroup(),
-      chart_data |>
-        dplyr::mutate(ts = lead(ts)) |>
-        dplyr::ungroup()) |>
-      dplyr::arrange(ts, line)
+    # Make step chart: add points at same Y but forward X up to the X of the next point. All angles are 90 degrees.
+    if(F) {
+      chart_data <- chart_data |>
+        dplyr::arrange(ts) |>
+        dplyr::mutate(line = row_number())
+      
+      chart_data <- union_all(
+        chart_data |>
+          dplyr::ungroup(),
+        chart_data |>
+          dplyr::mutate(ts = lead(ts)) |>
+          dplyr::ungroup()) |>
+        dplyr::arrange(ts, line)
+    }
     #
     
     range_start <- min(chart_data$value, na.rm = TRUE)
     range_end <- max(chart_data$value, na.rm = TRUE)
     
     res_plot <- chart_data |>
-      plotly::plot_ly(
-        x = ~ts,
-        y = ~value,
-        type = 'scatter',
-        mode = 'lines',
-        name = chart_item) |>
+      plotly::plot_ly(x = ~ts) |>
+      plotly::add_lines(y = ~value,
+        name = chart_item,
+        line = list(shape = 'hv')) |>
       plotly::layout(
         dragmode = 'pan',
         legend = list(orientation = 'h'),
@@ -785,7 +795,7 @@ phea_plot <- function(board, pid, plot_title = NULL, exclude = NULL, verbose = T
     return(res_plot)
   }
   
-  plots <- sapply(chart_items, make_one_chart, simplify = FALSE, USE.NAMES = TRUE)
+  plots <- sapply(chart_items, make_chart, simplify = FALSE, USE.NAMES = TRUE)
   
   subplot_args <- c(plots,
     nrows = length(plots),
