@@ -1,5 +1,5 @@
 ---
-title: "Find myocardial infarction in obese patients"
+title: "Finding myocardial infarction in obese patients"
 output: rmarkdown::html_vignette
 vignette: >
   %\VignetteIndexEntry{Calculate drop in body weight}
