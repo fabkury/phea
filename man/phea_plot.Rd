@@ -4,7 +4,7 @@
 \alias{phea_plot}
 \title{Plot a phenotype.}
 \usage{
-phea_plot(board, pid, plot_title = NULL, exclude = NULL, verbose = TRUE)
+phea_plot(board, pid, plot_title = NULL, exclude = NULL, verbose = NULL)
 }
 \arguments{
 \item{board}{Phenotype object returned by \code{calculate_formula()}.}
@@ -16,7 +16,7 @@ phea_plot(board, pid, plot_title = NULL, exclude = NULL, verbose = TRUE)
 \item{verbose}{If TRUE, will let you know how long it takes to \code{collect()} the data.}
 }
 \value{
-Plot created by \code{plotly::plot_ly()} and \code{plotly::subplot()}.
+Plot created by \code{plotly::plot_ly()} within \code{plotly::subplot()}.
 }
 \description{
 Plots the result from \code{calculate_formula()} in an interactive timeline chart using \code{plotly}.

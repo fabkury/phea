@@ -4,7 +4,7 @@
 \alias{setup_phea}
 \title{Setup Phea}
 \usage{
-setup_phea(connection, schema)
+setup_phea(connection, schema, .verbose = TRUE)
 }
 \arguments{
 \item{connection}{DBI-compatible SQL connection (e.g. produced by DBI::dbConnect).}
