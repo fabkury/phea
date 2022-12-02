@@ -1,5 +1,5 @@
 ---
-title: "Acute kidney injury lab presentation"
+title: "Kidney injury lab presentation"
 output: rmarkdown::html_vignette
 vignette: >
   %\VignetteIndexEntry{Acute kidney injury labs}
