@@ -53,13 +53,33 @@ The phenotype we will compute here is not relevant. We just want to test Phea!
 These are these vignette's takeaways:
 
  - The time Phea needs for assembling the query is negligible in practice.  
- - The number of input rows processed per second decreases as the number of components increase.  
- - Query time increases at sub-exponential rate with number of components and number of input rows.  
+ - The number of input rows processed per second (of query time) decreases as the number of components increase.  
+ - Query time increases at sub-exponential rate with the number of components and of input rows.  
 
 ## The dataset
 We will be using table `MEASUREMENT` from `cdm_new_york3`. For context, let us measure the size of that table.  
 
-```{r size_stats, results = 'hide', message = FALSE}
+```{r size_stats_noeval, eval = FALSE}
+size_stats <- sqlt(measurement) |>
+  group_by() |>
+  summarise(
+    rows = n(),
+    patients = n_distinct(person_id)) |>
+  collect()
+
+measurement_summary <- sql0('
+    select measurement_concept_id as concept_id, concept_code, concept_name, vocabulary_id,
+      count(*) as records, count(distinct person_id) as patients
+    from cdm_new_york3.measurement a
+    inner join cdm_new_york3.concept b
+    on a.measurement_concept_id = b.concept_id
+    group by measurement_concept_id, concept_code, concept_name, vocabulary_id
+    order by patients desc, records desc
+  ') |>
+  collect()
+```
+
+```{r size_stats, echo = FALSE, results = 'hide', message = FALSE}
 size_stats <- sqlt(measurement) |>
   group_by() |>
   summarise(
