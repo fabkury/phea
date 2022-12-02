@@ -299,12 +299,12 @@ make_record_source <- function(records, rec_name = NULL, ts, pid, vars = NULL, .
 
 
 # Calculate formula -----------------------------------------------------------------------------------------------
-#' Calculate formula
+#' Calculate phenotype formula(s)
 #'
-#' Gathers records according to timestamps and computes a SQL formula.
+#' Receives a list of components, and a formula in SQL language, and computes the result by gathering records according 
+#' to their timestamps.
 #'
-#' This receives a list of components, and a formula in SQL language, and computes the result by gathering records
-#' according to their timestamps.
+#' The data type of the columns from the components (only those that are actually used or exported) cannot be Boolean.
 #'
 #' @export
 #' @param components A list of components, a record source, or a lazy table. If a record source or lazy table is 
@@ -326,9 +326,8 @@ make_record_source <- function(records, rec_name = NULL, ts, pid, vars = NULL, .
 #' clause. Only rows satisfying all conditions provided will be returned.  
 #' @return Lazy table with result of formula or formulas.
 calculate_formula <- function(components, fml = NULL, window = NA, export = NULL, add_components = NULL,
-  .ts = NULL, .pid = NULL, .delay = NULL, .line = NULL,
-  .require_all = FALSE, .lim = NA, .dont_require = NULL, .filter = NULL,
-  .cascaded = TRUE, .clip_sql = FALSE) {
+  .ts = NULL, .pid = NULL, .delay = NULL, .line = NULL, .require_all = FALSE, .lim = NA, .dont_require = NULL,
+  .filter = NULL, .cascaded = TRUE, .clip_sql = FALSE) {
 # Prepare ---------------------------------------------------------------------------------------------------------
   # TODO: Improve the logic regarding these two variables below.
   keep_names_unchanged <- FALSE
@@ -727,11 +726,12 @@ calculate_formula <- function(components, fml = NULL, window = NA, export = NULL
 #' Collects (downloads) the results and creates interactive timeline chart using the `plotly` library.
 #'
 #' @export
-#' @param board The object returned by `calculate_formula()`.
+#' @param board Phenotype object returned by `calculate_formula()`.
 #' @param pid Required. ID of the patient to be included in the chart.
+#' @param exclude Optional. Names of columns to not plot.
 #' @param verbose If TRUE, will let you know how long it takes to `collect()` the data.
 #' @return Plot created by `plotly::plot_ly()` and `plotly::subplot()`.
-phea_plot <- function(board, pid, plot_title = NULL, verbose = TRUE) {
+phea_plot <- function(board, pid, plot_title = NULL, exclude = NULL, verbose = TRUE) {
   board <- board |>
     dplyr::filter(pid == local(pid))
   
@@ -741,7 +741,11 @@ phea_plot <- function(board, pid, plot_title = NULL, verbose = TRUE) {
   if(verbose)
     cat('done. (turn this message off with `verbose = FALSE`)\n')
   
+  # Plot all columns except some.
   chart_items <- setdiff(colnames(board_data), c('row_id', 'pid', 'ts', 'window'))
+  
+  if(!is.null(exclude))
+    chart_items <- setdiff(chart_items, exclude)
   
   make_one_chart <- function(chart_item) {
     chart_data <- board_data |>

@@ -2,7 +2,7 @@
 % Please edit documentation in R/phea.R
 \name{calculate_formula}
 \alias{calculate_formula}
-\title{Calculate formula}
+\title{Calculate phenotype formula(s)}
 \usage{
 calculate_formula(
   components,
@@ -55,9 +55,9 @@ character using \code{as.character()}), and also copies it to the clipboard.}
 Lazy table with result of formula or formulas.
 }
 \description{
-Gathers records according to timestamps and computes a SQL formula.
+Receives a list of components, and a formula in SQL language, and computes the result by gathering records according
+to their timestamps.
 }
 \details{
-This receives a list of components, and a formula in SQL language, and computes the result by gathering records
-according to their timestamps.
+The data type of the columns from the components (only those that are actually used or exported) cannot be Boolean.
 }

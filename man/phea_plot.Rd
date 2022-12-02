@@ -4,12 +4,14 @@
 \alias{phea_plot}
 \title{Plot a phenotype.}
 \usage{
-phea_plot(board, pid, plot_title = NULL, verbose = TRUE)
+phea_plot(board, pid, plot_title = NULL, exclude = NULL, verbose = TRUE)
 }
 \arguments{
-\item{board}{The object returned by \code{calculate_formula()}.}
+\item{board}{Phenotype object returned by \code{calculate_formula()}.}
 
 \item{pid}{Required. ID of the patient to be included in the chart.}
+
+\item{exclude}{Optional. Names of columns to not plot.}
 
 \item{verbose}{If TRUE, will let you know how long it takes to \code{collect()} the data.}
 }
