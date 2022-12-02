@@ -288,7 +288,7 @@ Here are the meanings of the columns:
 
  - **N**: Number of components included in the run.  
  - **in. rows**: Total number of rows in the record sources provided to `calculate_formula()`.	 
- - **re. rows**: Total number of rows in the phenotype returned by `calculate_formula()`.  
+ - **res. rows**: Total number of rows in the phenotype returned by `calculate_formula()`.  
  - **test_a_sum**: Sum of the result of the formula across all patients.  
  - **in. patients**: Number of patients in the record sources.    
  - **res. patients**: Number of patients in the resulting phenotype.   
