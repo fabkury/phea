@@ -780,12 +780,6 @@ phea_plot <- function(board, pid, plot_title = NULL, exclude = NULL, verbose = N
     range_start <- min(chart_data$value, na.rm = TRUE)
     range_end <- max(chart_data$value, na.rm = TRUE)
     
-    ramge_length <- range_end - range_start
-    
-    # Add margins to the range
-    range_start <- range_start - range_length/25
-    range_end <- range_start + range_length/25
-    
     res_plot <- chart_data |>
       plotly::plot_ly(x = ~ts) |>
       plotly::add_lines(y = ~value,
