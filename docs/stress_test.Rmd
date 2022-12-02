@@ -44,8 +44,9 @@ Especifically, we talk about two dimensions of complexity:
  a. 
 In this vignette we perform two stress tests:  
 
- a. Compute formulas with 1 to 200 components.  
- b. Compute a formula, use it as a component in another formula, repeat that consecutively 1 to 200 times.  
+ a. Compute formulas with 1 to 210 components, each coming from a different record source (SQL query).  
+ b. Compute a formula, use it as a component in another formula, repeat that consecutively 1 to 210 times.  
+ c. Compute formulas with 1 to 210 components, all from the same record source (SQL query).
 
 The phenotypes we will compute here not relevant. We just want to test Phea.  
 
@@ -132,7 +133,7 @@ produce_N_components <- function(N) {
 Function `run_test_a(N)` runs Test A using `N` components.  
 ```{r}
 run_test_a <- function(N) {
-  wrap(paste0('test_a_N', N), by_name = TRUE, pass_val = TRUE, ovr = T, {
+  wrap(paste0('test_a_N', N), by_name = TRUE, pass_val = TRUE, {
     components <- produce_N_components(N)
     
     formula_string <- paste0('coalesce(', names(components), '_value_as_number, 0)', collapse = ' + ')
@@ -226,9 +227,9 @@ With N = 5 (five components), Phea took `r test_runs[[2]]$phea_time` sec to asse
 
 ### Test A, runs N = 10 to N = 200  
 Now that we have a grip on how Test A works, let's run it for N = 10 to 50, increasing 10 at a time.
-```{r test_a_10_200, message = FALSE}
+```{r test_a_10_210, message = FALSE}
 N <- 10
-N_max <- 120
+N_max <- 210
 while(N <= N_max) {
   test_runs[[length(test_runs)+1]] <- run_test_a(N)
   N <- N + 10
@@ -244,6 +245,12 @@ Let's look at those numbers with a plot.
 A few takeaways from the results:  
 
  - Time time Phea needs for assembling the query is negligible in practice.  
+
+
+## Stress-test B: Multiple recursions of formula -> result -> formula  
+```{r}
+```
+
 
 ### Author contact  
 Fabrício Kury  

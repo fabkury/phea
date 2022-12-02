@@ -112,9 +112,11 @@ setup_phea <- function(connection, schema, .verbose = TRUE) {
 #' `setup_phea()` previously.
 #'
 #' @export
-#' @param dbi_connection DBI-compatible SQL connection (e.g. produced by DBI::dbConnect).
-#' @param schema Schema to be used by default in `sqlt()`.
+#' @param table Unquoted name of the table to be accessed within `def_schema`.
 #' @return Lazy table equal to `select * from def_schema.table;`.
+#' @examples
+#' `sqlt(person)`
+#' `sqlt(condition_occurrence)`
 sqlt <- function(table) {
   if(!exists('con', envir = .pheaglobalenv))
     stop('SQL connection not found. Please call setup_phea() before sqlt().')
@@ -128,12 +130,54 @@ sqlt <- function(table) {
 #' Combines with `paste0` the strings in `...`, then runs it as a SQL query.
 #'
 #' @export
-#' @param ... Arguments to be coerced to `character` and concatenated.
+#' @param ... Character strings to be concatenated with `paste0`.
 #' @return Lazy table corresponding to the query.
 sql0 <- function(...) {
   sql_txt <- paste0(...)
   dplyr::tbl(.pheaglobalenv$con,
     dplyr::sql(sql_txt))
+}
+
+#' SQL query with arguments
+#'
+#' Combines with `paste0` the strings in `...`, then runs it as a SQL query using `args` as common table expressions.
+#' The names of the `args` objects are the names made available in the query.
+#'
+#' @export
+#' @param args 
+#' @param ... Character strings to be concatenated with `paste0`.
+#' @return Lazy table corresponding to the query.
+#' @examples
+#' ```
+#' list(a = sqlt(person), b = sqlt(procedure)) |>
+#'   sqla('select person_id ', 'from a ', 'inner join b on a.person_id = b.person_id')
+#' ```
+sqla <- function(args, ...) {
+  query <- paste0(...)
+  # Produces a dbplyr tbl object from arbitrary SQL.
+  # Usage example:
+  # sqla(list(a = sqlt(person)), 'select person_id from a')
+  
+  if(stringr::str_count(query, ";") > 1)
+    stop('Only a single SQL query is allowed. The ending ";" is optional.')
+  
+  # For some reason, we can't have the query end with ;, otherwise we get "Error: Failed to prepare query: ERROR: 
+  # syntax error at or near ";"". So, remove ending ';', if it exists.
+  query_str_len <- nchar(query)
+  if(substr(query, query_str_len, query_str_len) == ';')
+    query <- substr(query, 1, query_str_len-1)
+  
+  # Convert the arguments into common table expressions (WITH clauses).
+  with_clauses <- purrr::map2(names(args), args, \(arg_name, arg) {
+    paste0(arg_name, ' as (', dbplyr::sql_render(arg), ') ')
+  }) |>
+    paste0(collapse = ', ')
+  
+  query_with_args <- paste0('with ', with_clauses, query)
+  
+  return(
+    dplyr::sql(query_with_args) |>
+      dplyr::tbl(src = .pheaglobalenv$con))
 }
 
 

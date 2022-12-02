@@ -7,9 +7,7 @@
 sqlt(table)
 }
 \arguments{
-\item{dbi_connection}{DBI-compatible SQL connection (e.g. produced by DBI::dbConnect).}
-
-\item{schema}{Schema to be used by default in \code{sqlt()}.}
+\item{table}{Unquoted name of the table to be accessed within \code{def_schema}.}
 }
 \value{
 Lazy table equal to \verb{select * from def_schema.table;}.
@@ -20,4 +18,8 @@ Produces lazy table object of table \code{table} in the preconfigured schema.
 \details{
 This function is a shorthand for \verb{select * from def_schema.table;}. \code{def_schema} is the schema passed to
 \code{setup_phea()} previously.
+}
+\examples{
+`sqlt(person)`
+`sqlt(condition_occurrence)`
 }
