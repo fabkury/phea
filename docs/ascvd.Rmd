@@ -1,0 +1,178 @@
+---
+title: "Calculating the ASCVD Risk Estimator Plus score"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{ASCVD+}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+  _This vignette assumes a SQL server at `localhost` (we use PostgreSQL), with data in OMOP Common Data Model v5.4 format in schema `cdm_new_york3`. The patient records shown in this example are synthetic data from [Synthea(TM) Patient Generator](https://github.com/synthetichealth/synthea)._  
+```{r, results = 'hide', include = FALSE}
+library(knitr)
+options(scipen = 5e5)
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
+source(paste0(Sys.getenv("HOME"), '/Estudo/Tecnologia/R/espinha/credenciais.R')) # contains cred$pg
+source(paste0(Sys.getenv("HOME"), '/Estudo/Tecnologia/R/wrap/wrap.R'))
+
+usn <- function(n, decimals = 0) {
+  sapply(n, function(e) {
+    if(is.na(e))
+      return(e)
+    # usn()'s decimals behave like round()'s digits, but comma()'s precision is different.
+    scales::comma(e, 10^(-decimals))
+  })
+}
+```
+```{r setup, message = FALSE}
+library(phea)
+library(dplyr)
+
+# Connect to SQL server.
+dbcon <- DBI::dbConnect(RPostgres::Postgres(),
+  host = 'localhost', port = 7654, dbname = 'fort',
+  user = cred$pg$user, password = cred$pg$pass)
+
+# Call setup_phea so we can use sqlt() and sql0().
+setup_phea(dbcon, 'cdm_new_york3')
+```
+
+## Components
+
+### Systolic Blood Pressure (mm Hg)
+3004249 Loinc 8480-6 Systolic blood pressure
+```{r systolic_blood_pressure}
+sbp <- sqlt(measurement) |>
+  filter(measurement_concept_id == 3004249) |>
+  make_component(
+    .pid = person_id,
+    .ts = measurement_datetime)
+```
+
+### Diastolic Blood Pressure (mm Hg)
+3012888 Loinc 8462-4 Diastolic blood pressure
+```{r diastolic_blood_pressure}
+dbp <- sqlt(measurement) |>
+  filter(measurement_concept_id == 3012888) |>
+  make_component(
+    .pid = person_id,
+    .ts = measurement_datetime)
+```
+
+### Total Cholesterol (mg/dL)
+3027114 Loinc 2093-3 Cholesterol [Mass/volume] in Serum or Plasma
+```{r total_cholesterol}
+tc <- sqlt(measurement) |>
+  filter(measurement_concept_id == 3027114) |>
+  make_component(
+    .pid = person_id,
+    .ts = measurement_datetime)
+```
+
+### HDL Cholesterol (mg/dL)
+3007070 Loinc 2085-9 Cholesterol in HDL [Mass/volume] in Serum or Plasma
+```{r hdl_cholesterol}
+hdl <- sqlt(measurement) |>
+  filter(measurement_concept_id == 3007070) |>
+  make_component(
+    .pid = person_id,
+    .ts = measurement_datetime)
+```
+
+### LDL Cholesterol (mg/dL)
+3009966 Loinc 18262-6 Cholesterol in LDL [Mass/volume] in Serum or Plasma by Direct assay
+```{r ldl_cholesterol}
+ldl <- sqlt(measurement) |>
+  filter(measurement_concept_id == 3009966) |>
+  make_component(
+    .pid = person_id,
+    .ts = measurement_datetime)
+```
+
+### History of Diabetes?
+201826 SNOMED 44054006 Type 2 diabetes mellitus
+```{r diabetes}
+diabetes <- sqlt(condition_occurrence) |>
+  filter(condition_concept_id == 201826) |>
+  make_component(
+    .pid = person_id,
+    .ts = condition_start_datetime)
+```
+
+#### Smoker?
+_43054909 LOINC 72166-2 Tobacco smoking status_
+42709996 SNOMED 449868002 Smokes tobacco daily
+```{r smoker}
+smoker <- sqlt(observation) |>
+  filter(observation_concept_id %in% c(42709996)) |>
+  make_component(
+    .pid = person_id,
+    .ts = observation_datetime)
+```
+
+### On Hypertension Treatment?
+ATC:
+	C02 ANTIHYPERTENSIVES
+	C03 - Diuretics
+	C07 - Beta blocking agents
+	C08 - Calcium channel blockers and
+	C09 - Agents acting on the renin-angiotensin system.
+```{r hypertension_treatment}
+atc_concepts <- sqlt(concept) |>
+  filter(concept_code %in% c('C02', 'C03', 'C07', 'C08', 'C09') &&
+      vocabulary_id == 'ATC') |>
+  select(concept_id)
+
+drug_concepts <- sqlt(concept_ancestor) |>
+  inner_join(atc_concepts, by = c('ancestor_concept_id' = 'concept_id')) |>
+  select(descendant_concept_id)
+
+htt <- sqlt(drug_exposure) |>
+  inner_join(drug_concepts, by = c('drug_concept_id' = 'descendant_concept_id')) |>
+  make_component(
+    .pid = person_id,
+    .ts = drug_exposure_start_datetime)
+```
+
+#### _On a Statin?_  
+
+#### _On Aspirin Therapy?_  
+
+
+## Formula
+```{r}
+ascvd = calculate_formula(
+  components = list(
+    sbp = sbp,
+    dbp = dbp,
+    tc = tc,
+    hdl = hdl,
+    ldl = ldl,
+    diabetes = diabetes,
+    smoker = smoker,
+    htt = htt),
+  export = c(
+    'sbp_value_as_number',
+    'dbp_value_as_number',
+    'tc_value_as_number',
+    'hdl_value_as_number',
+    'ldl_value_as_number',
+    'diabetes_condition_concept_id',
+    'diabetes_condition_start_datetime',
+    'smoker_observation_datetime',
+    'htt_drug_concept_id',
+    'htt_drug_exposure_start_datetime'),
+  .dont_require = c(
+    'smoker', 'htt', 'diabetes'))
+```
+
+## Results
+
+## Plots
+
+### Author contact  
+Fabrício Kury  
+`r format(Sys.time(), '%Y/%b/%d')`  
+Be always welcome to reach me at fab@kury.dev.  
+```{r, include = FALSE}
+# DBI::dbDisconnect(dbcon)
+```

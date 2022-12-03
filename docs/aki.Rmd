@@ -165,9 +165,11 @@ message('Sampled patient: ', random_patient)
 ```
 
 Then we plot all data for the chosen patient (pid = ``r random_patient``).  
-```{r plot, out.width="100%", out.height = 1200}
+```{r plot, out.width="100%", out.height = 1400}
 scr_change |>
   select(-ends_with('datetime')) |>
+  mutate(
+    scr_case_a_or_b = scr_case_a | scr_case_b) |>
   phea_plot(random_patient)
 ```
 
