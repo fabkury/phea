@@ -103,7 +103,7 @@ setup_phea <- function(connection, schema, .verbose = TRUE) {
 }
 
 
-# sqlt & sql0 -----------------------------------------------------------------------------------------------------
+# SQL shorthands --------------------------------------------------------------------------------------------------
 #' SQL table
 #'
 #' Produces lazy table object of table `table` in the preconfigured schema.
@@ -113,15 +113,20 @@ setup_phea <- function(connection, schema, .verbose = TRUE) {
 #'
 #' @export
 #' @param table Unquoted name of the table to be accessed within `def_schema`.
+#' @param schema Optional. Name of schema to use. If not provided, will default to schema passed to `setup_phea()`.
 #' @return Lazy table equal to `select * from def_schema.table;`.
 #' @examples
 #' `sqlt(person)`
 #' `sqlt(condition_occurrence)`
-sqlt <- function(table) {
+sqlt <- function(table, schema = NULL) {
   if(!exists('con', envir = .pheaglobalenv))
     stop('SQL connection not found. Please call setup_phea() before sqlt().')
+  
+  if(is.null(schema))
+    schema <- .pheaglobalenv$schema
+  
   dplyr::tbl(.pheaglobalenv$con,
-    dbplyr::in_schema(.pheaglobalenv$schema,
+    dbplyr::in_schema(schema,
       deparse(substitute(table))))
 }
 
@@ -131,10 +136,15 @@ sqlt <- function(table) {
 #'
 #' @export
 #' @param ... Character strings to be concatenated with `paste0`.
+#' @param schema Optional. Name of schema to use. If not provided, will default to schema passed to `setup_phea()`.
 #' @return Lazy table corresponding to the query.
-sql0 <- function(...) {
+sql0 <- function(..., schema = NULL) {
   sql_txt <- paste0(...)
-  dplyr::tbl(.pheaglobalenv$con,
+  
+  if(is.null(schema))
+    schema <- .pheaglobalenv$schema
+  
+  dplyr::tbl(schema,
     dplyr::sql(sql_txt))
 }
 
@@ -153,10 +163,10 @@ sql0 <- function(...) {
 #'   sqla('select person_id ', 'from a ', 'inner join b on a.person_id = b.person_id')
 #' ```
 sqla <- function(args, ...) {
-  query <- paste0(...)
   # Produces a dbplyr tbl object from arbitrary SQL.
   # Usage example:
   # sqla(list(a = sqlt(person)), 'select person_id from a')
+  query <- paste0(...)
   
   if(stringr::str_count(query, ";") > 1)
     stop('Only a single SQL query is allowed. The ending ";" is optional.')

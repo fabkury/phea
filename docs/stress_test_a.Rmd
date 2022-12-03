@@ -12,7 +12,7 @@ library(knitr)
 options(scipen = 5e5)
 knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
 source(paste0(Sys.getenv("HOME"), '/Estudo/Tecnologia/R/espinha/credenciais.R')) # contains cred$pg
-source(paste0(Sys.getenv("HOME"), '/Estudo/Tecnologia/R/wrap/wrap.R')) # contains cred$pg
+source(paste0(Sys.getenv("HOME"), '/Estudo/Tecnologia/R/wrap/wrap.R'))
 
 usn <- function(n, decimals = 0) {
   sapply(n, function(e) {
@@ -131,17 +131,17 @@ This was the machine used to execute this test:
 ## Formula used for testing
 For each run of test A, we will pick N concepts, build a component for each (C<sub>1</sub> to C<sub>n</sub>), and compute the following formula:  
 
-> **P = C<sub>1</sub><sup>value_as_number</sup> + C<sub>2</sub><sup>value_as_number</sup> + C<sub>2</sub><sup>value_as_number</sup> + ... + C<sub>n</sub><sup>value_as_number</sup>**
+> **test_a = C<sub>1</sub><sup>value_as_number</sup> + C<sub>2</sub><sup>value_as_number</sup> + C<sub>2</sub><sup>value_as_number</sup> + ... + C<sub>n</sub><sup>value_as_number</sup>**
 
 In other words, we will just add up the `value_as_number` of each component.  
 
-We do not want to put a `NULL` into that sum, because it would cause the entire result to permanently collapse to `NULL`. This is because any number plus `NULL` equals to `NULL`. To circumvent that, we will use a `coalesce()`. If a component C<sub>x</sub> is `NULL`, the number `0` will be used instead. So the actual formula we'll use is:  
+We do not want to put a `NULL` into that sum, because it would cause the entire result to permanently collapse to `NULL`. This is because any number plus `NULL` equals to `NULL`. To circumvent that, we will use function `coalesce()`. If a component C<sub>x</sub> is `NULL`, the number `0` will be used instead. So the actual formula we'll use is:  
 
-> **P = coalesce(C<sub>1</sub><sup>value_as_number</sup>, 0) + coalesce(C<sub>2</sub><sup>value_as_number</sup>, 0) + coalesce(C<sub>2</sub><sup>value_as_number</sup>, 0) + ... + coalesce(C<sub>n</sub><sup>value_as_number</sup>, 0)**  
+> **test_a = coalesce(C<sub>1</sub><sup>value_as_number</sup>, 0) + coalesce(C<sub>2</sub><sup>value_as_number</sup>, 0) + coalesce(C<sub>2</sub><sup>value_as_number</sup>, 0) + ... + coalesce(C<sub>n</sub><sup>value_as_number</sup>, 0)**  
 
-From the finalized phenotype, we will just count the rows, unique patients, and sum the result (across patients). This is just to force the SQL server to compute the phenotype entirely, for all patients, so we can measure how long it takes.  
+From the finalized phenotype, we will just count the rows, unique patients, and sum the result across patients. This is just to force the SQL server to compute the phenotype entirely, for all patients, so we can measure how long it takes.  
 
-In each run, we use library `tictoc` to measure time the time spent.    
+In each run, we use library `tictoc` to measure the time spent.    
 
 ```{r}
 library(tictoc)
