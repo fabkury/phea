@@ -449,7 +449,7 @@ patients_with_most_data <- list(ascvd = ascvd) |>
   pull('pid')
 ```
 
-```{r random_patient_eval, echo = FALSE, message = FALSE}
+```{r random_patient_eval, echo = FALSE, message = FALSE, results = 'hide'}
 wrap(patients_with_most_data,
   list(ascvd = ascvd) |>
     sqla('
