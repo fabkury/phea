@@ -17,6 +17,7 @@ To learn how to use, please see:
  - [Find acute myocardial infarction in obese patients](https://fabkury.github.io/phea/obese_ami.html): Finding acute myocardial infarctions happening _while_ a patient was obese, considering a person can go in and out of obesity over time.  
  - [Find increase in serum creatinine or low glomerular filtration rate](https://fabkury.github.io/phea/aki.html): Finding laboratory manifestations of kidney injury.  
  - [Stress-testing Phea, test A](https://fabkury.github.io/phea/stress_test_a.html): Compute formulas with up to 150 variables, each coming from a different SQL query.  
+ - [Calculating the ASCVD Risk Estimator Plus score](https://fabkury.github.io/phea/ascvd.html): Compute a clinical risk score involving exponentiation and separate formulas for each of 4 subgroups of patients.  
   
 By Fabrício Kury  
 Author contact: github@kury.dev
