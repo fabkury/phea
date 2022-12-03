@@ -50,9 +50,9 @@ In this vignette we will stress-test Phea in dimension A. We are calling this _s
 The phenotype we will compute here is not relevant. We just want to test Phea!  
 
 ## TL;DR
-These are these vignette's takeaways:
+These are this vignette's takeaways:
 
- - The time Phea needs for assembling the query is negligible in practice.  
+ - The time Phea needs for assembling the query is negligible in practice. What matters is query execution time.  
  - The number of input rows processed per second (of query time) decreases as the number of components increase.  
  - Query time increases at sub-exponential rate with the number of components and of input rows.  
 
