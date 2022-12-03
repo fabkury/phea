@@ -137,6 +137,13 @@ htt <- sqlt(drug_exposure) |>
 
 #### _On Aspirin Therapy?_  
 
+#### Patient age  
+```{r person}
+person <- sqlt(person) |>
+  make_component(
+    .pid = person_id,
+    .ts = birth_datetime)
+```
 
 ## Formula
 ```{r}
@@ -149,7 +156,8 @@ ascvd = calculate_formula(
     ldl = ldl,
     diabetes = diabetes,
     smoker = smoker,
-    htt = htt),
+    htt = htt,
+    person = person),
   export = c(
     'sbp_value_as_number',
     'dbp_value_as_number',
@@ -160,9 +168,67 @@ ascvd = calculate_formula(
     'diabetes_condition_start_datetime',
     'smoker_observation_datetime',
     'htt_drug_concept_id',
-    'htt_drug_exposure_start_datetime'),
+    'htt_drug_exposure_start_datetime',
+    'person_birth_datetime'),
+  fml = c(
+    age = 'extract(year from age(ts, person_birth_datetime))',
+    smoker = 'smoker_observation_datetime is not null',
+    diabetes = 'diabetes_condition_start_datetime is not null',
+    htt = "htt_drug_exposure_start_datetime is not null
+      and abs(htt_drug_exposure_start_datetime - sbp_ts) < '4 months'", # SBP and HTT within 4 months of each other
+    is_woman = 'person_gender_concept_id == 8532',
+    is_black = 'person_race_concept_id == 8516'
+    ),
   .dont_require = c(
     'smoker', 'htt', 'diabetes'))
+
+
+# WHITE WOMEN
+white_women_sum <- paste0(collapse = ' + ',
+  '–29.799 * ln(age)', # Ln Age (y) –29.799
+  
+  '4.884 * ln(age)^2', # Ln Age, Squared 4.884
+  
+  '13.540 * ln(tc_value_as_number)', # Ln Total Cholesterol (mg/dL) 13.540
+
+  '–3.114 * ln(age) * ln(tc_value_as_number)', # Ln Age × Ln Total Cholesterol –3.114
+  
+  '–13.578 * ln(hdl_value_as_number)', # Ln HDL-C (mg/dL) –13.578
+  
+  '3.149 * ln(age) * ln(hdl_value_as_number)', # Ln Age × Ln HDL-C 3.149
+  
+  'case when htt is true then
+    2.019 * ln(sbp_value_as_number) else 0 end', # Ln Treated Systolic BP (mm Hg) 2.019
+  
+  NULL, ### # Ln Age × Ln Treated Systolic BP N/A
+  
+  'case when htt is false then
+    1.957 * sbp_value_as_number else 0 end', # Ln Untreated Systolic BP (mm Hg) 1.957
+  
+  NULL, ### # Ln Age × Ln Untreated Systolic BP N/A
+  
+  '7.574 * smoker', # Current Smoker (1=Yes, 0=No) 7.574
+  
+  '–1.665 * ln(age) * smoker', # Ln Age × Current Smoker –1.665
+  
+  '0.661 * diabetes' # Diabetes (1=Yes, 0=No) 0.661
+)
+
+black_women_sum <- ''
+white_men_sum <- ''
+black_men_sum <- ''
+
+individual_sum <- paste0(
+  'case when is_women then (
+      case when is_black then (', black_women_sum, ')
+      else (', white_women_sum, ')
+      end)
+  else (
+    case when is_black then (', black_men_sum, ')
+    else (', white_men_sum, ')
+    end)
+  end')
+
 ```
 
 ## Results
