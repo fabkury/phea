@@ -6,7 +6,7 @@ vignette: >
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
 ---
-  _This vignette assumes a SQL server at `localhost` (we use PostgreSQL), with data in OMOP Common Data Model v5.4 format in schema `cdm_new_york3`. The patient records shown in this example are synthetic data from [Synthea(TM) Patient Generator](https://github.com/synthetichealth/synthea)._  
+  _This vignette assumes a SQL server at `localhost` (we use PostgreSQL), with data in OMOP Common Data Model v5.4 format in schema `cdm_new_york3`. The patient records shown in this example are synthetic data from [Synthea<sup>TM</sup> Patient Generator](https://github.com/synthetichealth/synthea)._  
 ```{r, results = 'hide', include = FALSE}
 library(knitr)
 options(scipen = 5e5)
@@ -47,7 +47,8 @@ To compute this phenotype, we first prepare the components, then the formula par
 
 ## Components
 ### Systolic Blood Pressure (mm Hg)
-3004249 Loinc 8480-6 Systolic blood pressure
+Loinc 8480-6 Systolic blood pressure  
+OMOP CDM concept ID 3004249
 ```{r systolic_blood_pressure}
 sbp <- sqlt(measurement) |>
   filter(measurement_concept_id == 3004249) |>
@@ -57,7 +58,8 @@ sbp <- sqlt(measurement) |>
 ```
 
 ### Diastolic Blood Pressure (mm Hg)
-3012888 Loinc 8462-4 Diastolic blood pressure
+Loinc 8462-4 Diastolic blood pressure  
+OMOP CDM concept ID 3012888
 ```{r diastolic_blood_pressure}
 dbp <- sqlt(measurement) |>
   filter(measurement_concept_id == 3012888) |>
@@ -67,7 +69,8 @@ dbp <- sqlt(measurement) |>
 ```
 
 ### Total Cholesterol (mg/dL)
-3027114 Loinc 2093-3 Cholesterol [Mass/volume] in Serum or Plasma
+Loinc 2093-3 Cholesterol [Mass/volume] in Serum or Plasma  
+OMOP CDM concept ID 3027114
 ```{r total_cholesterol}
 tc <- sqlt(measurement) |>
   filter(measurement_concept_id == 3027114) |>
@@ -77,7 +80,8 @@ tc <- sqlt(measurement) |>
 ```
 
 ### HDL Cholesterol (mg/dL)
-3007070 Loinc 2085-9 Cholesterol in HDL [Mass/volume] in Serum or Plasma
+Loinc 2085-9 Cholesterol in HDL [Mass/volume] in Serum or Plasma  
+OMOP CDM concept ID 3007070
 ```{r hdl_cholesterol}
 hdl <- sqlt(measurement) |>
   filter(measurement_concept_id == 3007070) |>
@@ -87,7 +91,8 @@ hdl <- sqlt(measurement) |>
 ```
 
 ### LDL Cholesterol (mg/dL)
-3009966 Loinc 18262-6 Cholesterol in LDL [Mass/volume] in Serum or Plasma by Direct assay
+Loinc 18262-6 Cholesterol in LDL [Mass/volume] in Serum or Plasma by Direct assay  
+OMOP CDM concept ID 3009966
 ```{r ldl_cholesterol}
 ldl <- sqlt(measurement) |>
   filter(measurement_concept_id == 3009966) |>
@@ -97,7 +102,8 @@ ldl <- sqlt(measurement) |>
 ```
 
 ### History of Diabetes?
-201826 SNOMED 44054006 Type 2 diabetes mellitus
+SNOMED 44054006 Type 2 diabetes mellitus  
+OMOP CDM concept ID 201826
 ```{r diabetes}
 diabetes <- sqlt(condition_occurrence) |>
   filter(condition_concept_id == 201826) |>
@@ -107,8 +113,8 @@ diabetes <- sqlt(condition_occurrence) |>
 ```
 
 #### Smoker?
-_43054909 LOINC 72166-2 Tobacco smoking status [Not required]_ 
-42709996 SNOMED 449868002 Smokes tobacco daily
+SNOMED 449868002 Smokes tobacco daily  
+OMOP CDM concept ID 42709996
 ```{r smoker}
 smoker <- sqlt(observation) |>
   filter(observation_concept_id %in% c(42709996)) |>
@@ -118,17 +124,17 @@ smoker <- sqlt(observation) |>
 ```
 
 ### On Hypertension Treatment?
-**ATC:**  
+**ATC codes:**  
 
- - C02 ANTIHYPERTENSIVES  
+ - C02 - Antihypertensives  
  - C03 - Diuretics  
  - C07 - Beta blocking agents  
  - C08 - Calcium channel blockers and  
  - C09 - Agents acting on the renin-angiotensin system.  
 ```{r hypertension_treatment}
 atc_concepts <- sqlt(concept) |>
-  filter(concept_code %in% c('C02', 'C03', 'C07', 'C08', 'C09') &&
-      vocabulary_id == 'ATC') |>
+  filter(vocabulary_id == 'ATC' &&
+      concept_code %in% c('C02', 'C03', 'C07', 'C08', 'C09')) |>
   select(concept_id)
 
 drug_concepts <- sqlt(concept_ancestor) |>
@@ -165,9 +171,9 @@ There are a three main parts here:
  b. The survival baseline  
  c. The group mean  
 
-The truth is, the formula as written over there _is slightly wrong_. By checking the numbers from the paper, one can realize that the ASCVD+ formula is:  
+The truth is, the formula as written over there _is slightly wrong_. By going through the numbers and examples in the paper, and calculating by hand, one can realize that the ASCVD+ formula actually is:  
 
-> `ascvd = (1-b) * exp(a-c)`
+> `estimated_risk = (1-b) * exp(a-c)`
 
 We prepare each part a, b and c separately, then assemble them together in `calculate_formula()`.  
 
@@ -186,33 +192,46 @@ Let us first compute the individual sum using the coeficients according to each 
 ```{r individual_sums}
 # WHITE WOMEN
 white_women_sum <- paste(sep = ' + ',
-  '-29.799 * ln(age)', # Ln Age (y) –29.799
+  # Ln Age (y) –29.799
+  '-29.799 * ln(age)',
   
-  '4.884 * ln(age)^2', # Ln Age, Squared 4.884
+  # Ln Age, Squared 4.884
+  '4.884 * ln(age)^2',
   
-  '13.540 * ln(tc_value_as_number)', # Ln Total Cholesterol (mg/dL) 13.540
+  # Ln Total Cholesterol (mg/dL) 13.540
+  '13.540 * ln(tc_value_as_number)',
 
-  '-3.114 * ln(age) * ln(tc_value_as_number)', # Ln Age × Ln Total Cholesterol –3.114
+  # Ln Age × Ln Total Cholesterol –3.114
+  '-3.114 * ln(age) * ln(tc_value_as_number)',
   
-  '-13.578 * ln(hdl_value_as_number)', # Ln HDL-C (mg/dL) –13.578
+  # Ln HDL-C (mg/dL) –13.578
+  '-13.578 * ln(hdl_value_as_number)',
   
-  '3.149 * ln(age) * ln(hdl_value_as_number)', # Ln Age × Ln HDL-C 3.149
+  # Ln Age × Ln HDL-C 3.149
+  '3.149 * ln(age) * ln(hdl_value_as_number)',
   
+  # Ln Treated Systolic BP (mm Hg) 2.019
   'case when htt is true then
-    2.019 * ln(sbp_value_as_number) else 0 end', # Ln Treated Systolic BP (mm Hg) 2.019
+    2.019 * ln(sbp_value_as_number) else 0 end',
   
-  ### # Ln Age × Ln Treated Systolic BP N/A
+  ### # Ln Age × Ln Treated Systolic BP
+  # N/A
   
+  # Ln Untreated Systolic BP (mm Hg) 1.957
   'case when htt is false then
-    1.957 * ln(sbp_value_as_number) else 0 end', # Ln Untreated Systolic BP (mm Hg) 1.957
+    1.957 * ln(sbp_value_as_number) else 0 end',
   
-  ### # Ln Age × Ln Untreated Systolic BP N/A
+  ### # Ln Age × Ln Untreated Systolic BP
+  # N/A
   
-  '7.574 * case when is_smoker then 1 else 0 end', # Current Smoker (1=Yes, 0=No) 7.574
+  # Current Smoker (1=Yes, 0=No) 7.574
+  '7.574 * case when is_smoker then 1 else 0 end',
   
-  '-1.665 * ln(age) * case when is_smoker then 1 else 0 end', # Ln Age × Current Smoker –1.665
-  
-  '0.661 * case when has_diabetes then 1 else 0 end' # Diabetes (1=Yes, 0=No) 0.661
+  # Ln Age × Current Smoker –1.665
+  '-1.665 * ln(age) * case when is_smoker then 1 else 0 end',
+ 
+  # Diabetes (1=Yes, 0=No) 0.661 
+  '0.661 * case when has_diabetes then 1 else 0 end'
 )
 
 # BLACK WOMEN
@@ -220,12 +239,14 @@ black_women_sum <- paste(sep = ' + ',
   # Ln Age (y) 17.114
   '17.114 * ln(age)',
   
-  # Ln Age, Squared N/A
+  # Ln Age, Squared
+  # N/A
   
   # Ln Total Cholesterol (mg/dL) 0.940
   '0.940 * ln(tc_value_as_number)',
   
-  # Ln Age × Ln Total Cholesterol N/A
+  # Ln Age × Ln Total Cholesterol
+  # N/A
   
   # Ln HDL-C (mg/dL) –18.920
   '-18.920 * ln(hdl_value_as_number)',
@@ -252,11 +273,12 @@ black_women_sum <- paste(sep = ' + ',
   # Current Smoker (1=Yes, 0=No) 0.691
   '0.691 * case when is_smoker then 1 else 0 end',
   
-  # Ln Age × Current Smoker N/A
+  # Ln Age × Current Smoker
+  # N/A
   
   # Diabetes (1=Yes, 0=No) 0.874
   '0.874 * case when has_diabetes then 1 else 0 end'
-  )
+)
 
 # WHITE MEN
 white_men_sum <- paste(sep = ' + ',
@@ -301,12 +323,14 @@ black_men_sum <- paste(sep = ' + ',
   # Ln Total Cholesterol (mg/dL) 0.30
   '0.30 * ln(tc_value_as_number)',
   
-  # Ln Age × Ln Total Cholesterol N/A
+  # Ln Age × Ln Total Cholesterol
+  # N/A
   
   # Ln HDL-C (mg/dL) –0.307
   '-0.307 * ln(hdl_value_as_number)',
   
-  # Ln Age × Ln HDL-C N/A
+  # Ln Age × Ln HDL-C
+  # N/A
   
   # Ln Treated Systolic BP (mm Hg) 1.916
   'case when htt is true then
@@ -319,11 +343,12 @@ black_men_sum <- paste(sep = ' + ',
   # Current Smoker (1=Yes, 0=No) 0.549
   '0.549 * case when is_smoker then 1 else 0 end',
   
-  # Ln Age × Current Smoker N/A
+  # Ln Age × Current Smoker
+  # N/A
   
   # Diabetes (1=Yes, 0=No) 0.645
   '0.645 * case when has_diabetes then 1 else 0 end'
-  )
+)
 ```
 
 ### Formula parts  
@@ -370,10 +395,10 @@ Armed with the components and formula parts, we put it all together in `calculat
 ascvd = calculate_formula(
   components = list(
     sbp = sbp,
-    dbp = dbp,
+    # dbp = dbp,
     tc = tc,
     hdl = hdl,
-    ldl = ldl,
+    # ldl = ldl,
     diabetes = diabetes,
     smoker = smoker,
     htt = htt,
@@ -437,6 +462,7 @@ ascvd |>
 
 ## Plots
 To make a visually interesting plot, let us pick a patient at random, but from among those that have the most data points.  
+To do that we use function `sqla()`, which allows you to run arbitrary SQL on _lazy tables_ from the `dbplyr/dplyr` interface.  
 ```{r random_patient_noeval, eval = FALSE}
 patients_with_most_data <- list(ascvd = ascvd) |>
   sqla('
@@ -471,10 +497,15 @@ message('Sampled patient: ', random_patient)
 ```
 
 And then we plot the chosen patient.  
-```{r plot, out.width = '100%', out.height = 1800}
-ascvd |>
-  select(-ends_with('datetime'), -ends_with('concept_id'), -htt_sbp_dist,
-    -group_mean, -individual_sum, -calculated_risk, -baseline_survival) |>
+```{r plot, out.width = '100%', out.height = 1400}
+ascvd |> select( # Let's NOT plot the columns below
+    -ends_with('datetime'),
+    -ends_with('concept_id'),
+    -htt_sbp_dist,
+    -group_mean,
+    -individual_sum,
+    -calculated_risk,
+    -baseline_survival) |>
   phea_plot(random_patient, verbose = FALSE)
 ```
 
