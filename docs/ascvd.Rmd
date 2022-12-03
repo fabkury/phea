@@ -36,7 +36,7 @@ dbcon <- DBI::dbConnect(RPostgres::Postgres(),
 setup_phea(dbcon, 'cdm_new_york3')
 ```
 
-The **Atherosclerotic cardiovascular disease (ASCVD) events** Risk Estimator+ (ASCVD Risk Estimator Plus, or ASCVD+ for short) is a score developed by the _American College of Cardiology/American Heart Association Task Force on Practice Guidelines_ for assessing the 10-year risk of an event. It was published in 12 Nov 2013 at (https://doi.org/10.1161/01.cir.0000437741.48606.98)[https://doi.org/10.1161/01.cir.0000437741.48606.98].  
+The **Atherosclerotic cardiovascular disease (ASCVD) events** Risk Estimator+ (ASCVD Risk Estimator Plus, or ASCVD+ for short) is a score developed by the _American College of Cardiology/American Heart Association Task Force on Practice Guidelines_ for assessing the 10-year risk of an event. It was published in 12 Nov 2013 at [https://doi.org/10.1161/01.cir.0000437741.48606.98](https://doi.org/10.1161/01.cir.0000437741.48606.98).  
 
 To get a sense of what goes into the score, one can look at the calculator provided by the American College of Cardiology:  
 ![](C:/Users/Fab/Dropbox/PC/Documents/Estudo/Tecnologia/phea/phea/docs/img/ascvd_calculator.png){ width=100% }
