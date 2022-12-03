@@ -382,7 +382,7 @@ make_record_source <- function(records, rec_name = NULL, ts, pid, vars = NULL, .
 #' @return Lazy table with result of formula or formulas.
 calculate_formula <- function(components, fml = NULL, window = NA, export = NULL, add_components = NULL,
   .ts = NULL, .pid = NULL, .delay = NULL, .line = NULL, .require_all = FALSE, .lim = NA, .dont_require = NULL,
-  .filter = NULL, .cascaded = TRUE, .clip_sql = FALSE) {
+  .filter = NULL, .cascaded = TRUE, .clip_sql = FALSE, .out_window = NULL) {
 # Prepare ---------------------------------------------------------------------------------------------------------
   # TODO: Improve the logic regarding these two variables below.
   keep_names_unchanged <- FALSE
@@ -651,8 +651,9 @@ calculate_formula <- function(components, fml = NULL, window = NA, export = NULL
 # Compute window --------------------------------------------------------------------------------------------------
   # The front (most recent point) of the window is column ts of the current line. The back (oldest point) is the
   # smallest among the ts's of the components.
-  if(length(unique(var_map$component_name)) > 1 && !input_is_phenotype)
-    sql_ts_least <- paste0('least(', paste0(paste0(unique(var_map$component_name), '_ts'), collapse = ', '), ')')
+  window_components <- unique(setdiff(var_map$component_name, .out_window))
+  if(length(window_components) > 1 && !input_is_phenotype)
+    sql_ts_least <- paste0('least(', paste0(paste0(window_components, '_ts'), collapse = ', '), ')')
   else
     sql_ts_least <- 'ts'
 
@@ -717,7 +718,7 @@ calculate_formula <- function(components, fml = NULL, window = NA, export = NULL
             stop('Formulas cannot be nested deeper than 1 level.')
           
           res_vars <- c(res_vars, names(fml[[i]]))
-          commands <- map2(names(fml[[i]]), fml[[i]],
+          commands <- purrr::map2(names(fml[[i]]), fml[[i]],
               ~rlang::exprs(!!..1 := dplyr::sql(!!..2))) |>
             unlist()
           board <- dplyr::mutate(board,
@@ -831,8 +832,10 @@ phea_plot <- function(board, pid, plot_title = NULL, exclude = NULL, verbose = N
     }
     #
     
-    range_start <- min(chart_data$value, na.rm = TRUE)
-    range_end <- max(chart_data$value, na.rm = TRUE)
+    if(any(!is.na(chart_data$value)))
+      range <- c(min(chart_data$value, na.rm = TRUE), max(chart_data$value, na.rm = TRUE))
+    else
+      range <- NA
     
     res_plot <- chart_data |>
       plotly::plot_ly(x = ~ts) |>
@@ -843,7 +846,7 @@ phea_plot <- function(board, pid, plot_title = NULL, exclude = NULL, verbose = N
         dragmode = 'pan',
         legend = list(orientation = 'h'),
         yaxis = list(
-          range = c(range_start, range_end),
+          range = range,
           fixedrange = TRUE))
     
     return(res_plot)

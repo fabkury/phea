@@ -1,6 +1,6 @@
 Package: phea
 Title: Phenotyping Algebra
-Version: 0.4.0.0000
+Version: 0.4.1.0000
 Authors@R: 
     person("Fabrício", "Kury", , "github@kury.dev", role = c("aut", "cre"),
            comment = c(ORCID = "YOUR-ORCID-ID"))

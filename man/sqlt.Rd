@@ -4,10 +4,12 @@
 \alias{sqlt}
 \title{SQL table}
 \usage{
-sqlt(table)
+sqlt(table, schema = NULL)
 }
 \arguments{
 \item{table}{Unquoted name of the table to be accessed within \code{def_schema}.}
+
+\item{schema}{Optional. Name of schema to use. If not provided, will default to schema passed to \code{setup_phea()}.}
 }
 \value{
 Lazy table equal to \verb{select * from def_schema.table;}.

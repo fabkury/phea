@@ -4,10 +4,12 @@
 \alias{sql0}
 \title{SQL query}
 \usage{
-sql0(...)
+sql0(..., schema = NULL)
 }
 \arguments{
 \item{...}{Character strings to be concatenated with \code{paste0}.}
+
+\item{schema}{Optional. Name of schema to use. If not provided, will default to schema passed to \code{setup_phea()}.}
 }
 \value{
 Lazy table corresponding to the query.

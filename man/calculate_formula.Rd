@@ -19,7 +19,8 @@ calculate_formula(
   .dont_require = NULL,
   .filter = NULL,
   .cascaded = TRUE,
-  .clip_sql = FALSE
+  .clip_sql = FALSE,
+  .out_window = NULL
 )
 }
 \arguments{

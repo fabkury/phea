@@ -36,8 +36,16 @@ dbcon <- DBI::dbConnect(RPostgres::Postgres(),
 setup_phea(dbcon, 'cdm_new_york3')
 ```
 
-## Components
+The **Atherosclerotic cardiovascular disease (ASCVD) events** Risk Estimator+ (ASCVD Risk Estimator Plus, or ASCVD+ for short) is a score developed by the _American College of Cardiology/American Heart Association Task Force on Practice Guidelines_ for assessing the 10-year risk of an event. It was published in 12 Nov 2013 at (https://doi.org/10.1161/01.cir.0000437741.48606.98)[https://doi.org/10.1161/01.cir.0000437741.48606.98].  
 
+To get a sense of what goes into the score, one can look at the calculator provided by the American College of Cardiology:  
+![](C:/Users/Fab/Dropbox/PC/Documents/Estudo/Tecnologia/phea/phea/docs/img/ascvd_calculator.png){ width=100% }
+
+The mathematical formula for the score is a bit complicated and is shown further down in this vignette.  
+
+To compute this phenotype, we first prepare the components, then the formula parts, then we put it all together in `calculate_formula()`.  
+
+## Components
 ### Systolic Blood Pressure (mm Hg)
 3004249 Loinc 8480-6 Systolic blood pressure
 ```{r systolic_blood_pressure}
@@ -99,7 +107,7 @@ diabetes <- sqlt(condition_occurrence) |>
 ```
 
 #### Smoker?
-_43054909 LOINC 72166-2 Tobacco smoking status_
+_43054909 LOINC 72166-2 Tobacco smoking status [Not required]_ 
 42709996 SNOMED 449868002 Smokes tobacco daily
 ```{r smoker}
 smoker <- sqlt(observation) |>
@@ -110,12 +118,13 @@ smoker <- sqlt(observation) |>
 ```
 
 ### On Hypertension Treatment?
-ATC:
-	C02 ANTIHYPERTENSIVES
-	C03 - Diuretics
-	C07 - Beta blocking agents
-	C08 - Calcium channel blockers and
-	C09 - Agents acting on the renin-angiotensin system.
+**ATC:**  
+
+ - C02 ANTIHYPERTENSIVES  
+ - C03 - Diuretics  
+ - C07 - Beta blocking agents  
+ - C08 - Calcium channel blockers and  
+ - C09 - Agents acting on the renin-angiotensin system.  
 ```{r hypertension_treatment}
 atc_concepts <- sqlt(concept) |>
   filter(concept_code %in% c('C02', 'C03', 'C07', 'C08', 'C09') &&
@@ -134,8 +143,10 @@ htt <- sqlt(drug_exposure) |>
 ```
 
 #### _On a Statin?_  
+_[Not required]_
 
 #### _On Aspirin Therapy?_  
+_[Not required]_
 
 #### Patient age  
 ```{r person}
@@ -146,7 +157,216 @@ person <- sqlt(person) |>
 ```
 
 ## Formula
-```{r}
+The ASCVD Risk Estimator+ formula can be a bit abstruse at first. Here's how the original paper phrased it:
+![](C:/Users/Fab/Dropbox/PC/Documents/Estudo/Tecnologia/phea/phea/docs/img/ascvd_formula.png){ width='100%' }
+There are a three main parts here:  
+
+ a. The individual sum  
+ b. The survival baseline  
+ c. The group mean  
+
+The truth is, the formula as written over there _is slightly wrong_. By checking the numbers from the paper, one can realize that the ASCVD+ formula is:  
+
+> `ascvd = (1-b) * exp(a-c)`
+
+We prepare each part a, b and c separately, then assemble them together in `calculate_formula()`.  
+
+The _individual sum_ comes from multiplying the values of the components by their coefficients as published in **Table A.**:  
+![](C:/Users/Fab/Dropbox/PC/Documents/Estudo/Tecnologia/phea/phea/docs/img/ascvd_equation_params.png){ width=100% }  
+  
+Notice that the formula has 4 variations, according to whether the patient:  
+
+ - Is a woman or man
+ - Is white or not
+
+We use `CASE WHEN ...` constructs to prepare the formula according to these 4 groups.  
+
+### Individual sum  
+Let us first compute the individual sum using the coeficients according to each of the 4 groups.  
+```{r individual_sums}
+# WHITE WOMEN
+white_women_sum <- paste(sep = ' + ',
+  '-29.799 * ln(age)', # Ln Age (y) –29.799
+  
+  '4.884 * ln(age)^2', # Ln Age, Squared 4.884
+  
+  '13.540 * ln(tc_value_as_number)', # Ln Total Cholesterol (mg/dL) 13.540
+
+  '-3.114 * ln(age) * ln(tc_value_as_number)', # Ln Age × Ln Total Cholesterol –3.114
+  
+  '-13.578 * ln(hdl_value_as_number)', # Ln HDL-C (mg/dL) –13.578
+  
+  '3.149 * ln(age) * ln(hdl_value_as_number)', # Ln Age × Ln HDL-C 3.149
+  
+  'case when htt is true then
+    2.019 * ln(sbp_value_as_number) else 0 end', # Ln Treated Systolic BP (mm Hg) 2.019
+  
+  ### # Ln Age × Ln Treated Systolic BP N/A
+  
+  'case when htt is false then
+    1.957 * ln(sbp_value_as_number) else 0 end', # Ln Untreated Systolic BP (mm Hg) 1.957
+  
+  ### # Ln Age × Ln Untreated Systolic BP N/A
+  
+  '7.574 * case when is_smoker then 1 else 0 end', # Current Smoker (1=Yes, 0=No) 7.574
+  
+  '-1.665 * ln(age) * case when is_smoker then 1 else 0 end', # Ln Age × Current Smoker –1.665
+  
+  '0.661 * case when has_diabetes then 1 else 0 end' # Diabetes (1=Yes, 0=No) 0.661
+)
+
+# BLACK WOMEN
+black_women_sum <- paste(sep = ' + ',
+  # Ln Age (y) 17.114
+  '17.114 * ln(age)',
+  
+  # Ln Age, Squared N/A
+  
+  # Ln Total Cholesterol (mg/dL) 0.940
+  '0.940 * ln(tc_value_as_number)',
+  
+  # Ln Age × Ln Total Cholesterol N/A
+  
+  # Ln HDL-C (mg/dL) –18.920
+  '-18.920 * ln(hdl_value_as_number)',
+  
+  # Ln Age × Ln HDL-C 4.475
+  '4.475 * ln(age) * ln(hdl_value_as_number)',
+  
+  # Ln Treated Systolic BP (mm Hg) 29.291
+  'case when htt is true then
+    29.291 * ln(sbp_value_as_number) else 0 end',
+  
+  # Ln Age × Ln Treated Systolic BP –6.432
+  'case when htt is true then
+    -6.432 * ln(age) * ln(sbp_value_as_number) else 0 end',
+  
+  # Ln Untreated Systolic BP (mm Hg) 27.820
+  'case when htt is false then
+    27.820 * ln(sbp_value_as_number) else 0 end',
+  
+  # Ln Age × Ln Untreated Systolic BP –6.087
+  'case when htt is false then
+    -6.087 * ln(age) * ln(sbp_value_as_number) else 0 end',
+  
+  # Current Smoker (1=Yes, 0=No) 0.691
+  '0.691 * case when is_smoker then 1 else 0 end',
+  
+  # Ln Age × Current Smoker N/A
+  
+  # Diabetes (1=Yes, 0=No) 0.874
+  '0.874 * case when has_diabetes then 1 else 0 end'
+  )
+
+# WHITE MEN
+white_men_sum <- paste(sep = ' + ',
+  # Ln Age (y) 12.344
+  '12.344 * ln(age)',
+  
+  # Ln Total Cholesterol (mg/dL) 11.853
+  '11.853 * ln(tc_value_as_number)',
+  
+  # Ln Age × Ln Total Cholesterol –2.664
+  '-2.664 * ln(age) * ln(tc_value_as_number)',
+  
+  # Ln HDL-C (mg/dL) –7.990
+  '-7.990 * ln(hdl_value_as_number)',
+  
+  # Ln Age × Ln HDL-C 1.769
+  '1.769 * ln(age) * ln(hdl_value_as_number)',
+  
+  # Ln Treated Systolic BP (mm Hg) 1.797
+  'case when htt is true then 
+    1.797 * ln(sbp_value_as_number) else 0 end',
+  
+  # Ln Untreated Systolic BP (mm Hg) 1.764
+  'case when htt is false then
+    1.764 * ln(sbp_value_as_number) else 0 end',
+  
+  # Current Smoker (1=Yes, 0=No) 7.837
+  '7.837 * case when is_smoker then 1 else 0 end',
+  
+  # Ln Age × Current Smoker –1.795
+  '-1.795 * ln(age) * case when is_smoker then 1 else 0 end',
+  
+  # Diabetes (1=Yes, 0=No) 0.658
+  '0.658 * case when has_diabetes then 1 else 0 end'
+)
+
+# BLACK MEN
+black_men_sum <- paste(sep = ' + ',
+  # Ln Age (y) 2.469
+  '2.469 * ln(age)',
+  
+  # Ln Total Cholesterol (mg/dL) 0.30
+  '0.30 * ln(tc_value_as_number)',
+  
+  # Ln Age × Ln Total Cholesterol N/A
+  
+  # Ln HDL-C (mg/dL) –0.307
+  '-0.307 * ln(hdl_value_as_number)',
+  
+  # Ln Age × Ln HDL-C N/A
+  
+  # Ln Treated Systolic BP (mm Hg) 1.916
+  'case when htt is true then
+    1.916 * ln(sbp_value_as_number) else 0 end',
+  
+  # Ln Untreated Systolic BP (mm Hg) 1.809
+  'case when htt is false then
+    1.809 * ln(sbp_value_as_number) else 0 end',
+  
+  # Current Smoker (1=Yes, 0=No) 0.549
+  '0.549 * case when is_smoker then 1 else 0 end',
+  
+  # Ln Age × Current Smoker N/A
+  
+  # Diabetes (1=Yes, 0=No) 0.645
+  '0.645 * case when has_diabetes then 1 else 0 end'
+  )
+```
+
+### Formula parts  
+To facilitate reading and using the code, we assemble parts of the phenotype in separate formulas.  
+```{r assembly}
+individual_sum <- paste0(
+  'case when is_woman then (
+    case when is_black then (', black_women_sum, ')
+    else (', white_women_sum, ')
+    end)
+  else (
+    case when is_black then (', black_men_sum, ')
+    else (', white_men_sum, ')
+    end)
+  end')
+
+baseline_survival <- paste0(
+  'case when is_woman then (
+    case when is_black then 0.9533
+    else 0.9665
+    end)
+  else (
+    case when is_black then 0.8954
+    else 0.9144
+    end)
+  end')
+
+group_mean <- paste0(
+  'case when is_woman then (
+    case when is_black then 86.61
+    else -29.18
+    end)
+  else (
+    case when is_black then 19.54
+    else 61.18
+    end)
+  end')
+
+```
+
+### Calculate formula
+Armed with the components and formula parts, we put it all together in `calculate_formula()`.  
+```{r calculate_formula}
 ascvd = calculate_formula(
   components = list(
     sbp = sbp,
@@ -160,85 +380,117 @@ ascvd = calculate_formula(
     person = person),
   export = c(
     'sbp_value_as_number',
-    'dbp_value_as_number',
+    # 'dbp_value_as_number',
     'tc_value_as_number',
     'hdl_value_as_number',
-    'ldl_value_as_number',
+    # 'ldl_value_as_number',
     'diabetes_condition_concept_id',
     'diabetes_condition_start_datetime',
     'smoker_observation_datetime',
     'htt_drug_concept_id',
     'htt_drug_exposure_start_datetime',
     'person_birth_datetime'),
-  fml = c(
-    age = 'extract(year from age(ts, person_birth_datetime))',
-    smoker = 'smoker_observation_datetime is not null',
-    diabetes = 'diabetes_condition_start_datetime is not null',
-    htt = "htt_drug_exposure_start_datetime is not null
-      and abs(htt_drug_exposure_start_datetime - sbp_ts) < '4 months'", # SBP and HTT within 4 months of each other
-    is_woman = 'person_gender_concept_id == 8532',
-    is_black = 'person_race_concept_id == 8516'
+  fml = list(
+    preprocess = list(
+      is_woman = 'person_gender_concept_id = 8532',
+      
+      is_black = 'person_race_concept_id = 8516',
+      
+      age = 'extract(year from age(ts, person_birth_datetime))',
+      
+      is_smoker = 'smoker_observation_datetime is null',
+      
+      has_diabetes = 'diabetes_condition_start_datetime is null',
+      
+      htt_sbp_dist = "case when htt_drug_exposure_start_datetime - sbp_measurement_datetime < interval '0'
+        then sbp_measurement_datetime - htt_drug_exposure_start_datetime
+        else htt_drug_exposure_start_datetime - sbp_measurement_datetime end"
     ),
-  .dont_require = c(
-    'smoker', 'htt', 'diabetes'))
 
-
-# WHITE WOMEN
-white_women_sum <- paste0(collapse = ' + ',
-  '–29.799 * ln(age)', # Ln Age (y) –29.799
+    htt = "htt_drug_exposure_start_datetime is not null
+      and htt_sbp_dist < '4 months'", # SBP and HTT within 4 months of each other
+    
+    individual_sum = individual_sum,
+    
+    baseline_survival = baseline_survival,
+    
+    group_mean = group_mean,
+    
+    calculated_risk = '(1 - baseline_survival) * exp(individual_sum - group_mean)',
+    
+    estimated_risk = 'least(0.3, greatest(0.01, calculated_risk))' # Cap to 1%-30%.
+    ),
   
-  '4.884 * ln(age)^2', # Ln Age, Squared 4.884
+  .dont_require = c('smoker', 'htt', 'diabetes'),
   
-  '13.540 * ln(tc_value_as_number)', # Ln Total Cholesterol (mg/dL) 13.540
-
-  '–3.114 * ln(age) * ln(tc_value_as_number)', # Ln Age × Ln Total Cholesterol –3.114
-  
-  '–13.578 * ln(hdl_value_as_number)', # Ln HDL-C (mg/dL) –13.578
-  
-  '3.149 * ln(age) * ln(hdl_value_as_number)', # Ln Age × Ln HDL-C 3.149
-  
-  'case when htt is true then
-    2.019 * ln(sbp_value_as_number) else 0 end', # Ln Treated Systolic BP (mm Hg) 2.019
-  
-  NULL, ### # Ln Age × Ln Treated Systolic BP N/A
-  
-  'case when htt is false then
-    1.957 * sbp_value_as_number else 0 end', # Ln Untreated Systolic BP (mm Hg) 1.957
-  
-  NULL, ### # Ln Age × Ln Untreated Systolic BP N/A
-  
-  '7.574 * smoker', # Current Smoker (1=Yes, 0=No) 7.574
-  
-  '–1.665 * ln(age) * smoker', # Ln Age × Current Smoker –1.665
-  
-  '0.661 * diabetes' # Diabetes (1=Yes, 0=No) 0.661
-)
-
-black_women_sum <- ''
-white_men_sum <- ''
-black_men_sum <- ''
-
-individual_sum <- paste0(
-  'case when is_women then (
-      case when is_black then (', black_women_sum, ')
-      else (', white_women_sum, ')
-      end)
-  else (
-    case when is_black then (', black_men_sum, ')
-    else (', white_men_sum, ')
-    end)
-  end')
+  .out_window = c('person', 'diabetes'))
 
 ```
 
 ## Results
+Let us peek at 20 rows from the phenotype.  
+```{r results}
+ascvd |>
+  head_shot(20, blind = TRUE) |>
+  kable()
+```
 
 ## Plots
+To make a visually interesting plot, let us pick a patient at random, but from among those that have the most data points.  
+```{r random_patient_noeval, eval = FALSE}
+patients_with_most_data <- list(ascvd = ascvd) |>
+  sqla('
+    select pid, count(*) as rows
+    from ascvd
+    group by pid
+    order by rows desc
+    limit 20
+    ') |>
+  pull('pid')
+```
+
+```{r random_patient_eval, echo = FALSE, message = FALSE}
+wrap(patients_with_most_data,
+  list(ascvd = ascvd) |>
+    sqla('
+      select pid, count(*) as rows
+      from ascvd
+      group by pid
+      order by rows desc
+      limit 20
+      ') |>
+    pull('pid')
+)
+```
+
+From the 20 `patients_with_most_data`, we pick one at random.  
+```{r sample_random_patient}
+random_patient <- sample(patients_with_most_data, 1)
+
+message('Sampled patient: ', random_patient)
+```
+
+And then we plot the chosen patient.  
+```{r plot, out.width = '100%', out.height = 1800}
+ascvd |>
+  select(-ends_with('datetime'), -ends_with('concept_id'), -htt_sbp_dist,
+    -group_mean, -individual_sum, -calculated_risk, -baseline_survival) |>
+  phea_plot(random_patient, verbose = FALSE)
+```
+
+## Obtain the SQL query that computes the phenotype  
+To see the SQL query that computes the phenotype, use helper function `code_shot()`, or `dbplyr::sql_render()`, or the `.clip_sql` option in `calculate_formula()`.  
+```{r, eval = FALSE}
+code_shot(ascvd)
+```
+```sql
+`r code_shot(ascvd)`
+```
 
 ### Author contact  
 Fabrício Kury  
 `r format(Sys.time(), '%Y/%b/%d')`  
 Be always welcome to reach me at fab@kury.dev.  
 ```{r, include = FALSE}
-# DBI::dbDisconnect(dbcon)
+DBI::dbDisconnect(dbcon)
 ```
