@@ -647,6 +647,15 @@ calculate_formula <- function(components, fml = NULL, window = NA, export = NULL
     dplyr::group_by(pid) |>
     tidyr::fill(!c(row_id, pid, ts)) |>
     ungroup()
+  
+  # For some reason, apparently a bug in dbplyr's SQL translation, we need to "erase" an ORDER BY "pid", "ts" that is
+  # left over in the translated query. That ORDER BY persists even if you posteriorly do a dplyr::group_by() on the
+  # result of the phenotype (i.e. the board at this point). This causes the SQL server's query engine to raise an error,
+  # saying that "ts" must also be part of the GROUP BY. This left over ORDER BY "pid", "ts" apparently comes from the
+  # dbplyr::window_order() call that was necessary to guarantee the intended behavior of the call to
+  # tidyr::fill.lazy_tbl() above.
+  board <- board |>
+    arrange()
 
 # Compute window --------------------------------------------------------------------------------------------------
   # The front (most recent point) of the window is column ts of the current line. The back (oldest point) is the
@@ -718,14 +727,18 @@ calculate_formula <- function(components, fml = NULL, window = NA, export = NULL
             stop('Formulas cannot be nested deeper than 1 level.')
           
           res_vars <- c(res_vars, names(fml[[i]]))
+          
           commands <- purrr::map2(names(fml[[i]]), fml[[i]],
               ~rlang::exprs(!!..1 := dplyr::sql(!!..2))) |>
             unlist()
+          
           board <- dplyr::mutate(board,
             !!!commands)
         } else {
           res_vars <- c(res_vars, names(fml)[i])
+          
           sql_txt <- fml[[i]]
+          
           board <- dplyr::mutate(board,
             !!rlang::sym(names(fml)[i]) := dplyr::sql(sql_txt))
         }
@@ -737,6 +750,7 @@ calculate_formula <- function(components, fml = NULL, window = NA, export = NULL
       
       # Compute them all in one statement, so that computation time is (potentially, haven't tested) minimized.
       res_vars <- c(res_vars, names(fml))
+      
       commands <- purrr::map2(names(fml), fml,
         ~rlang::exprs(!!..1 := dplyr::sql(!!..2))) |> unlist()
 
@@ -746,15 +760,6 @@ calculate_formula <- function(components, fml = NULL, window = NA, export = NULL
   }
 
 # Collapse SQL and return -----------------------------------------------------------------------------------------
-  # For some reason, apparently a bug in dbplyr's SQL translation, we need to "erase" an ORDER BY "pid", "ts" that is
-  # left over in the translated query. That ORDER BY persists even if you posteriorly do a dplyr::group_by() on the
-  # result of the phenotype (i.e. the board at this point). This causes the SQL server's query engine to raise an error,
-  # saying that "ts" must also be part of the GROUP BY. This left over ORDER BY "pid", "ts" apparently comes from the
-  # dbplyr::window_order() call that was necessary to guarantee the intended behavior of the call to
-  # tidyr::fill.lazy_tbl() above.
-  board <- board |>
-    arrange()
-  
   # Calling collapse() is necessary to minimize the accumulation of "lazy table generating code". That accumulation
   # can produce error "C stack usage is too close to the limit", especially when compounding phenotypes (i.e. using 
   # phenotypes as components of other phenotypes). See https://github.com/tidyverse/dbplyr/issues/719. Thanks, mgirlich!
