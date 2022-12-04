@@ -36,14 +36,14 @@ dbcon <- DBI::dbConnect(RPostgres::Postgres(),
 setup_phea(dbcon, 'cdm_new_york3')
 ```
 
-The **Atherosclerotic cardiovascular disease (ASCVD) events** Risk Estimator+ (ASCVD Risk Estimator Plus, or ASCVD+ for short) is a score developed by the _American College of Cardiology/American Heart Association Task Force on Practice Guidelines_ for assessing the 10-year risk of an event. It was published in 12 Nov 2013 at [https://doi.org/10.1161/01.cir.0000437741.48606.98](https://doi.org/10.1161/01.cir.0000437741.48606.98).  
+The **Atherosclerotic Cardiovascular Disease (ASCVD) Events** Risk Estimator+ (ASCVD Risk Estimator Plus, or ASCVD+ for short) is a score developed by the _American College of Cardiology/American Heart Association Task Force on Practice Guidelines_ for estimating the 10-year risk of said events. It was published in Nov. 12, 2013 on the journal Circulation. See  [https://doi.org/10.1161/01.cir.0000437741.48606.98](https://doi.org/10.1161/01.cir.0000437741.48606.98).  
 
-To get a sense of what goes into the score, one can look at the calculator provided by the American College of Cardiology:  
+To get a sense of what data goes into the score, see the online [calculator provided by the American College of Cardiology](https://tools.acc.org/ASCVD-Risk-Estimator-Plus/#!/calculate/estimate/):  
 ![](C:/Users/Fab/Dropbox/PC/Documents/Estudo/Tecnologia/phea/phea/docs/img/ascvd_calculator.png){ width=100% }
 
-The mathematical formula for the score is a bit complicated and is shown further down in this vignette.  
+The mathematical formula for the score is a bit convoluted. I discuss that further down in this vignette.  
 
-To compute this phenotype, we first prepare the components, then the formula parts, then we put it all together in `calculate_formula()`.  
+To compute this phenotype, we first prepare the components, then the formula parts, then we put it all together in a call to `calculate_formula()`.  
 
 ## Components
 ### Systolic Blood Pressure (mm Hg)
@@ -90,7 +90,8 @@ hdl <- sqlt(measurement) |>
     .ts = measurement_datetime)
 ```
 
-### LDL Cholesterol (mg/dL)
+### _LDL Cholesterol (mg/dL)_
+_[Not required]_  
 Loinc 18262-6 Cholesterol in LDL [Mass/volume] in Serum or Plasma by Direct assay  
 OMOP CDM concept ID 3009966
 ```{r ldl_cholesterol}
@@ -123,7 +124,7 @@ smoker <- sqlt(observation) |>
     .ts = observation_datetime)
 ```
 
-### On hypertension treatment?
+### On Hypertension Treatment?
 **ATC codes:**  
 
  - C02 - Antihypertensives  
@@ -163,29 +164,33 @@ person <- sqlt(person) |>
 ```
 
 ## Formula
-The ASCVD Risk Estimator+ formula can be a bit abstruse at first. Here's how the original paper phrased it:
+The ASCVD Risk Estimator+ formula can be a bit confusing at first, because of a misprint in the paper. Here is how the paper defined it:
 ![](C:/Users/Fab/Dropbox/PC/Documents/Estudo/Tecnologia/phea/phea/docs/img/ascvd_formula.png){ width='100%' }
-There are a three main parts here:  
+There are three main parts here:  
 
- a. The individual sum  
- b. The survival baseline  
- c. The group mean  
+ a. The individual sum ("IndX'B")  
+ b. The survival baseline ("S<sub>10</sub>")  
+ c. The group mean ("_Mean_X'B")  
 
-The truth is, the formula as written over there _is slightly wrong_. By going through the numbers and examples in the paper, and calculating by hand, one can realize that the ASCVD+ formula actually is:  
+The truth is, the formula written over there _is wrong_. Credits to the authors, nevertheless, for including in the text careful demonstrations of the use of the formula, including a walk through each calculation. By going through the numbers and examples in the paper, and calculating by hand, one can realize that the ASCVD+ formula actually is:  
 
 > `estimated_risk = (1-b) * exp(a-c)`
 
-We prepare each part a, b and c separately, then assemble them together in `calculate_formula()`.  
+We prepare each part a, b and c separately, then assemble them together into a phentype using `calculate_formula()`.  
 
-The _individual sum_ comes from multiplying the values of the components by their coefficients as published in **Table A.**:  
+The _individual sum (a)_ comes from multiplying the values of the components by their coefficients as published in **Table A.** of Appendix 7:  
 ![](C:/Users/Fab/Dropbox/PC/Documents/Estudo/Tecnologia/phea/phea/docs/img/ascvd_equation_params.png){ width=100% }  
   
-Notice that the formula has 4 variations, according to whether the patient:  
+Notice that the coefficients have 4 variations according to whether the patient is:  
 
- - Is a woman or man
- - Is white or not
+ - female yes/no
+ - black yes/no
 
-We use `CASE WHEN ...` constructs to prepare the formula according to these 4 groups.  
+We use `CASE WHEN ...` to construct the formula according to these 4 groups.  
+
+Some coefficients are `N/A` for some groups, meaning the formula loses that component. For example, the term `ln(age)*ln(total cholesterol)` is not used for Blacks.  
+
+The paper also is clear that, in regards to race, the question really is of type Boolean yes/no. As consequence, Asians and Latinos are computed using the coefficients of Whites.  
 
 ### Individual sum  
 Let us first compute the individual sum using the coeficients according to each of the 4 groups.  
@@ -365,7 +370,7 @@ individual_sum <- paste0(
     end)
   end')
 
-baseline_survival <- paste0(
+baseline_survival <- 
   'case when is_woman then (
     case when is_black then 0.9533
     else 0.9665
@@ -374,9 +379,9 @@ baseline_survival <- paste0(
     case when is_black then 0.8954
     else 0.9144
     end)
-  end')
+  end'
 
-group_mean <- paste0(
+group_mean <-
   'case when is_woman then (
     case when is_black then 86.61
     else -29.18
@@ -385,7 +390,7 @@ group_mean <- paste0(
     case when is_black then 19.54
     else 61.18
     end)
-  end')
+  end'
 
 ```
 
@@ -416,7 +421,7 @@ ascvd = calculate_formula(
     'htt_drug_exposure_start_datetime',
     'person_birth_datetime'),
   fml = list(
-    preprocess = list(
+    a = list(
       is_woman = 'person_gender_concept_id = 8532',
       
       is_black = 'person_race_concept_id = 8516',
@@ -432,16 +437,17 @@ ascvd = calculate_formula(
         then sbp_measurement_datetime - htt_drug_exposure_start_datetime
         else htt_drug_exposure_start_datetime - sbp_measurement_datetime end"
     ),
+    
+    b = list(
+      baseline_survival = baseline_survival,
+      
+      group_mean = group_mean,
+      # SBP and HTT within 4 months of each other
+      htt = "htt_drug_exposure_start_datetime is not null
+        and htt_sbp_dist < '4 months'"
+    ),
 
-    # SBP and HTT within 4 months of each other
-    htt = "htt_drug_exposure_start_datetime is not null
-      and htt_sbp_dist < '4 months'",
-    
     individual_sum = individual_sum,
-    
-    baseline_survival = baseline_survival,
-    
-    group_mean = group_mean,
     
     calculated_risk = '(1 - baseline_survival) * exp(individual_sum - group_mean)',
     
@@ -527,5 +533,5 @@ Fabrício Kury
 `r format(Sys.time(), '%Y/%b/%d')`  
 Be always welcome to reach me at fab@kury.dev.  
 ```{r, include = FALSE}
-DBI::dbDisconnect(dbcon)
+# DBI::dbDisconnect(dbcon)
 ```

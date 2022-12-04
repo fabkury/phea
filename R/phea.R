@@ -570,8 +570,8 @@ calculate_formula <- function(components, fml = NULL, window = NA, export = NULL
       
       component$rec_source$records <- new_records |>
         dplyr::rename(
-          !!sym(component$rec_source$rec_pid) := pid,
-          !!sym(component$rec_source$ts) := ts) |>
+          !!rlang::sym(component$rec_source$rec_pid) := pid,
+          !!rlang::sym(component$rec_source$ts) := ts) |>
         select(-tidyr::any_of(c('row_id', 'window')))
       
       component$delay <- NA
@@ -814,7 +814,7 @@ phea_plot <- function(board, pid, plot_title = NULL, exclude = NULL, verbose = N
   
   make_chart <- function(chart_item) {
     chart_data <- board_data |>
-      select(ts, value = !!chart_item)
+      select(ts, value = !!sym(chart_item))
     
     # Make step chart: add points at same Y but forward X up to the X of the next point. All angles are 90 degrees.
     if(F) {
