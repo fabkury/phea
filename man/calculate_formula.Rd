@@ -43,7 +43,7 @@ timestamps (even if their value is NA). If \code{.dont_require} is provided, \co
 \item{.dont_require}{If provided, causes formula to require all components (regardless of .require_all), except for
 those listed here.}
 
-\item{.filter}{Character string or list of strings. Logical conditions to satisfy. These go into the SQL \code{WHERE}
+\item{.filter}{Character vector. Logical conditions to satisfy. These go into the SQL \code{WHERE}
 clause. Only rows satisfying all conditions provided will be returned.}
 
 \item{.cascaded}{If \code{TRUE} (default), each formula is computed in a separate, nested SELECT statement. This allows
@@ -51,13 +51,15 @@ the result of the prior formula to be used in the following, at the potential co
 
 \item{.clip_sql}{If \code{TRUE}, instead of lazy table it returns the SQL query as a SQL object (can be converted to
 character using \code{as.character()}), and also copies it to the clipboard.}
+
+\item{.out_window}{Character vector. Names of components to not be included when calculating the window.}
 }
 \value{
 Lazy table with result of formula or formulas.
 }
 \description{
-Receives a list of components, and a formula in SQL language, and computes the result by gathering records according
-to their timestamps.
+Receives a list of components, and a formula (or list of formulas) in SQL language, and computes the result by
+gathering records according to their timestamps.
 }
 \details{
 The data type of the columns from the components (only those that are actually used or exported) cannot be Boolean.

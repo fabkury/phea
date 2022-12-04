@@ -133,5 +133,5 @@ code_shot(bmi)
 ```
 
 ```{r, include = FALSE}
-DBI::dbDisconnect(dbcon)
+# DBI::dbDisconnect(dbcon)
 ```

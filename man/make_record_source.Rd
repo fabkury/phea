@@ -39,3 +39,6 @@ Create a Phea record source.
 \details{
 Creates a record source from a lazy table.
 }
+\seealso{
+\code{\link[=make_component]{make_component()}} to create a component from a record source.
+}

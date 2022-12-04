@@ -17,3 +17,6 @@ Lazy table corresponding to the query.
 \description{
 Combines with \code{paste0} the strings in \code{...}, then runs it as a SQL query.
 }
+\seealso{
+\code{\link[=sqlt]{sqlt()}} to create lazy tables from SQL tables. \code{\link[=sqla]{sqla()}} to run arbitrary SQL with lazy tables.
+}

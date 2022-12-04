@@ -37,6 +37,16 @@ keep_row_by <- function(lazy_tbl, by, partition, pick_last = FALSE) {
 }
 
 
+# Keep change of --------------------------------------------------------------------------------------------------
+keep_change_of <- function(lazy_tbl, of, partition = NULL, order = NULL) {
+  lazy_tbl |>
+    mutate(phea_kco_lag = dbplyr::win_over(sql(paste0('lag(', of, ')')),
+      partition = partition, order = order, con = .pheaglobalenv$con)) |>
+    filter(is.na(phea_kco_lag) || phea_kco_lag != !!sym(of)) |>
+    select(-phea_kco_lag)
+}
+
+
 # Head shot & code shot -------------------------------------------------------------------------------------------
 #' Head shot
 #'
@@ -103,7 +113,7 @@ setup_phea <- function(connection, schema, .verbose = TRUE) {
 }
 
 
-# SQL shorthands --------------------------------------------------------------------------------------------------
+# sql0, sqlt & sqla -----------------------------------------------------------------------------------------------
 #' SQL table
 #'
 #' Produces lazy table object of `table` in the preconfigured default schema.
@@ -115,6 +125,7 @@ setup_phea <- function(connection, schema, .verbose = TRUE) {
 #' @param table Unquoted name of the table to be accessed within `def_schema`.
 #' @param schema Optional. Name of schema to use. If provided, overrides `def_schema`.  
 #' @return Lazy table equal to `select * from def_schema.table;`.
+#' @seealso [sql0()] to run arbitrary SQL. [sqla()] to run arbitrary SQL with lazy tables.
 #' @examples
 #' `sqlt(person)`
 #' `sqlt(condition_occurrence)`
@@ -137,6 +148,7 @@ sqlt <- function(table, schema = NULL) {
 #' @export
 #' @param ... Character strings to be concatenated with `paste0`.
 #' @param schema Optional. Name of schema to use. If not provided, will default to schema passed to `setup_phea()`.
+#' @seealso [sqlt()] to create lazy tables from SQL tables. [sqla()] to run arbitrary SQL with lazy tables.
 #' @return Lazy table corresponding to the query.
 sql0 <- function(..., schema = NULL) {
   sql_txt <- paste0(...)
@@ -156,6 +168,7 @@ sql0 <- function(..., schema = NULL) {
 #' @export
 #' @param args 
 #' @param ... Character strings to be concatenated with `paste0`.
+#' @seealso [sqlt()] to create lazy tables from SQL tables. [sql0()] to run arbitrary SQL.
 #' @return Lazy table corresponding to the query.
 #' @examples
 #' ```
@@ -202,16 +215,17 @@ sqla <- function(args, ...) {
 #'
 #' @export
 #' @param input_source A record source from `make_record_source()`, a component from `make_component()`, or a lazy
-#' table. If the latter case, `.ts` and `.pid` must be provided.
+#'   table. If the latter case, `.ts` and `.pid` must be provided.
 #' @param line Interger. Which line to pick. 0 = skip no lines, 1 = skip one line, 2 = skip two lines, etc.
 #' @param delay Character. Time interval in SQL language. Minimum time difference between phenotype date and component
-#' date.
+#'   date.
 #' @param window Character. Time interval in SQL language. Maximum time difference between phenotype date and component
-#' date.
+#'   date.
 #' @param .ts Unquoted character. If passing a lazy table to `input_source`, `.ts` is used as `ts` to buid a record
-#' source.
+#'   source.
 #' @param .pid Unquoted character. If passing a lazy table to `input_source`, `.pid` is used as `pid` to buid a record
-#' source.
+#'   source.
+#' @seealso [make_record_source()] to create a record source.
 #' @return Phea component object.
 make_component <- function(input_source, line = NA, delay = NA, window = NA, rec_name = NA,
   .passthrough = FALSE, .ts = NULL, .pid = NULL, .delay_fn = 'last_value', .ts_fn = NULL) {
@@ -296,6 +310,7 @@ make_component <- function(input_source, line = NA, delay = NA, window = NA, rec
 #' @param vars Character vector. Name of the colums to make available from `records`. If not supplied, all columns are
 #' used.
 #' @param .capture_col Unquoted string. Not yet implemented.
+#' @seealso [make_component()] to create a component from a record source.
 #' @return Phea record source object.
 make_record_source <- function(records, rec_name = NULL, ts, pid, vars = NULL, .capture_col = NULL, .type = 'direct',
   .ts = NULL, .pid = NULL) {
@@ -363,22 +378,22 @@ make_record_source <- function(records, rec_name = NULL, ts, pid, vars = NULL, .
 #'
 #' @export
 #' @param components A list of components, a record source, or a lazy table. If a record source or lazy table is 
-#' provided, a default component will be made from it.
+#'   provided, a default component will be made from it.
 #' @param fml Formula or list of formulas.
 #' @param export List of additional variables to export.
 #' @param add_components Additional components. Used mostly in case components is not a list of components.
 #' @param .ts,.pid,.delay,.line If supplied, these will overwrite those of the given component.
 #' @param .require_all If `TRUE`, returns only rows where all components to have been found according to their
-#' timestamps (even if their value is NA). If `.dont_require` is provided, `.require_all` is ignored.
+#'   timestamps (even if their value is NA). If `.dont_require` is provided, `.require_all` is ignored.
 #' @param .lim Maximum number of rows to return. This is imposed before the calculation of the formula.
 #' @param .dont_require If provided, causes formula to require all components (regardless of .require_all), except for
-#' those listed here.
+#'   those listed here.
 #' @param .cascaded If `TRUE` (default), each formula is computed in a separate, nested SELECT statement. This allows
-#' the result of the prior formula to be used in the following, at the potential cost of longer computation times.
+#'   the result of the prior formula to be used in the following, at the potential cost of longer computation times.
 #' @param .clip_sql If `TRUE`, instead of lazy table it returns the SQL query as a SQL object (can be converted to
-#' character using `as.character()`), and also copies it to the clipboard.  
+#'   character using `as.character()`), and also copies it to the clipboard.  
 #' @param .filter Character vector. Logical conditions to satisfy. These go into the SQL `WHERE`
-#' clause. Only rows satisfying all conditions provided will be returned.  
+#'   clause. Only rows satisfying all conditions provided will be returned.  
 #' @param .out_window Character vector. Names of components to not be included when calculating the window.  
 #' @return Lazy table with result of formula or formulas.
 calculate_formula <- function(components, fml = NULL, window = NA, export = NULL, add_components = NULL,
@@ -821,22 +836,6 @@ phea_plot <- function(board, pid, plot_title = NULL, exclude = NULL, verbose = N
   make_chart <- function(chart_item) {
     chart_data <- board_data |>
       select(ts, value = !!sym(chart_item))
-    
-    # Make step chart: add points at same Y but forward X up to the X of the next point. All angles are 90 degrees.
-    if(F) {
-      chart_data <- chart_data |>
-        dplyr::arrange(ts) |>
-        dplyr::mutate(line = row_number())
-      
-      chart_data <- union_all(
-        chart_data |>
-          dplyr::ungroup(),
-        chart_data |>
-          dplyr::mutate(ts = lead(ts)) |>
-          dplyr::ungroup()) |>
-        dplyr::arrange(ts, line)
-    }
-    #
     
     if(any(!is.na(chart_data$value)))
       range <- c(min(chart_data$value, na.rm = TRUE), max(chart_data$value, na.rm = TRUE))

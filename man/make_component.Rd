@@ -46,3 +46,6 @@ Creates a component from the given \code{input_source} record source and optiona
 record source, it is used. If it is a component, it is copied (including its record source) and other paremeters, if
 provided, overwrite existing ones.
 }
+\seealso{
+\code{\link[=make_record_source]{make_record_source()}} to create a record source.
+}

@@ -21,6 +21,9 @@ The names of the \code{args} objects are the names made available in the query.
 \examples{
 ```
 list(a = sqlt(person), b = sqlt(procedure)) |>
-  sqla('select person_id ', 'from a ', 'inner join b on a.person_id = b.person_id')
+  sqla('select person_id fr', 'om a inner jo', 'in b on a.person_id = b.person_id')
 ```
+}
+\seealso{
+\code{\link[=sqlt]{sqlt()}} to create lazy tables from SQL tables. \code{\link[=sql0]{sql0()}} to run arbitrary SQL.
 }
