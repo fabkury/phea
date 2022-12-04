@@ -112,7 +112,7 @@ diabetes <- sqlt(condition_occurrence) |>
     .ts = condition_start_datetime)
 ```
 
-#### Smoker?
+### Smoker?
 SNOMED 449868002 Smokes tobacco daily  
 OMOP CDM concept ID 42709996
 ```{r smoker}
@@ -123,7 +123,7 @@ smoker <- sqlt(observation) |>
     .ts = observation_datetime)
 ```
 
-### On Hypertension Treatment?
+### On hypertension treatment?
 **ATC codes:**  
 
  - C02 - Antihypertensives  
@@ -148,13 +148,13 @@ htt <- sqlt(drug_exposure) |>
     .ts = drug_exposure_start_datetime)
 ```
 
-#### _On a Statin?_  
+### _On a Statin?_  
 _[Not required]_
 
-#### _On Aspirin Therapy?_  
+### _On Aspirin Therapy?_  
 _[Not required]_
 
-#### Patient age  
+### Patient age  
 ```{r person}
 person <- sqlt(person) |>
   make_component(
@@ -423,17 +423,19 @@ ascvd = calculate_formula(
       
       age = 'extract(year from age(ts, person_birth_datetime))',
       
-      is_smoker = 'smoker_observation_datetime is null',
+      is_smoker = 'smoker_observation_datetime is not null',
       
-      has_diabetes = 'diabetes_condition_start_datetime is null',
+      has_diabetes = 'diabetes_condition_start_datetime is not null',
       
-      htt_sbp_dist = "case when htt_drug_exposure_start_datetime - sbp_measurement_datetime < interval '0'
+      # Calculate difference as positive number, regardless of which came first
+      htt_sbp_dist = "case when htt_drug_exposure_start_datetime < sbp_measurement_datetime
         then sbp_measurement_datetime - htt_drug_exposure_start_datetime
         else htt_drug_exposure_start_datetime - sbp_measurement_datetime end"
     ),
 
+    # SBP and HTT within 4 months of each other
     htt = "htt_drug_exposure_start_datetime is not null
-      and htt_sbp_dist < '4 months'", # SBP and HTT within 4 months of each other
+      and htt_sbp_dist < '4 months'",
     
     individual_sum = individual_sum,
     
@@ -443,7 +445,8 @@ ascvd = calculate_formula(
     
     calculated_risk = '(1 - baseline_survival) * exp(individual_sum - group_mean)',
     
-    estimated_risk = 'least(0.3, greatest(0.01, calculated_risk))' # Cap to 1%-30%.
+    # Cap to 1%-30%, as indicated by the paper
+    estimated_risk = 'least(0.3, greatest(0.01, calculated_risk))'
     ),
   
   .dont_require = c('smoker', 'htt', 'diabetes'),
@@ -498,7 +501,8 @@ message('Sampled patient: ', random_patient)
 
 And then we plot the chosen patient.  
 ```{r plot, out.width = '100%', out.height = 1400}
-ascvd |> select( # Let's NOT plot the columns below
+ascvd |> select(
+  # Let's NOT plot the columns below
     -ends_with('datetime'),
     -ends_with('concept_id'),
     -htt_sbp_dist,
@@ -515,7 +519,7 @@ To see the SQL query that computes the phenotype, use helper function `code_shot
 code_shot(ascvd)
 ```
 ```sql
-`r code_shot(ascvd)`
+`r code_shot(ascvd, clip = FALSE)`
 ```
 
 ### Author contact  
