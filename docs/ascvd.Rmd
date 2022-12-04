@@ -409,17 +409,8 @@ ascvd = calculate_formula(
     htt = htt,
     person = person),
   export = c(
-    'sbp_value_as_number',
-    # 'dbp_value_as_number',
-    'tc_value_as_number',
-    'hdl_value_as_number',
-    # 'ldl_value_as_number',
     'diabetes_condition_concept_id',
-    'diabetes_condition_start_datetime',
-    'smoker_observation_datetime',
-    'htt_drug_concept_id',
-    'htt_drug_exposure_start_datetime',
-    'person_birth_datetime'),
+    'htt_drug_concept_id'),
   fml = list(
     a = list(
       is_woman = 'person_gender_concept_id = 8532',
