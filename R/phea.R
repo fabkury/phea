@@ -1,10 +1,9 @@
 # Data ------------------------------------------------------------------------------------------------------------
-# TODO: Remove the if()?
 if(!exists('.pheaglobalenv'))
   .pheaglobalenv <- new.env(parent=emptyenv())
 
 
-# Keep row by -----------------------------------------------------------------------------------------------------
+# Keep row by & keep change of ------------------------------------------------------------------------------------
 #' Keep [first] row by [window function]
 #'
 #' Keeps the row containing the group-wise maximum or minimum.
@@ -37,7 +36,6 @@ keep_row_by <- function(lazy_tbl, by, partition, pick_last = FALSE) {
 }
 
 
-# Keep change of --------------------------------------------------------------------------------------------------
 keep_change_of <- function(lazy_tbl, of, partition = NULL, order = NULL) {
   lazy_tbl |>
     mutate(phea_kco_lag = dbplyr::win_over(sql(paste0('lag(', of, ')')),
@@ -147,16 +145,12 @@ sqlt <- function(table, schema = NULL) {
 #'
 #' @export
 #' @param ... Character strings to be concatenated with `paste0`.
-#' @param schema Optional. Name of schema to use. If not provided, will default to schema passed to `setup_phea()`.
 #' @seealso [sqlt()] to create lazy tables from SQL tables. [sqla()] to run arbitrary SQL with lazy tables.
 #' @return Lazy table corresponding to the query.
-sql0 <- function(..., schema = NULL) {
+sql0 <- function(...) {
   sql_txt <- paste0(...)
   
-  if(is.null(schema))
-    schema <- .pheaglobalenv$schema
-  
-  dplyr::tbl(schema,
+  dplyr::tbl(.pheaglobalenv$con,
     dplyr::sql(sql_txt))
 }
 

@@ -12,7 +12,7 @@ library(knitr)
 options(scipen = 5e5)
 knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
 source(paste0(Sys.getenv("HOME"), '/Estudo/Tecnologia/R/espinha/credenciais.R')) # contains cred$pg
-source(paste0(Sys.getenv("HOME"), '/Estudo/Tecnologia/R/wrap/wrap.R'))
+library(wrap)
 
 usn <- function(n, decimals = 0) {
   sapply(n, function(e) {
@@ -269,7 +269,7 @@ test_a_runs = list()
 ```
 
 Let's first run Test A with N = 1, that is, a single component.
-```{r test_a_1, results = 'hide'}
+```{r test_a_1, results = 'hide', message = FALSE}
 test_a_runs[[length(test_a_runs)+1]] <- run_test_a(1)
 ```
 
@@ -300,7 +300,7 @@ Here are the meanings of the columns:
 With N = 1 (a single component), Phea took `r test_a_runs[[1]]$phea_time` seconds to assemble the phenotype, and the SQL server took `r test_a_runs[[1]]$query_time` seconds to run the query. That is `r usn(test_a_runs[[1]]$rps_query)` input rows per second of query time.  
 
 ## Run N = 5  
-```{r test_a_5, results = 'hide'}
+```{r test_a_5, results = 'hide', message = FALSE}
 test_a_runs[[length(test_a_runs)+1]] <- run_test_a(5)
 
 print_test_a_results()
@@ -312,7 +312,7 @@ With N = 5 (five components), Phea took `r test_a_runs[[2]]$phea_time` sec to as
 
 ## Runs N = 10 to N = 150    
 Now that we have a grip on how Test A works, let's run it for N = 10 to 150, increasing 10 at a time.
-```{r test_a_10_150, results = 'hide'}
+```{r test_a_10_150, results = 'hide', message = FALSE}
 N <- 10
 N_max <- 150
 while(N <= N_max) {

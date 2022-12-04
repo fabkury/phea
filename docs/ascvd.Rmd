@@ -12,7 +12,7 @@ library(knitr)
 options(scipen = 5e5)
 knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
 source(paste0(Sys.getenv("HOME"), '/Estudo/Tecnologia/R/espinha/credenciais.R')) # contains cred$pg
-source(paste0(Sys.getenv("HOME"), '/Estudo/Tecnologia/R/wrap/wrap.R'))
+library(wrap)
 
 usn <- function(n, decimals = 0) {
   sapply(n, function(e) {
