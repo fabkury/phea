@@ -356,8 +356,8 @@ make_record_source <- function(records, rec_name = NULL, ts, pid, vars = NULL, .
 # Calculate formula -----------------------------------------------------------------------------------------------
 #' Calculate phenotype formula(s)
 #'
-#' Receives a list of components, and a formula in SQL language, and computes the result by gathering records according 
-#' to their timestamps.
+#' Receives a list of components, and a formula (or list of formulas) in SQL language, and computes the result by 
+#' gathering records according to their timestamps.
 #'
 #' The data type of the columns from the components (only those that are actually used or exported) cannot be Boolean.
 #'
@@ -377,8 +377,9 @@ make_record_source <- function(records, rec_name = NULL, ts, pid, vars = NULL, .
 #' the result of the prior formula to be used in the following, at the potential cost of longer computation times.
 #' @param .clip_sql If `TRUE`, instead of lazy table it returns the SQL query as a SQL object (can be converted to
 #' character using `as.character()`), and also copies it to the clipboard.  
-#' @param .filter Character string or list of strings. Logical conditions to satisfy. These go into the SQL `WHERE`
+#' @param .filter Character vector. Logical conditions to satisfy. These go into the SQL `WHERE`
 #' clause. Only rows satisfying all conditions provided will be returned.  
+#' @param .out_window Character vector. Names of components to not be included when calculating the window.  
 #' @return Lazy table with result of formula or formulas.
 calculate_formula <- function(components, fml = NULL, window = NA, export = NULL, add_components = NULL,
   .ts = NULL, .pid = NULL, .delay = NULL, .line = NULL, .require_all = FALSE, .lim = NA, .dont_require = NULL,
