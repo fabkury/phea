@@ -41,7 +41,7 @@ The **Atherosclerotic Cardiovascular Disease (ASCVD) Events** Risk Estimator+ (A
 To get a sense of what data goes into the score, see the [online calculator](https://tools.acc.org/ASCVD-Risk-Estimator-Plus/#!/calculate/estimate/) provided by the American College of Cardiology:  
 ![](C:/Users/Fab/Dropbox/PC/Documents/Estudo/Tecnologia/phea/phea/docs/img/ascvd_calculator.png){ width=100% }
 
-The mathematical formula for the score is a bit convoluted. I discuss that further down in this vignette.  
+The mathematical formula for the score is a bit convoluted. I discuss the formula further down in this vignette.  
 
 To compute this phenotype, we first prepare the components, then the formula parts, then we put it all together in a call to `calculate_formula()`.  
 

@@ -106,14 +106,14 @@ setup_phea <- function(connection, schema, .verbose = TRUE) {
 # SQL shorthands --------------------------------------------------------------------------------------------------
 #' SQL table
 #'
-#' Produces lazy table object of table `table` in the preconfigured schema.
+#' Produces lazy table object of `table` in the preconfigured default schema.
 #'
 #' This function is a shorthand for `select * from def_schema.table;`. `def_schema` is the schema passed to
 #' `setup_phea()` previously.
 #'
 #' @export
 #' @param table Unquoted name of the table to be accessed within `def_schema`.
-#' @param schema Optional. Name of schema to use. If not provided, will default to schema passed to `setup_phea()`.
+#' @param schema Optional. Name of schema to use. If provided, overrides `def_schema`.  
 #' @return Lazy table equal to `select * from def_schema.table;`.
 #' @examples
 #' `sqlt(person)`
@@ -160,7 +160,7 @@ sql0 <- function(..., schema = NULL) {
 #' @examples
 #' ```
 #' list(a = sqlt(person), b = sqlt(procedure)) |>
-#'   sqla('select person_id ', 'from a ', 'inner join b on a.person_id = b.person_id')
+#'   sqla('select person_id fr', 'om a inner jo', 'in b on a.person_id = b.person_id')
 #' ```
 sqla <- function(args, ...) {
   # Produces a dbplyr tbl object from arbitrary SQL.
