@@ -38,7 +38,7 @@ setup_phea(dbcon, 'cdm_new_york3')
 
 The **Atherosclerotic Cardiovascular Disease (ASCVD) Events** Risk Estimator+ (ASCVD Risk Estimator Plus, or ASCVD+ for short) is a score developed by the _American College of Cardiology/American Heart Association Task Force on Practice Guidelines_ for estimating the 10-year risk of said events. It was published in Nov. 12, 2013 on the journal Circulation. See  [https://doi.org/10.1161/01.cir.0000437741.48606.98](https://doi.org/10.1161/01.cir.0000437741.48606.98).  
 
-To get a sense of what data goes into the score, see the online [calculator provided by the American College of Cardiology](https://tools.acc.org/ASCVD-Risk-Estimator-Plus/#!/calculate/estimate/):  
+To get a sense of what data goes into the score, see the [online calculator](https://tools.acc.org/ASCVD-Risk-Estimator-Plus/#!/calculate/estimate/) provided by the American College of Cardiology:  
 ![](C:/Users/Fab/Dropbox/PC/Documents/Estudo/Tecnologia/phea/phea/docs/img/ascvd_calculator.png){ width=100% }
 
 The mathematical formula for the score is a bit convoluted. I discuss that further down in this vignette.  
@@ -533,5 +533,5 @@ Fabrício Kury
 `r format(Sys.time(), '%Y/%b/%d')`  
 Be always welcome to reach me at fab@kury.dev.  
 ```{r, include = FALSE}
-# DBI::dbDisconnect(dbcon)
+DBI::dbDisconnect(dbcon)
 ```
