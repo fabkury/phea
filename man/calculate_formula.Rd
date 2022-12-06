@@ -20,7 +20,8 @@ calculate_formula(
   .filter = NULL,
   .cascaded = TRUE,
   .clip_sql = FALSE,
-  .out_window = NULL
+  .out_window = NULL,
+  .dates = NULL
 )
 }
 \arguments{
@@ -53,6 +54,9 @@ the result of the prior formula to be used in the following, at the potential co
 character using \code{as.character()}), and also copies it to the clipboard.}
 
 \item{.out_window}{Character vector. Names of components to not be included when calculating the window.}
+
+\item{.dates}{Tibble. Column names must be \code{pid} (person ID) and \code{ts} (timestamp). If provided, these dates (for each
+person ID) are added to the board, so that the phenotype computation can be attempted at those times.}
 }
 \value{
 Lazy table with result of formula or formulas.

@@ -3,6 +3,7 @@
 export(calculate_formula)
 export(code_shot)
 export(head_shot)
+export(keep_change_of)
 export(keep_row_by)
 export(make_component)
 export(make_record_source)

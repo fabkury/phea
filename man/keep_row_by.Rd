@@ -2,7 +2,7 @@
 % Please edit documentation in R/phea.R
 \name{keep_row_by}
 \alias{keep_row_by}
-\title{Keep \link{first} row by \link{window function}}
+\title{Keep \link{first or last} row by \link{window function}}
 \usage{
 keep_row_by(lazy_tbl, by, partition, pick_last = FALSE)
 }

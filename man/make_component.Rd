@@ -13,8 +13,10 @@ make_component(
   .passthrough = FALSE,
   .ts = NULL,
   .pid = NULL,
-  .delay_fn = "last_value",
-  .ts_fn = NULL
+  .fn = NA,
+  .ts_fn = NULL,
+  ahead = NA,
+  up_to = NA
 )
 }
 \arguments{
