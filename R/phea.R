@@ -68,14 +68,49 @@ keep_row_by <- function(lazy_tbl, by, partition, pick_last = FALSE) {
 #' @param order Character. Optional. If provided, this or these column(s) will define the ordering of the rows and hence
 #' how changes are detected.
 #' @return Lazy table with only rows where `of` changes in comparison to the previous row.
-keep_change_of <- function(lazy_tbl, of, partition = NULL, order = NULL) {
+keep_change_of <- function(lazy_tbl, of, partition = NULL, order = NULL, con = NULL) {
+  if(is.null(con)) {
+    if(is.null(.pheaglobalenv$con))
+      stop('Connection must be provided or setup previously with setup_phea().')
+    else
+      con <- .pheaglobalenv$con
+  }
+  
+  if(!is.null(partition))
+    of <- c(partition, of)
+  
+  of_names <- paste0('phea_kco_var', seq(of))
+  
+  commands_a <- purrr::map2(of_names, of,
+    ~rlang::exprs(!!..1 := dplyr::sql(!!..2))) |>
+    unlist()
+  
+  lag_names <- paste0('phea_kco_lag', seq(of))
+  
+  lag_sql <- paste0('lag(', of_names, ')')
+  
+  commands_b <- purrr::map2(lag_names, lag_sql, ~rlang::exprs(
+    !!..1 := dbplyr::win_over(
+      sql(!!..2),
+      partition = partition,
+      order = order,
+      con = con))) |>
+    unlist()
+  
+  # Keep rows where either
+  # - prior row is different from current row
+  # - if there is no prior row, keep current row if current row is not NA
+  # - if all rows are NA, nothing will be in the output.
+  
+  commands_c <- paste0('(is.na(', lag_names, ') && !is.na(', of_names, ')) || ', lag_names, ' != ', of_names) |>
+    paste0(collapse = ' || ') |>
+    str2lang()
+  
   lazy_tbl |>
-    mutate(phea_kco_var = sql(of)) |>
-    mutate(
-      phea_kco_lag = dbplyr::win_over(sql('lag(phea_kco_var)'),
-        partition = partition, order = order, con = .pheaglobalenv$con)) |>
-    filter(is.na(phea_kco_lag) || phea_kco_lag != phea_kco_var) |>
-    select(-phea_kco_var, -phea_kco_lag)
+    mutate(!!!commands_a) |>
+    mutate(!!!commands_b) |>
+    filter(!!commands_c) |>
+    select(-all_of(lag_names), -all_of(of_names))
 }
 
 
@@ -314,7 +349,7 @@ make_component <- function(input_source, line = NA, delay = NA, window = NA, rec
   if(!is.null(.ts_fn))
     component$ts_fn <- .ts_fn
   else
-    component$ts_fn <- component$fn
+    component$ts_fn <- 'last_value' # component$fn
   
   attr(component, 'phea') <- 'component'
 
@@ -424,10 +459,12 @@ make_record_source <- function(records, rec_name = NULL, ts, pid, vars = NULL, .
 #' @param .out_window Character vector. Names of components to not be included when calculating the window.
 #' @param .dates Tibble. Column names must be `pid` (person ID) and `ts` (timestamp). If provided, these dates (for each
 #' person ID) are added to the board, so that the phenotype computation can be attempted at those times.
+#' @param .kco Logical. If `TRUE` (default), output will include only rows where the result of any of the formulas
+#' change. If `FALSE`, all dates from the components will be present.
 #' @return Lazy table with result of formula or formulas.
 calculate_formula <- function(components, fml = NULL, window = NA, export = NULL, add_components = NULL,
   .ts = NULL, .pid = NULL, .delay = NULL, .line = NULL, .require_all = FALSE, .lim = NA, .dont_require = NULL,
-  .filter = NULL, .cascaded = TRUE, .clip_sql = FALSE, .out_window = NULL, .dates = NULL, .kco = FALSE) {
+  .filter = NULL, .cascaded = TRUE, .clip_sql = FALSE, .out_window = NULL, .dates = NULL, .kco = TRUE) {
 # Prepare ---------------------------------------------------------------------------------------------------------
   # TODO: Improve the logic regarding these two variables below.
   keep_names_unchanged <- FALSE
@@ -863,14 +900,21 @@ calculate_formula <- function(components, fml = NULL, window = NA, export = NULL
   }
 
 # Collapse SQL and return -----------------------------------------------------------------------------------------
-  if(.kco) {
-    browser()
+  # Keep change of, if requested.
+  if(class(.kco) == 'logical') {
+    if(length(.kco) > 1)
+      stop('If logical, .kco must be of length 1.')
+    
+    if(.kco)
+      board <- board |>
+        keep_change_of(res_vars, partition = 'pid', order = 'ts')
+  } else {
+    if(class(.kco) != 'character')
+      stop('.kco must be logical or character vector.')
+    
     board <- board |>
-      keep_change_of(res_vars[length(res_vars)],
-        partition = 'pid', order = 'ts')
-    browser()
+      keep_change_of(.kco, partition = 'pid', order = 'ts')
   }
-  
   
   # Calling collapse() is necessary to minimize the accumulation of "lazy table generating code". That accumulation
   # can produce error "C stack usage is too close to the limit", especially when compounding phenotypes (i.e. using 
