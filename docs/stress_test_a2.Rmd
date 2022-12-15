@@ -1,0 +1,417 @@
+---
+title: "Stress-testing Phea, test A2"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Stress testing2}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+  _This vignette assumes a SQL server at `localhost` (we use PostgreSQL), with data in OMOP Common Data Model v5.4 format in schema `cdm_new_york3`. The patient records shown in this example are synthetic data from [Synthea(TM) Patient Generator](https://github.com/synthetichealth/synthea)._  
+```{r, results = 'hide', include = FALSE}
+library(knitr)
+options(scipen = 5e5)
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
+source(paste0(Sys.getenv("HOME"), '/Estudo/Tecnologia/R/espinha/credenciais.R')) # contains cred$pg
+library(wrap)
+
+usn <- function(n, decimals = 0) {
+  sapply(n, function(e) {
+    if(is.na(e))
+      return(e)
+    # usn()'s decimals behave like round()'s digits, but comma()'s precision is different.
+    scales::comma(e, 10^(-decimals))
+  })
+}
+```
+```{r setup, message = FALSE}
+library(phea)
+library(dplyr)
+
+# Connect to SQL server.
+dbcon <- DBI::dbConnect(RPostgres::Postgres(),
+  host = 'localhost', port = 7654, dbname = 'fort',
+  user = cred$pg$user, password = cred$pg$pass)
+
+# Call setup_phea so we can use sqlt() and sql0().
+setup_phea(dbcon, 'cdm_new_york3')
+```
+
+How complex can a phenotype be in [Phea](https://github.com/fabkury/phea)? And how does performance change as you increase the complexity? Do the queries ever become **too complex**?  
+
+Especifically, we talk about two dimensions of complexity:
+
+> A. How many components you can put into one formula.  
+> B. How many _consecutive_ times can you repeat this: compute a formula, use its results as a component inside another formula.  
+ 
+In this vignette we will stress-test Phea in dimension A. We are calling this _stress test A_: 
+
+ a. Compute formulas with 1 to 150 components, each coming from a different SQL query.  
+ 
+The phenotype we will compute here is not relevant. We just want to test Phea!  
+
+## TL;DR
+These are this vignette's takeaways:
+
+ - The time Phea needs for assembling the query is negligible in practice. What matters is query execution time.  
+ - The number of input rows processed per second (of query time) decreases as the number of components increase.  
+ - Query time increases at sub-exponential rate with the number of components and of input rows.  
+
+## The dataset
+We will be using table `MEASUREMENT` from `cdm_new_york3`. For context, let us measure the size of that table.  
+
+```{r size_stats_noeval, eval = FALSE}
+size_stats <- sqlt(measurement) |>
+  group_by() |>
+  summarise(
+    rows = n(),
+    patients = n_distinct(person_id)) |>
+  collect()
+
+measurement_summary <- sql0('
+    select measurement_concept_id as concept_id, concept_code, concept_name, vocabulary_id,
+      count(*) as records, count(distinct person_id) as patients
+    from cdm_new_york3.measurement a
+    inner join cdm_new_york3.concept b
+    on a.measurement_concept_id = b.concept_id
+    group by measurement_concept_id, concept_code, concept_name, vocabulary_id
+    order by patients desc, records desc
+  ') |>
+  collect()
+```
+
+```{r size_stats, echo = FALSE, results = 'hide', message = FALSE}
+size_stats <- sqlt(measurement) |>
+  group_by() |>
+  summarise(
+    rows = n(),
+    patients = n_distinct(person_id)) |>
+  collect()
+
+wrap(measurement_summary, {
+  sql0('
+    select measurement_concept_id as concept_id, concept_code, concept_name, vocabulary_id,
+      count(*) as records, count(distinct person_id) as patients
+    from cdm_new_york3.measurement a
+    inner join cdm_new_york3.concept b
+    on a.measurement_concept_id = b.concept_id
+    group by measurement_concept_id, concept_code, concept_name, vocabulary_id
+    order by patients desc, records desc') |>
+  collect()
+})
+```
+
+`MEASUREMENT` has **`r usn(as.numeric(size_stats$rows))` rows** and **`r usn(as.numeric(size_stats$patients))` patients**. Let's see the most popular concepts in it.  
+```{r measurement_summary_peek}
+head(measurement_summary, 10) |>
+  kable()
+```
+
+That is the data we will use to benchmark Phea. Each component will be exactly like this:  
+```sql
+SELECT *
+FROM cdm_new_york3.measurement
+WHERE measurement_concept_id = [chosen concept]
+```
+In other words, each component uses a different `measurement_concept_id`, from the summary table, to `SELECT` from `MEASUREMENT`.  
+  
+We will be picking rows (concepts) from the summary table starting from the first, so, to reduce bias, let us shuffle them.  
+```{r}
+# Shuffle the rows
+set.seed(42)
+measurement_summary <- measurement_summary[sample(1:nrow(measurement_summary)),]
+```
+
+## Computer used to run this test
+This was the machine used to execute this test:  
+
+> Processor	Intel(R) Core(TM) i7-10750H CPU @ 2.60GHz   2.59 GHz  
+> Installed RAM	64.0 GB (63.8 GB usable)  
+> System type	64-bit operating system, x64-based processor  
+
+## Formula used for testing
+For each run of test A, we will pick N concepts, build a component for each (C<sub>1</sub> to C<sub>n</sub>), and compute the following formula:  
+
+> **test_a = C<sub>1</sub><sup>value_as_number</sup> + C<sub>2</sub><sup>value_as_number</sup> + C<sub>2</sub><sup>value_as_number</sup> + ... + C<sub>n</sub><sup>value_as_number</sup>**
+
+In other words, we will just add up the `value_as_number` of each component.  
+
+We do not want to put a `NULL` into that sum, because it would cause the entire result to permanently collapse to `NULL`. This is because any number plus `NULL` equals to `NULL`. To circumvent that, we will use function `coalesce()`. If a component C<sub>x</sub> is `NULL`, the number `0` will be used instead. So the actual formula we'll use is:  
+
+> **test_a = coalesce(C<sub>1</sub><sup>value_as_number</sup>, 0) + coalesce(C<sub>2</sub><sup>value_as_number</sup>, 0) + coalesce(C<sub>2</sub><sup>value_as_number</sup>, 0) + ... + coalesce(C<sub>n</sub><sup>value_as_number</sup>, 0)**  
+
+From the finalized phenotype, we will just count the rows, unique patients, and sum the result across patients. This is just to force the SQL server to compute the phenotype entirely, for all patients, so we can measure how long it takes.  
+
+In each run, we use library `tictoc` to measure the time spent.    
+
+```{r}
+library(tictoc)
+```
+
+## Functions used for the test
+Function `produce_N_components(N)` produces `N` components using the first `N` rows of `measurement_summary`.  
+```{r}
+produce_N_components <- function(N) {
+  make_test_component <- function(i) {
+    concept_id <- measurement_summary$concept_id[i]
+    records <- sqlt(measurement) |>
+      filter(measurement_concept_id == local(concept_id))
+    component <- make_component(records,
+      .ts = measurement_datetime,
+      .pid = person_id)
+    return(component)
+  }
+  # Pick the first N lab tests
+  components <- lapply(1:N, make_test_component)
+  
+  # Their names will be simply "C<sub>n</sub>"
+  names(components) <- paste0('c', 1:length(components))
+  
+  return(components)
+}
+```
+
+Function `run_test_a(N)` runs Test A using `N` components.  
+```{r}
+run_test_a <- function(N) {
+  wrap(paste0('test_a2_N', N), by_name = TRUE, pass_val = TRUE, {
+    components <- produce_N_components(N)
+    
+    formula_string <- paste0('coalesce(', names(components), '_value_as_number, 0)', collapse = ' + ')
+  
+    tic()
+    phen <- calculate_formula(
+      components = components,
+      fml = list(test_a = formula_string)) |>
+      keep_change_of('test_a', partition = 'pid', order = 'ts')
+    phea_time <- toc(quiet = TRUE)
+    phea_time <- phea_time$toc - phea_time$tic
+    tic()
+    
+    result <- phen |>
+      group_by() |>
+      summarise(
+        rows = n(),
+        patients = n_distinct(pid),
+        test_a_sum = sum(test_a/100000, na.rm = TRUE)) |>
+      collect()
+    query_time <- toc(quiet = TRUE)
+    query_time <- query_time$toc - query_time$tic
+    
+    result_rows <- result$rows
+    result_patients <- result$patients
+    test_a_sum <- result$test_a_sum
+    
+    # Compute component stats
+    input_rows <- lapply(components, \(x) summarise(x$rec_source$records, rows = n()) |> pull('rows')) |>
+      purrr::reduce(`+`)
+    
+    input_patients <- lapply(components, \(x) select(x$rec_source$records, person_id)) |>
+      purrr::reduce(union_all) |>
+      summarise(patients = n_distinct(person_id)) |>
+      pull('patients')
+    
+    phen_head <- head(phen, 5) |> collect()
+    
+    res <- tibble(
+      N = N,
+      
+      input_rows = input_rows,
+      result_rows = result_rows,
+      test_a_sum = test_a_sum,
+      
+      input_patients = input_patients,
+      result_patients = result_patients,
+      
+      phea_time = phea_time,
+      query_time = query_time,
+      
+      pps_query = input_patients/query_time,
+      rps_query = input_rows/query_time,
+      
+      phen_head = list(phen_head)
+    )
+    
+    return(res)
+  })
+}
+
+```
+
+Function `print_test_a_results()` will also be used. For brevity it is not printed here. You can see it by downloading the markdown file `stress_test_a.Rmd`.  
+```{r, echo = FALSE}
+print_test_a_results <- function() {
+  lapply(test_a_runs, \(x) select(x, -phen_head)) |>
+    bind_rows() |>
+    mutate(
+      test_a_sum = round(test_a_sum, 1),
+      pps_query = round(pps_query, 1),
+      rps_query = round(rps_query, 1),
+      phea_time = round(phea_time, 1),
+      query_time = round(query_time, 1),
+      input_rows = paste0(round(input_rows/1000, 1), 'k'),
+      result_rows = paste0(round(result_rows/1000, 1), 'k'),
+      rps_query = paste0(round(rps_query/1000, 1), 'k')) |>
+    rename(
+      `in. rows` = input_rows,
+      `res. rows` = result_rows,
+      `in. patients` = input_patients,
+      `res. patients` = result_patients,
+      `Phea time (s)` = phea_time,
+      `query time (s)` = query_time,
+      `query pps` = pps_query,
+      `query rps` = rps_query) |>
+    kable()
+}
+```
+
+## Run N = 1  
+```{r}
+test_a_runs = list()
+```
+
+Let's first run Test A with N = 1, that is, a single component.
+```{r test_a_1, results = 'hide', message = FALSE}
+test_a_runs[[length(test_a_runs)+1]] <- run_test_a(1)
+```
+
+Done! Now let us briefly peek at the results of the phenotype itself.  
+```{r test_a_1_peek}
+test_a_runs[[length(test_a_runs)]]$phen_head[[1]] |>
+  kable()
+```
+Column `test_a` is the result of the formula, i.e. the sum of the components. As it appears, there are many NAs in `value_as_number` in our table `MEASUREMENT`, but that is not an issue.  
+  
+How was the performance? Let's see.  
+```{r}
+print_test_a_results()
+```
+Here are the meanings of the columns:  
+
+ - **N**: Number of components included in the run.  
+ - **in. rows**: Total number of rows in the record sources provided to `calculate_formula()`.	 
+ - **res. rows**: Total number of rows in the phenotype returned by `calculate_formula()`.  
+ - **test_a_sum**: Sum of the result of the formula across all patients.  
+ - **in. patients**: Number of patients in the record sources.    
+ - **res. patients**: Number of patients in the resulting phenotype.   
+ - **Phea time**: Time spent by `calculate_formula()`, in seconds.  
+ - **query time**: Time spent to run (`collect()`) the phenotype (aggregated), in seconds.   
+ - **query pps**: Input patients processed per second of query time.  
+ - **query rps**: Input rows processed per second of query time.  
+
+With N = 1 (a single component), Phea took `r test_a_runs[[1]]$phea_time` seconds to assemble the phenotype, and the SQL server took `r test_a_runs[[1]]$query_time` seconds to run the query. That is `r usn(test_a_runs[[1]]$rps_query)` input rows per second of query time.  
+
+## Run N = 5  
+```{r test_a_5, results = 'hide', message = FALSE}
+test_a_runs[[length(test_a_runs)+1]] <- run_test_a(5)
+
+print_test_a_results()
+```
+```{r, echo = FALSE}
+print_test_a_results()
+```
+With N = 5 (five components), Phea took `r test_a_runs[[2]]$phea_time` sec to assemble the phenotype, and the SQL server took `r test_a_runs[[2]]$query_time` sec to run the query. That is `r usn(test_a_runs[[2]]$rps_query)` input rows per second of query time.  
+
+## Runs N = 10 to N = 150    
+Now that we have a grip on how Test A works, let's run it for N = 10 to 150, increasing 10 at a time.
+```{r test_a_10_150, results = 'hide', message = FALSE}
+N <- 10
+N_max <- 90 #150
+while(N <= N_max) {
+  test_a_runs[[length(test_a_runs)+1]] <- run_test_a(N)
+  N <- N + 10
+}
+```
+
+## Test A results
+```{r}
+print_test_a_results()
+```
+
+That is a lot of numbers. Let us do some plots. **For brevity, the code that makes the plots is hidden. Please download `stress_test_a.Rmd` from GitHub if you'd like to see it.**  
+
+```{r, test_a_plot_1, results = 'hide', message = FALSE}
+library(plotly)
+```
+```{r, echo = FALSE}
+test_a_stats <- lapply(test_a_runs, \(x) select(x, -phen_head)) |>
+  bind_rows()
+```
+
+```{r, out.width="100%", out.height = 300, echo = FALSE}
+test_a_stats |>
+  plot_ly(
+    x = ~N,
+    y = ~round(query_time, 1),
+    name = 'query time (s)',
+    type = 'scatter',
+    mode = 'lines+markers') |>
+  layout(
+    title = "Query time X number of components",
+    dragmode = 'pan',
+    legend = list(orientation = 'h'),
+    xaxis = list(
+      title = 'Components'),
+    yaxis = list(
+      title = "Query time (seconds, log10)",
+      type = "log"))
+```
+As we increase the number of components, the query time increases at sub-exponential rate (exponential growth would be a straight line).  
+  
+  
+
+```{r, out.width="100%", out.height = 300, echo = FALSE}
+test_a_stats |>
+  plot_ly(
+    x = ~input_rows,
+    y = ~round(query_time, 1),
+    name = 'query time (s)',
+    type = 'scatter',
+    mode = 'lines+markers') |>
+  layout(
+    title = "Query time X input rows",
+    dragmode = 'pan',
+    legend = list(orientation = 'h'),
+    xaxis = list(
+      title = 'Input rows'),
+    yaxis = list(
+      title = "Query time (seconds, log10)",
+      type = "log"))
+```
+Same as before: as we increase the number of input rows (and number of components), the query time increases at sub-exponential rate.  
+  
+  
+
+```{r, out.width="100%", out.height = 300, echo = FALSE}
+test_a_stats |>
+  plot_ly(
+    x = ~N,
+    y = ~round(rps_query, 1),
+    name = 'rows per second',
+    type = 'scatter',
+    mode = 'lines+markers') |>
+  layout(
+    title = "Input rows per second X components",
+    dragmode = 'pan',
+    legend = list(orientation = 'h'),
+    xaxis = list(
+      title = 'Components'),
+    yaxis = list(
+      title = "Input rows per second"))
+```
+As we increase the number of components, less rows per second are computed, because each row takes longer. This is on top of the fact that, the more components you add, the more input rows, because each component is coming from a different SQL query (in Phea's parlance, a different _record source_). Nevertheless, these two factors are not enough to cause exponential growth of query time. The _rate_ of growth in query time, with respect to the number of rows or components, tapers off as N increases.     
+  
+  
+
+**Takeaways from the results:**  
+
+ - The time Phea needs for assembling the query is negligible in practice.  
+ - The number of input rows processed per second decreases as the number of components increase.  
+ - Query time increases at sub-exponential rate with number of components and number of input rows.  
+
+### Author contact  
+Fabrício Kury  
+`r format(Sys.time(), '%Y/%b/%d')`  
+Be always welcome to reach me at fab@kury.dev.  
+```{r, include = FALSE}
+DBI::dbDisconnect(dbcon)
+```

@@ -71,8 +71,9 @@ keep_row_by <- function(lazy_tbl, by, partition, pick_last = FALSE) {
 keep_change_of <- function(lazy_tbl, of, partition = NULL, order = NULL) {
   lazy_tbl |>
     mutate(phea_kco_var = sql(of)) |>
-    mutate(phea_kco_lag = dbplyr::win_over(sql('lag(phea_kco_var)'),
-      partition = partition, order = order, con = .pheaglobalenv$con)) |>
+    mutate(
+      phea_kco_lag = dbplyr::win_over(sql('lag(phea_kco_var)'),
+        partition = partition, order = order, con = .pheaglobalenv$con)) |>
     filter(is.na(phea_kco_lag) || phea_kco_lag != phea_kco_var) |>
     select(-phea_kco_var, -phea_kco_lag)
 }
@@ -243,9 +244,9 @@ make_component <- function(input_source, line = NA, delay = NA, window = NA, rec
   ahead = NA, up_to = NA) {
   component <- list()
 
-  if((!is.na(ahead) || !is.na(up_to)) && (!is.na(delay) || !is.na(window))) {
-    stop('Cannot utilize ahead/up_to together with delay/window.')
-  }
+  # if((!is.na(ahead) || !is.na(up_to)) && (!is.na(delay) || !is.na(window))) {
+  #   stop('Cannot utilize ahead/up_to together with delay/window.')
+  # }
   
   if(isTRUE(attr(input_source, 'phea') == 'component')) {
     # rec_source is actually a component.
@@ -426,7 +427,7 @@ make_record_source <- function(records, rec_name = NULL, ts, pid, vars = NULL, .
 #' @return Lazy table with result of formula or formulas.
 calculate_formula <- function(components, fml = NULL, window = NA, export = NULL, add_components = NULL,
   .ts = NULL, .pid = NULL, .delay = NULL, .line = NULL, .require_all = FALSE, .lim = NA, .dont_require = NULL,
-  .filter = NULL, .cascaded = TRUE, .clip_sql = FALSE, .out_window = NULL, .dates = NULL) {
+  .filter = NULL, .cascaded = TRUE, .clip_sql = FALSE, .out_window = NULL, .dates = NULL, .kco = FALSE) {
 # Prepare ---------------------------------------------------------------------------------------------------------
   # TODO: Improve the logic regarding these two variables below.
   keep_names_unchanged <- FALSE
@@ -679,12 +680,21 @@ calculate_formula <- function(components, fml = NULL, window = NA, export = NULL
         
         sql_start <- paste0(use_fn, '(', columns_sql, ') over (', over_clause, ' ')
         
-        sql_txts <- paste0(sql_start, 'range between ',
-          ifelse(is.na(component$comp_window) || component$comp_window == -Inf, 'unbounded',
-            paste0('\'', component$comp_window, '\'::interval')), ' preceding ',
-          'and ', ifelse(is.na(component$delay), 'current row',
-            paste0('\'', component$delay, ' days\'::interval preceding')),
-          ')')
+        if(is.na(component$up_to)) {
+          sql_txts <- paste0(sql_start, 'range between ',
+            ifelse(is.na(component$comp_window) || component$comp_window == -Inf, 'unbounded',
+              paste0('\'', component$comp_window, '\'::interval')), ' preceding ',
+            'and ', ifelse(is.na(component$delay), 'current row',
+              paste0('\'', component$delay, ' days\'::interval preceding')),
+            ')')
+        } else {
+          sql_txts <- paste0(sql_start, 'range between ',
+            ifelse(is.na(component$comp_window) || component$comp_window == -Inf, 'unbounded',
+              paste0('\'', component$comp_window, '\'::interval')), ' preceding ',
+            'and ', ifelse(component$up_to == Inf, 'unbounded',
+              paste0('\'', component$up_to, '\'::interval')),
+            ' following)')
+        }
       } else {
         # Otherwise, produce access via *ahead/up_to*.
         if(is.na(component$ahead) && is.na(component$up_to)) {
@@ -853,6 +863,15 @@ calculate_formula <- function(components, fml = NULL, window = NA, export = NULL
   }
 
 # Collapse SQL and return -----------------------------------------------------------------------------------------
+  if(.kco) {
+    browser()
+    board <- board |>
+      keep_change_of(res_vars[length(res_vars)],
+        partition = 'pid', order = 'ts')
+    browser()
+  }
+  
+  
   # Calling collapse() is necessary to minimize the accumulation of "lazy table generating code". That accumulation
   # can produce error "C stack usage is too close to the limit", especially when compounding phenotypes (i.e. using 
   # phenotypes as components of other phenotypes). See https://github.com/tidyverse/dbplyr/issues/719. Thanks, mgirlich!
