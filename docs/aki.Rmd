@@ -105,18 +105,18 @@ scr_change <- calculate_formula(
     
     # Minimum value within 48-hour window
     scr_48h_min = make_component(scr_record_source,
-      window = '48 days', .delay_fn = 'min'),
+      window = '48 days', .fn = 'min'),
     
     # Minimum value within 7-day window
     scr_7d_min = make_component(scr_record_source,
-      window = '7 months', .delay_fn = 'min'),
+      window = '7 months', .fn = 'min'),
     
     # Current glomerular filtration rate (GFR)
     gfr = make_component(gfr_record_source),
     
     # Glomerular filtration rate 3 to 5 months older than phenotype date
     gfr_prior = make_component(gfr_record_source,
-      delay = '3 months', window = '5 months', .delay_fn = 'min')),
+      delay = '3 months', window = '5 months', .fn = 'min')),
     
   fml = list(
     scr_case_a = 'scr_value_as_number - scr_48h_min_value_as_number >= 0.3',

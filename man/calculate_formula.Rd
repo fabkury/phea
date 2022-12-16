@@ -21,7 +21,8 @@ calculate_formula(
   .cascaded = TRUE,
   .clip_sql = FALSE,
   .out_window = NULL,
-  .dates = NULL
+  .dates = NULL,
+  .kco = TRUE
 )
 }
 \arguments{
@@ -57,6 +58,12 @@ character using \code{as.character()}), and also copies it to the clipboard.}
 
 \item{.dates}{Tibble. Column names must be \code{pid} (person ID) and \code{ts} (timestamp). If provided, these dates (for each
 person ID) are added to the board, so that the phenotype computation can be attempted at those times.}
+
+\item{.kco}{Logical. "Keep change of". This is a shorthand to call \code{keep_change_of()} after computing the phenotype.
+If \code{TRUE} (default), output will include only rows where the result of any of the formulas change. If \code{FALSE},
+\code{keep_change_of()} is not called and therefore all dates from every component will be present. This argument can also
+be a character vector of names of columns and/or SQL expressions. In that case, \code{calculate_formula()} will output
+only rows where the value of those columns or expressions change.}
 }
 \value{
 Lazy table with result of formula or formulas.

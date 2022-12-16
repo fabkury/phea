@@ -63,7 +63,8 @@ keep_row_by <- function(lazy_tbl, by, partition, pick_last = FALSE) {
 #'
 #' @export
 #' @param lazy_tbl Lazy table to be filtered.
-#' @param of Character. Column or SQL expression. Only rows where `of` changes are kept.
+#' @param of Character vector. Name of column(s) or SQL expression(s). Only rows where the value of `of` changes are
+#' kept. If multiple columns or expressions are provided, a change in any of them causes the row to be in the output.
 #' @param partition Character. Optional. Variable or variables to define the partition.
 #' @param order Character. Optional. If provided, this or these column(s) will define the ordering of the rows and hence
 #' how changes are detected.
@@ -459,8 +460,11 @@ make_record_source <- function(records, rec_name = NULL, ts, pid, vars = NULL, .
 #' @param .out_window Character vector. Names of components to not be included when calculating the window.
 #' @param .dates Tibble. Column names must be `pid` (person ID) and `ts` (timestamp). If provided, these dates (for each
 #' person ID) are added to the board, so that the phenotype computation can be attempted at those times.
-#' @param .kco Logical. If `TRUE` (default), output will include only rows where the result of any of the formulas
-#' change. If `FALSE`, all dates from the components will be present.
+#' @param .kco Logical. "Keep change of". This is a shorthand to call `keep_change_of()` after computing the phenotype.
+#' If `TRUE` (default), output will include only rows where the result of any of the formulas change. If `FALSE`,
+#' `keep_change_of()` is not called and therefore all dates from every component will be present. This argument can also
+#' be a character vector of names of columns and/or SQL expressions. In that case, `calculate_formula()` will output
+#' only rows where the value of those columns or expressions change.
 #' @return Lazy table with result of formula or formulas.
 calculate_formula <- function(components, fml = NULL, window = NA, export = NULL, add_components = NULL,
   .ts = NULL, .pid = NULL, .delay = NULL, .line = NULL, .require_all = FALSE, .lim = NA, .dont_require = NULL,
