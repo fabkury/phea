@@ -316,29 +316,31 @@ document.addEventListener('DOMContentLoaded', function(e) {
       document.body.style.height = "100%";
       document.documentElement.style.width = "100%";
       document.documentElement.style.height = "100%";
-      if (cel) {
-        cel.style.position = "absolute";
-        var pad = unpackPadding(sizing.padding);
-        cel.style.top = pad.top + "px";
-        cel.style.right = pad.right + "px";
-        cel.style.bottom = pad.bottom + "px";
-        cel.style.left = pad.left + "px";
-        el.style.width = "100%";
-        el.style.height = "100%";
-      }
+      cel.style.position = "absolute";
+      var pad = unpackPadding(sizing.padding);
+      cel.style.top = pad.top + "px";
+      cel.style.right = pad.right + "px";
+      cel.style.bottom = pad.bottom + "px";
+      cel.style.left = pad.left + "px";
+      el.style.width = "100%";
+      el.style.height = "100%";
+
+      var rect = cel.getBoundingClientRect();
 
       return {
-        getWidth: function() { return cel.offsetWidth; },
-        getHeight: function() { return cel.offsetHeight; }
+        getWidth: function() { return rect.width; },
+        getHeight: function() { return rect.height; }
       };
 
     } else {
       el.style.width = px(sizing.width);
       el.style.height = px(sizing.height);
 
+      var rect = cel.getBoundingClientRect();
+
       return {
-        getWidth: function() { return el.offsetWidth; },
-        getHeight: function() { return el.offsetHeight; }
+        getWidth: function() { return rect.width; },
+        getHeight: function() { return rect.height; }
       };
     }
   }
@@ -562,8 +564,8 @@ document.addEventListener('DOMContentLoaded', function(e) {
 
           elementData(el, "initialized", true);
           if (bindingDef.initialize) {
-            var result = bindingDef.initialize(el, el.offsetWidth,
-              el.offsetHeight);
+            var rect = el.getBoundingClientRect();
+            var result = bindingDef.initialize(el, rect.width, rect.height);
             elementData(el, "init_result", result);
           }
         }
@@ -605,29 +607,30 @@ document.addEventListener('DOMContentLoaded', function(e) {
       forEach(matches, function(el) {
         var sizeObj = initSizing(el, binding);
 
+        var getSize = function(el) {
+          if (sizeObj) {
+            return {w: sizeObj.getWidth(), h: sizeObj.getHeight()}
+          } else {
+            var rect = el.getBoundingClientRect();
+            return {w: rect.width, h: rect.height}
+          }
+        };
+
         if (hasClass(el, "html-widget-static-bound"))
           return;
         el.className = el.className + " html-widget-static-bound";
 
         var initResult;
         if (binding.initialize) {
-          initResult = binding.initialize(el,
-            sizeObj ? sizeObj.getWidth() : el.offsetWidth,
-            sizeObj ? sizeObj.getHeight() : el.offsetHeight
-          );
+          var size = getSize(el);
+          initResult = binding.initialize(el, size.w, size.h);
           elementData(el, "init_result", initResult);
         }
 
         if (binding.resize) {
-          var lastSize = {
-            w: sizeObj ? sizeObj.getWidth() : el.offsetWidth,
-            h: sizeObj ? sizeObj.getHeight() : el.offsetHeight
-          };
+          var lastSize = getSize(el);
           var resizeHandler = function(e) {
-            var size = {
-              w: sizeObj ? sizeObj.getWidth() : el.offsetWidth,
-              h: sizeObj ? sizeObj.getHeight() : el.offsetHeight
-            };
+            var size = getSize(el);
             if (size.w === 0 && size.h === 0)
               return;
             if (size.w === lastSize.w && size.h === lastSize.h)
@@ -929,7 +932,6 @@ document.addEventListener('DOMContentLoaded', function(e) {
     return result;
   }
 })();
-
 </script>
 <script>
 HTMLWidgets.widget({
@@ -3053,16 +3055,16 @@ the code that makes the plots is hidden. Please download
 <code>stress_test_a.Rmd</code> from GitHub if you’d like to see
 it.</strong></p>
 <div class="sourceCode" id="cb16"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(plotly)</span></code></pre></div>
-<div id="htmlwidget-61d61051d2ad105d49a4" style="width:100%;height:300px;" class="plotly html-widget"></div>
-<script type="application/json" data-for="htmlwidget-61d61051d2ad105d49a4">{"x":{"visdat":{"66c7bd44a25":["function () ","plotlyVisDat"]},"cur_data":"66c7bd44a25","attrs":{"66c7bd44a25":{"x":{},"y":{},"mode":"lines+markers","name":"query time (s)","alpha_stroke":1,"sizes":[10,100],"spans":[1,20],"type":"scatter"}},"layout":{"margin":{"b":40,"l":60,"t":25,"r":10},"title":"Query time X number of components","dragmode":"pan","legend":{"orientation":"h"},"xaxis":{"domain":[0,1],"automargin":true,"title":"Components"},"yaxis":{"domain":[0,1],"automargin":true,"title":"Query time (seconds, log10)","type":"log"},"hovermode":"closest","showlegend":false},"source":"A","config":{"modeBarButtonsToAdd":["hoverclosest","hovercompare"],"showSendToCloud":false},"data":[{"x":[1,5,10,20,30,40,50,60,70,80,90,100,110,120,130,140,150],"y":[0.8,4.4,10.1,33.4,121.9,234.7,348.4,612.9,1275.4,1570.2,2017.3,2383,3477.5,5483.3,7381.4,9472.8,11618.8],"mode":"lines+markers","name":"query time (s)","type":"scatter","marker":{"color":"rgba(31,119,180,1)","line":{"color":"rgba(31,119,180,1)"}},"error_y":{"color":"rgba(31,119,180,1)"},"error_x":{"color":"rgba(31,119,180,1)"},"line":{"color":"rgba(31,119,180,1)"},"xaxis":"x","yaxis":"y","frame":null}],"highlight":{"on":"plotly_click","persistent":false,"dynamic":false,"selectize":false,"opacityDim":0.2,"selected":{"opacity":1},"debounce":0},"shinyEvents":["plotly_hover","plotly_click","plotly_selected","plotly_relayout","plotly_brushed","plotly_brushing","plotly_clickannotation","plotly_doubleclick","plotly_deselect","plotly_afterplot","plotly_sunburstclick"],"base_url":"https://plot.ly"},"evals":[],"jsHooks":[]}</script>
+<div class="plotly html-widget html-fill-item-overflow-hidden html-fill-item" id="htmlwidget-386835d81d88c7127934" style="width:100%;height:300px;"></div>
+<script type="application/json" data-for="htmlwidget-386835d81d88c7127934">{"x":{"visdat":{"538c56676ded":["function () ","plotlyVisDat"]},"cur_data":"538c56676ded","attrs":{"538c56676ded":{"x":{},"y":{},"mode":"lines+markers","name":"query time (s)","alpha_stroke":1,"sizes":[10,100],"spans":[1,20],"type":"scatter"}},"layout":{"margin":{"b":40,"l":60,"t":25,"r":10},"title":"Query time X number of components","dragmode":"pan","legend":{"orientation":"h"},"xaxis":{"domain":[0,1],"automargin":true,"title":"Components"},"yaxis":{"domain":[0,1],"automargin":true,"title":"Query time (seconds, log10)","type":"log"},"hovermode":"closest","showlegend":false},"source":"A","config":{"modeBarButtonsToAdd":["hoverclosest","hovercompare"],"showSendToCloud":false},"data":[{"x":[1,5,10,20,30,40,50,60,70,80,90,100,110,120,130,140,150],"y":[0.8,4.4,10.1,33.4,121.9,234.7,348.4,612.9,1275.4,1570.2,2017.3,2383,3477.5,5483.3,7381.4,9472.8,11618.8],"mode":"lines+markers","name":"query time (s)","type":"scatter","marker":{"color":"rgba(31,119,180,1)","line":{"color":"rgba(31,119,180,1)"}},"error_y":{"color":"rgba(31,119,180,1)"},"error_x":{"color":"rgba(31,119,180,1)"},"line":{"color":"rgba(31,119,180,1)"},"xaxis":"x","yaxis":"y","frame":null}],"highlight":{"on":"plotly_click","persistent":false,"dynamic":false,"selectize":false,"opacityDim":0.2,"selected":{"opacity":1},"debounce":0},"shinyEvents":["plotly_hover","plotly_click","plotly_selected","plotly_relayout","plotly_brushed","plotly_brushing","plotly_clickannotation","plotly_doubleclick","plotly_deselect","plotly_afterplot","plotly_sunburstclick"],"base_url":"https://plot.ly"},"evals":[],"jsHooks":[]}</script>
 <p>As we increase the number of components, the query time increases at
 sub-exponential rate (exponential growth would be a straight line).</p>
-<div id="htmlwidget-acb1b2f2492fa1b943d8" style="width:100%;height:300px;" class="plotly html-widget"></div>
-<script type="application/json" data-for="htmlwidget-acb1b2f2492fa1b943d8">{"x":{"visdat":{"66c6d7172":["function () ","plotlyVisDat"]},"cur_data":"66c6d7172","attrs":{"66c6d7172":{"x":{},"y":{},"mode":"lines+markers","name":"query time (s)","alpha_stroke":1,"sizes":[10,100],"spans":[1,20],"type":"scatter"}},"layout":{"margin":{"b":40,"l":60,"t":25,"r":10},"title":"Query time X input rows","dragmode":"pan","legend":{"orientation":"h"},"xaxis":{"domain":[0,1],"automargin":true,"title":"Input rows"},"yaxis":{"domain":[0,1],"automargin":true,"title":"Query time (seconds, log10)","type":"log"},"hovermode":"closest","showlegend":false},"source":"A","config":{"modeBarButtonsToAdd":["hoverclosest","hovercompare"],"showSendToCloud":false},"data":[{"x":[12869,70666,205855,576122,1118468,1536740,1797319,2153072,3539828,3568517,3752685,3809544,4590107,5279300,5703454,6536119,6843258],"y":[0.8,4.4,10.1,33.4,121.9,234.7,348.4,612.9,1275.4,1570.2,2017.3,2383,3477.5,5483.3,7381.4,9472.8,11618.8],"mode":"lines+markers","name":"query time (s)","type":"scatter","marker":{"color":"rgba(31,119,180,1)","line":{"color":"rgba(31,119,180,1)"}},"error_y":{"color":"rgba(31,119,180,1)"},"error_x":{"color":"rgba(31,119,180,1)"},"line":{"color":"rgba(31,119,180,1)"},"xaxis":"x","yaxis":"y","frame":null}],"highlight":{"on":"plotly_click","persistent":false,"dynamic":false,"selectize":false,"opacityDim":0.2,"selected":{"opacity":1},"debounce":0},"shinyEvents":["plotly_hover","plotly_click","plotly_selected","plotly_relayout","plotly_brushed","plotly_brushing","plotly_clickannotation","plotly_doubleclick","plotly_deselect","plotly_afterplot","plotly_sunburstclick"],"base_url":"https://plot.ly"},"evals":[],"jsHooks":[]}</script>
+<div class="plotly html-widget html-fill-item-overflow-hidden html-fill-item" id="htmlwidget-9681bf4ca90b554ce11e" style="width:100%;height:300px;"></div>
+<script type="application/json" data-for="htmlwidget-9681bf4ca90b554ce11e">{"x":{"visdat":{"538c572e215b":["function () ","plotlyVisDat"]},"cur_data":"538c572e215b","attrs":{"538c572e215b":{"x":{},"y":{},"mode":"lines+markers","name":"query time (s)","alpha_stroke":1,"sizes":[10,100],"spans":[1,20],"type":"scatter"}},"layout":{"margin":{"b":40,"l":60,"t":25,"r":10},"title":"Query time X input rows","dragmode":"pan","legend":{"orientation":"h"},"xaxis":{"domain":[0,1],"automargin":true,"title":"Input rows"},"yaxis":{"domain":[0,1],"automargin":true,"title":"Query time (seconds, log10)","type":"log"},"hovermode":"closest","showlegend":false},"source":"A","config":{"modeBarButtonsToAdd":["hoverclosest","hovercompare"],"showSendToCloud":false},"data":[{"x":[12869,70666,205855,576122,1118468,1536740,1797319,2153072,3539828,3568517,3752685,3809544,4590107,5279300,5703454,6536119,6843258],"y":[0.8,4.4,10.1,33.4,121.9,234.7,348.4,612.9,1275.4,1570.2,2017.3,2383,3477.5,5483.3,7381.4,9472.8,11618.8],"mode":"lines+markers","name":"query time (s)","type":"scatter","marker":{"color":"rgba(31,119,180,1)","line":{"color":"rgba(31,119,180,1)"}},"error_y":{"color":"rgba(31,119,180,1)"},"error_x":{"color":"rgba(31,119,180,1)"},"line":{"color":"rgba(31,119,180,1)"},"xaxis":"x","yaxis":"y","frame":null}],"highlight":{"on":"plotly_click","persistent":false,"dynamic":false,"selectize":false,"opacityDim":0.2,"selected":{"opacity":1},"debounce":0},"shinyEvents":["plotly_hover","plotly_click","plotly_selected","plotly_relayout","plotly_brushed","plotly_brushing","plotly_clickannotation","plotly_doubleclick","plotly_deselect","plotly_afterplot","plotly_sunburstclick"],"base_url":"https://plot.ly"},"evals":[],"jsHooks":[]}</script>
 <p>Same as before: as we increase the number of input rows (and number
 of components), the query time increases at sub-exponential rate.</p>
-<div id="htmlwidget-593ce6a06d73d5f26b92" style="width:100%;height:300px;" class="plotly html-widget"></div>
-<script type="application/json" data-for="htmlwidget-593ce6a06d73d5f26b92">{"x":{"visdat":{"66c3e73730a":["function () ","plotlyVisDat"]},"cur_data":"66c3e73730a","attrs":{"66c3e73730a":{"x":{},"y":{},"mode":"lines+markers","name":"rows per second","alpha_stroke":1,"sizes":[10,100],"spans":[1,20],"type":"scatter"}},"layout":{"margin":{"b":40,"l":60,"t":25,"r":10},"title":"Input rows per second X components","dragmode":"pan","legend":{"orientation":"h"},"xaxis":{"domain":[0,1],"automargin":true,"title":"Components"},"yaxis":{"domain":[0,1],"automargin":true,"title":"Input rows per second"},"hovermode":"closest","showlegend":false},"source":"A","config":{"modeBarButtonsToAdd":["hoverclosest","hovercompare"],"showSendToCloud":false},"data":[{"x":[1,5,10,20,30,40,50,60,70,80,90,100,110,120,130,140,150],"y":[16086.2,15915.8,20442.4,17244,9176,6546.8,5158.8,3512.6,2775.4,2272.6,1860.2,1598.7,1320,962.8,772.7,690,589],"mode":"lines+markers","name":"rows per second","type":"scatter","marker":{"color":"rgba(31,119,180,1)","line":{"color":"rgba(31,119,180,1)"}},"error_y":{"color":"rgba(31,119,180,1)"},"error_x":{"color":"rgba(31,119,180,1)"},"line":{"color":"rgba(31,119,180,1)"},"xaxis":"x","yaxis":"y","frame":null}],"highlight":{"on":"plotly_click","persistent":false,"dynamic":false,"selectize":false,"opacityDim":0.2,"selected":{"opacity":1},"debounce":0},"shinyEvents":["plotly_hover","plotly_click","plotly_selected","plotly_relayout","plotly_brushed","plotly_brushing","plotly_clickannotation","plotly_doubleclick","plotly_deselect","plotly_afterplot","plotly_sunburstclick"],"base_url":"https://plot.ly"},"evals":[],"jsHooks":[]}</script>
+<div class="plotly html-widget html-fill-item-overflow-hidden html-fill-item" id="htmlwidget-588298f3c7dd3f0f2803" style="width:100%;height:300px;"></div>
+<script type="application/json" data-for="htmlwidget-588298f3c7dd3f0f2803">{"x":{"visdat":{"538c291653d":["function () ","plotlyVisDat"]},"cur_data":"538c291653d","attrs":{"538c291653d":{"x":{},"y":{},"mode":"lines+markers","name":"rows per second","alpha_stroke":1,"sizes":[10,100],"spans":[1,20],"type":"scatter"}},"layout":{"margin":{"b":40,"l":60,"t":25,"r":10},"title":"Input rows per second X components","dragmode":"pan","legend":{"orientation":"h"},"xaxis":{"domain":[0,1],"automargin":true,"title":"Components"},"yaxis":{"domain":[0,1],"automargin":true,"title":"Input rows per second"},"hovermode":"closest","showlegend":false},"source":"A","config":{"modeBarButtonsToAdd":["hoverclosest","hovercompare"],"showSendToCloud":false},"data":[{"x":[1,5,10,20,30,40,50,60,70,80,90,100,110,120,130,140,150],"y":[16086.2,15915.8,20442.4,17244,9176,6546.8,5158.8,3512.6,2775.4,2272.6,1860.2,1598.7,1320,962.8,772.7,690,589],"mode":"lines+markers","name":"rows per second","type":"scatter","marker":{"color":"rgba(31,119,180,1)","line":{"color":"rgba(31,119,180,1)"}},"error_y":{"color":"rgba(31,119,180,1)"},"error_x":{"color":"rgba(31,119,180,1)"},"line":{"color":"rgba(31,119,180,1)"},"xaxis":"x","yaxis":"y","frame":null}],"highlight":{"on":"plotly_click","persistent":false,"dynamic":false,"selectize":false,"opacityDim":0.2,"selected":{"opacity":1},"debounce":0},"shinyEvents":["plotly_hover","plotly_click","plotly_selected","plotly_relayout","plotly_brushed","plotly_brushing","plotly_clickannotation","plotly_doubleclick","plotly_deselect","plotly_afterplot","plotly_sunburstclick"],"base_url":"https://plot.ly"},"evals":[],"jsHooks":[]}</script>
 <p>As we increase the number of components, less rows per second are
 computed, because each row takes longer. This is on top of the fact
 that, the more components you add, the more input rows, because each
@@ -3085,7 +3087,7 @@ components and number of input rows.</li>
 <div id="author-contact" class="section level3">
 <h3>Author contact</h3>
 <p>Fabrício Kury<br />
-2022/Dec/04<br />
+2022/Dec/16<br />
 Be always welcome to reach me at <a href="mailto:fab@kury.dev" class="email">fab@kury.dev</a>.</p>
 </div>
 </div>
