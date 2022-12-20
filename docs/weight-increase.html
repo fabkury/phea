@@ -2279,7 +2279,7 @@ Generator</a>.</em></p>
 <span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="co"># Connect to SQL server.</span></span>
 <span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a>dbcon <span class="ot">&lt;-</span> DBI<span class="sc">::</span><span class="fu">dbConnect</span>(RPostgres<span class="sc">::</span><span class="fu">Postgres</span>(),</span>
-<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a>    <span class="at">host =</span> <span class="st">&#39;localhost&#39;</span>, <span class="at">port =</span> <span class="dv">7654</span>,</span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a>    <span class="at">host =</span> <span class="st">&#39;localhost&#39;</span>, <span class="at">port =</span> <span class="dv">8765</span>,</span>
 <span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a>    <span class="at">dbname =</span> <span class="st">&#39;fort&#39;</span>, <span class="at">user =</span> cred<span class="sc">$</span>pg<span class="sc">$</span>user, <span class="at">password =</span> cred<span class="sc">$</span>pg<span class="sc">$</span>pass)</span>
 <span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a><span class="co"># Provide the connection to Phea so we can use the sqlt() and sql0() shorthands.</span></span>

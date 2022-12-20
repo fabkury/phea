@@ -29,7 +29,7 @@ library(dplyr)
 
 # Connect to SQL server.
 dbcon <- DBI::dbConnect(RPostgres::Postgres(),
-  host = 'localhost', port = 7654, dbname = 'fort',
+  host = 'localhost', port = 8765, dbname = 'fort',
   user = cred$pg$user, password = cred$pg$pass)
 
 # Call setup_phea so we can use sqlt() and sql0().

@@ -13,8 +13,7 @@ knitr::opts_chunk$set(
   comment = "#>"
 )
 
-# kury - credenciais.R contains the cred$pg credentials.
-source(paste0(Sys.getenv("HOME"), '/Estudo/Tecnologia/R/espinha/credenciais.R'))
+library(credx) # contains cred$pg
 library(phea)
 suppressPackageStartupMessages(library(dplyr))
 # Connect to SQL server.
@@ -22,7 +21,7 @@ if(!exists('dbcon'))
   dbcon <- DBI::dbConnect(
     RPostgres::Postgres(),
     host = 'localhost',
-    port = 7654,
+    port = 8765,
     dbname = 'fort',
     user = cred$pg$user,
     password = cred$pg$pass)
@@ -128,7 +127,7 @@ library(phea)
 dbcon <- DBI::dbConnect(
     RPostgres::Postgres(),
     host = 'localhost',
-    port = 7654,
+    port = 8765,
     dbname = 'fort',
     user = cred$pg$user, # Credentials not declared in this file
     password = cred$pg$pass) # Credentials not declared in this file

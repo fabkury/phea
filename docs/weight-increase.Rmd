@@ -12,8 +12,8 @@ knitr::opts_chunk$set(
   collapse = TRUE,
   comment = "#>"
 )
-# kury - credenciais.R contains the cred$pg credentials.
-source(paste0(Sys.getenv("HOME"), '/Estudo/Tecnologia/R/espinha/credenciais.R'))
+
+library(credx) # contains cred$pg
 ```
 ```{r setup}
 library(knitr)
@@ -22,7 +22,7 @@ suppressPackageStartupMessages(library(dplyr))
 
 # Connect to SQL server.
 dbcon <- DBI::dbConnect(RPostgres::Postgres(),
-    host = 'localhost', port = 7654,
+    host = 'localhost', port = 8765,
     dbname = 'fort', user = cred$pg$user, password = cred$pg$pass)
 
 # Provide the connection to Phea so we can use the sqlt() and sql0() shorthands.
@@ -93,7 +93,7 @@ phen <- calculate_formula(
 
 ```{r, include = FALSE}
 # # Source:     SQL [?? x 3]
-# # Database:   postgres  [postgres@localhost:7654/fort]
+# # Database:   postgres  [postgres@localhost:8765/fort]
 # # Ordered by: desc(uvals)
 #      pid   lines   uvals
 #    <int> <int64> <int64>

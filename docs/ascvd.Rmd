@@ -11,7 +11,7 @@ vignette: >
 library(knitr)
 options(scipen = 5e5)
 knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
-source(paste0(Sys.getenv("HOME"), '/Estudo/Tecnologia/R/espinha/credenciais.R')) # contains cred$pg
+library(credx) # contains cred$pg
 library(wrap)
 
 usn <- function(n, decimals = 0) {
@@ -29,7 +29,7 @@ library(dplyr)
 
 # Connect to SQL server.
 dbcon <- DBI::dbConnect(RPostgres::Postgres(),
-  host = 'localhost', port = 7654, dbname = 'fort',
+  host = 'localhost', port = 8765, dbname = 'fort',
   user = cred$pg$user, password = cred$pg$pass)
 
 # Call setup_phea so we can use sqlt() and sql0().
