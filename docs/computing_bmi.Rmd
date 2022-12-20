@@ -13,8 +13,8 @@ opts_chunk$set(
   collapse = TRUE,
   comment = "#>"
 )
-# kury - credenciais.R contains the cred$pg credentials.
-source(paste0(Sys.getenv("HOME"), '/Estudo/Tecnologia/R/espinha/credenciais.R'))
+
+library(credx) # contains cred$pg
 ```
 
 Here we compute the body mass index (BMI) formula:  
@@ -33,14 +33,14 @@ Furthermore, this vignette assumes:
 First we connect to the server and call `setup_phea()`. Calling `setup_phea()` is optional, but it allows us to use
 the convenience functions `slqt()` and `sql0()`.  
 ```{r setup}
-library(phea)
 suppressPackageStartupMessages(library(dplyr))
+library(phea)
 
 # Connect to SQL server.
 dbcon <- DBI::dbConnect(
     RPostgres::Postgres(),
     host = 'localhost',
-    port = 7654,
+    port = 8765,
     dbname = 'fort',
     user = cred$pg$user,
     password = cred$pg$pass)

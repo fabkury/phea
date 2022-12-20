@@ -4,18 +4,21 @@
 \alias{sqlt}
 \title{SQL table}
 \usage{
-sqlt(table, schema = NULL)
+sqlt(table, schema = NULL, .table = NULL)
 }
 \arguments{
-\item{table}{Unquoted name of the table to be accessed within \code{def_schema}.}
+\item{table}{\emph{Unquoted} name of the table to be accessed within \code{def_schema}.}
 
-\item{schema}{Optional. Name of schema to use. If provided, overrides \code{def_schema}.}
+\item{schema}{Optional. Character. Name of schema to use. If provided, overrides \code{def_schema}.}
+
+\item{.table}{Character. Name of the table to be accessed within \code{def_schema}. If \code{.table} is provided, \code{table} is
+ignored.}
 }
 \value{
 Lazy table equal to \verb{select * from def_schema.table;}.
 }
 \description{
-Produces lazy table object of \code{table} in the preconfigured default schema.
+Produces a lazy table object of \code{table} in the preconfigured default schema, or in the specified \code{schema}.
 }
 \details{
 This function is a shorthand for \verb{select * from def_schema.table;}. \code{def_schema} is the schema passed to
@@ -23,8 +26,12 @@ This function is a shorthand for \verb{select * from def_schema.table;}. \code{d
 }
 \examples{
 `sqlt(person)`
+`sqlt(.table = 'person')`
+
 `sqlt(condition_occurrence)`
+`sqlt(.table = 'condition_occurrence')`
 }
 \seealso{
-\code{\link[=sql0]{sql0()}} to run arbitrary SQL. \code{\link[=sqla]{sqla()}} to run arbitrary SQL with lazy tables.
+\code{\link[=sql0]{sql0()}} to run arbitrary SQL queries on the server. \code{\link[=sqla]{sqla()}} to run arbitrary SQL queries using lazy
+tables.
 }

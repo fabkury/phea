@@ -4,7 +4,15 @@
 \alias{keep_row_by}
 \title{Keep \link{first or last} row by \link{window function}}
 \usage{
-keep_row_by(lazy_tbl, by, partition, pick_last = FALSE)
+keep_row_by(
+  lazy_tbl,
+  by,
+  partition,
+  pick_last = FALSE,
+  .fn = NULL,
+  .fn_arg = NULL,
+  .val = NULL
+)
 }
 \arguments{
 \item{lazy_tbl}{Lazy table to be filtered.}

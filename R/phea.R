@@ -34,21 +34,38 @@ setup_phea <- function(connection, schema, .verbose = TRUE) {
 #' @param partition Character vector. Variable or variables to define the partition.
 #' @param pick_last Logical. If `TRUE`, will pick the last row, instead of first.
 #' @return Lazy table with filtered rows.
-keep_row_by <- function(lazy_tbl, by, partition, pick_last = FALSE) {
-  # sql_txt <- paste0(ifelse(use_max, 'max', 'min'), '("', by, '") ',
-  #   'over (partition by "', paste0(partition, collapse = '", "'), '")')
-  if(pick_last)
-    sql_txt <- paste0('cume_dist() over (partition by "', 
+keep_row_by <- function(lazy_tbl, by, partition, pick_last = FALSE,
+  .fn = NULL, .fn_arg = NULL, .val = NULL) {
+  if(is.null(.fn)) {
+    if(pick_last)
+      sql_txt <- paste0('cume_dist() over (partition by "', 
+        paste0(partition, collapse = '", "'), '" order by "', by, '")')
+    else
+      sql_txt <- paste0('row_number() over (partition by "', 
+        paste0(partition, collapse = '", "'), '" order by "', by, '")')
+    
+    if(is.null(.val))
+      .val <- 1
+    
+  } else {
+    sql_txt <- paste0(.fn, '(', .fn_arg, ') over (partition by "', 
       paste0(partition, collapse = '", "'), '" order by "', by, '")')
-  else
-    sql_txt <- paste0('row_number() over (partition by "', 
-      paste0(partition, collapse = '", "'), '" order by "', by, '")')
-
-  res <- lazy_tbl |>
-    dplyr::mutate(
-      phea_calc_var = dplyr::sql(sql_txt)) |>
-    dplyr::filter(phea_calc_var == 1) |>
-    dplyr::select(-phea_calc_var)
+  }
+  
+  if(is.null(.val)) {
+    res <- lazy_tbl |>
+      dplyr::mutate(
+        phea_calc_var = dplyr::sql(sql_txt)) |>
+      dplyr::filter(!!by == phea_calc_var) |>
+      dplyr::select(-phea_calc_var)
+  } else {
+    res <- lazy_tbl |>
+      dplyr::mutate(
+        phea_calc_var = dplyr::sql(sql_txt)) |>
+      dplyr::filter(phea_calc_var == local(.val)) |>
+      dplyr::select(-phea_calc_var)
+  }
+  
   res
 }
 
@@ -80,11 +97,11 @@ keep_change_of <- function(lazy_tbl, of, partition = NULL, order = NULL, con = N
   if(!is.null(partition))
     of <- c(partition, of)
   
-  of_names <- paste0('phea_kco_var', seq(of))
+  of_names <- of # paste0('phea_kco_var', seq(of))
   
-  commands_a <- purrr::map2(of_names, of,
-    ~rlang::exprs(!!..1 := dplyr::sql(!!..2))) |>
-    unlist()
+  # commands_a <- purrr::map2(of_names, of,
+  #   ~rlang::exprs(!!..1 := dplyr::sql(!!..2))) |>
+  #   unlist()
   
   lag_names <- paste0('phea_kco_lag', seq(of))
   
@@ -107,11 +124,12 @@ keep_change_of <- function(lazy_tbl, of, partition = NULL, order = NULL, con = N
     paste0(collapse = ' || ') |>
     str2lang()
   
+    # mutate(!!!commands_a) |>
+  
   lazy_tbl |>
-    mutate(!!!commands_a) |>
     mutate(!!!commands_b) |>
     filter(!!commands_c) |>
-    select(-all_of(lag_names), -all_of(of_names))
+    select(-all_of(lag_names))
 }
 
 
@@ -168,29 +186,39 @@ code_shot <- function(lazy_tbl, clip = TRUE) {
 # sql0, sqlt & sqla -----------------------------------------------------------------------------------------------
 #' SQL table
 #'
-#' Produces lazy table object of `table` in the preconfigured default schema.
+#' Produces a lazy table object of `table` in the preconfigured default schema, or in the specified `schema`.
 #'
 #' This function is a shorthand for `select * from def_schema.table;`. `def_schema` is the schema passed to
 #' `setup_phea()` previously.
 #'
 #' @export
-#' @param table Unquoted name of the table to be accessed within `def_schema`.
-#' @param schema Optional. Name of schema to use. If provided, overrides `def_schema`.  
+#' @param table *Unquoted* name of the table to be accessed within `def_schema`.
+#' @param .table Character. Name of the table to be accessed within `def_schema`. If `.table` is provided, `table` is
+#' ignored.
+#' @param schema Optional. Character. Name of schema to use. If provided, overrides `def_schema`.  
 #' @return Lazy table equal to `select * from def_schema.table;`.
-#' @seealso [sql0()] to run arbitrary SQL. [sqla()] to run arbitrary SQL with lazy tables.
+#' @seealso [sql0()] to run arbitrary SQL queries on the server. [sqla()] to run arbitrary SQL queries using lazy
+#' tables.
 #' @examples
 #' `sqlt(person)`
+#' `sqlt(.table = 'person')`
+#' 
 #' `sqlt(condition_occurrence)`
-sqlt <- function(table, schema = NULL) {
+#' `sqlt(.table = 'condition_occurrence')`
+sqlt <- function(table, schema = NULL, .table = NULL) {
   if(!exists('con', envir = .pheaglobalenv))
     stop('SQL connection not found. Please call setup_phea() before sqlt().')
   
   if(is.null(schema))
     schema <- .pheaglobalenv$schema
   
+  if(!is.null(.table))
+    table_name <- .table
+  else
+    table_name <- deparse(substitute(table))
+  
   dplyr::tbl(.pheaglobalenv$con,
-    dbplyr::in_schema(schema,
-      deparse(substitute(table))))
+    dbplyr::in_schema(schema, table_name))
 }
 
 #' SQL query
@@ -382,8 +410,9 @@ make_record_source <- function(records, rec_name = NULL, ts, pid, vars = NULL, .
   rec_source$records <- records
   
   if(is.null(rec_name)) {
-    # Generate random rec_name, 12 characters long, case-insensitive, starting with a letter.
-    rec_name <- c(sample(letters, 1), sample(c(letters, 0:9), 12-1)) |>
+    # Generate random rec_name, 8 characters long, case-insensitive, starting with a letter.
+    name_len <- 8
+    rec_name <- c(sample(letters, 1), sample(c(letters, 0:9), name_len-1)) |>
       as.list() |> do.call(what = paste0)
   }
 
@@ -468,7 +497,7 @@ make_record_source <- function(records, rec_name = NULL, ts, pid, vars = NULL, .
 #' @return Lazy table with result of formula or formulas.
 calculate_formula <- function(components, fml = NULL, window = NA, export = NULL, add_components = NULL,
   .ts = NULL, .pid = NULL, .delay = NULL, .line = NULL, .require_all = FALSE, .lim = NA, .dont_require = NULL,
-  .filter = NULL, .cascaded = TRUE, .clip_sql = FALSE, .out_window = NULL, .dates = NULL, .kco = TRUE) {
+  .filter = NULL, .cascaded = TRUE, .clip_sql = FALSE, .out_window = NULL, .dates = NULL, .kco = FALSE) {
 # Prepare ---------------------------------------------------------------------------------------------------------
   # TODO: Improve the logic regarding these two variables below.
   keep_names_unchanged <- FALSE
@@ -640,10 +669,10 @@ calculate_formula <- function(components, fml = NULL, window = NA, export = NULL
   
   # Add extra dates, if any.
   if(!is.null(.dates)) {
-    dates <- paste0("SELECT * FROM (VALUES ",
+    dates <- sql0("SELECT * FROM (VALUES ",
       paste0("(", .dates$pid, ", '", .dates$ts, "'::date)", collapse = ', '),
-      ") AS pid_ts (pid, ts)") |>
-      sql0()
+      ") AS pid_ts (pid, ts)")
+    
     board <- dplyr::union_all(board, dates)
   }
 
@@ -656,6 +685,7 @@ calculate_formula <- function(components, fml = NULL, window = NA, export = NULL
 
     if((!is.na(component$delay) || !is.na(component$comp_window)) && !is.na(component$line)) {
       stop(paste0('Component ', comp_name, ': line and delay (or window) simultaneously is not implemented.'))
+      
       new_records <- make_component(component,
         line = NA,
         delay = component$delay,
@@ -670,8 +700,6 @@ calculate_formula <- function(components, fml = NULL, window = NA, export = NULL
         select(-tidyr::any_of(c('row_id', 'window')))
       
       component$delay <- NA
-      
-      browser()
     }
     
     # Add timestamp column
@@ -909,7 +937,8 @@ calculate_formula <- function(components, fml = NULL, window = NA, export = NULL
     if(length(.kco) > 1)
       stop('If logical, .kco must be of length 1.')
     
-    if(.kco)
+    # If no res_vars, keep_change_of would collapse to one row per partition.
+    if(.kco && !is.null(res_vars))
       board <- board |>
         keep_change_of(res_vars, partition = 'pid', order = 'ts')
   } else {
@@ -969,9 +998,10 @@ phea_plot <- function(board, pid, plot_title = NULL, exclude = NULL, verbose = N
     cat('done. (turn this message off with `verbose = FALSE`)\n')
   
   # Plot all columns except some.
-  if(all(c('row_id', 'pid', 'ts', 'window') %in% colnames(board_data))) {
+  chart_items <- colnames(board_data)
+  if(sum(c('row_id', 'pid', 'ts', 'window') %in% colnames(board_data)) > 3) {
     # The board has the base columns of a phenotype result. Remove them.
-    chart_items <- setdiff(colnames(board_data), c('row_id', 'pid', 'ts', 'window'))
+    chart_items <- setdiff(chart_items, c('row_id', 'pid', 'ts', 'window'))
   }
   
   if(!is.null(exclude))
