@@ -7,16 +7,18 @@
 make_component(
   input_source,
   line = NA,
+  bound = NA,
   delay = NA,
   window = NA,
-  rec_name = NA,
+  ahead = NA,
+  up_to = NA,
   .passthrough = FALSE,
   .ts = NULL,
   .pid = NULL,
   .fn = NA,
-  .ts_fn = NULL,
-  ahead = NA,
-  up_to = NA
+  .ts_fn = NA,
+  .rows = NULL,
+  .range = NULL
 )
 }
 \arguments{
@@ -25,17 +27,18 @@ table. If the latter case, \code{.ts} and \code{.pid} must be provided.}
 
 \item{line}{Interger. Which line to pick. 0 = skip no lines, 1 = skip one line, 2 = skip two lines, etc.}
 
-\item{delay}{Character. Time interval in SQL language. Minimum time difference between phenotype date and component
-date.}
+\item{delay}{Character. Minimum time difference between phenotype date and component date. Time interval in SQL
+language, including any necessary type casting according to the SQL flavor of the server. Examples in PostgreSQL:
+\code{'3 months'::interval}, \code{'20 seconds'::interval}, \code{'1.5 hours'::interval}.}
 
-\item{window}{Character. Time interval in SQL language. Maximum time difference between phenotype date and component
-date.}
+\item{window}{Character. Maximum time difference between phenotype date and component date. Time interval in SQL
+language (see argument \code{delay}).}
 
-\item{.ts}{Unquoted character. If passing a lazy table to \code{input_source}, \code{.ts} is used as \code{ts} to buid a record
-source.}
+\item{.ts}{Unquoted characters. If passing a lazy table to \code{input_source}, \code{.ts} is used as \code{ts} to buid a record
+source. See \code{\link{make_record_source}}.}
 
-\item{.pid}{Unquoted character. If passing a lazy table to \code{input_source}, \code{.pid} is used as \code{pid} to buid a record
-source.}
+\item{.pid}{Unquoted characters. If passing a lazy table to \code{input_source}, \code{.pid} is used as \code{pid} to buid a record
+source. See \code{\link{make_record_source}}.}
 }
 \value{
 Phea component object.
@@ -44,9 +47,29 @@ Phea component object.
 Produce a Phea component.
 }
 \details{
-Creates a component from the given \code{input_source} record source and optional parameters. If \code{input_source} is a
-record source, it is used. If it is a component, it is copied (including its record source) and other paremeters, if
-provided, overwrite existing ones.
+Creates a component from the given \code{input_source} record source and optional parameters.
+
+If \code{input_source} is a record source, it is used.
+
+If \code{input_source} is a component, it is copied, and any other paremeter if provided overwrites the original one.
+
+If \code{input_source} is a lazy table, a record source is generated from it, and used. In this case, arguments .pid and
+.ts must also be provided.
+}
+\examples{
+diabetes_mellitus <- sqlt(condition_occurrence) |>
+  filter(condition_concept_id == 201820) |>
+  make_component(
+    .pid = person_id,
+    .ts = condition_start_datetime)
+    
+diabetes_mellitus_6_mo_ago <- sqlt(condition_occurrence) |>
+  filter(condition_concept_id == 201820) |>
+  make_component(
+    .pid = person_id,
+    .ts = condition_start_datetime,
+    delay = "'6 months'::interval")
+    
 }
 \seealso{
 \code{\link[=make_record_source]{make_record_source()}} to create a record source.

@@ -6,29 +6,25 @@
 \usage{
 make_record_source(
   records,
-  rec_name = NULL,
   ts,
   pid,
+  rec_name = NULL,
   vars = NULL,
-  .capture_col = NULL,
-  .type = "direct",
   .ts = NULL,
   .pid = NULL
 )
 }
 \arguments{
-\item{records}{Lazy table with records to use.}
+\item{records}{Lazy table with records to be used.}
 
-\item{rec_name}{Character. Record name.}
+\item{ts}{Unquoted characters. Name of the colum in \code{records} that gives the timestamp.}
 
-\item{ts}{Unquoted string. Name of the colum in \code{records} that gives the timestamp.}
+\item{pid}{Unquoted characters. Name of the colum in \code{records} that gives the person (patient) identifier.}
 
-\item{pid}{Unquoted string. Name of the colum in \code{records} that gives the person (patient) identifier.}
+\item{rec_name}{Character. Optional. Record name.}
 
-\item{vars}{Character vector. Name of the colums to make available from \code{records}. If not supplied, all columns are
-used.}
-
-\item{.capture_col}{Unquoted string. Not yet implemented.}
+\item{vars}{Character vector. Optional. Name of the colums to make available from \code{records}. If not supplied, all
+columns are used.}
 }
 \value{
 Phea record source object.

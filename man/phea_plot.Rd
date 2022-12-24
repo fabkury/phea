@@ -4,7 +4,14 @@
 \alias{phea_plot}
 \title{Plot a phenotype.}
 \usage{
-phea_plot(board, pid, plot_title = NULL, exclude = NULL, verbose = NULL)
+phea_plot(
+  board,
+  pid,
+  plot_title = NULL,
+  exclude = NULL,
+  verbose = NULL,
+  .board = NULL
+)
 }
 \arguments{
 \item{board}{Phenotype object returned by \code{calculate_formula()}.}
@@ -13,7 +20,11 @@ phea_plot(board, pid, plot_title = NULL, exclude = NULL, verbose = NULL)
 
 \item{exclude}{Optional. Names of columns to not plot.}
 
-\item{verbose}{If TRUE, will let you know how long it takes to \code{collect()} the data.}
+\item{verbose}{If TRUE, will let you know how long it takes to \code{collect()} the data. If not provided, defaults to
+\code{.verbose} provided to \code{setup_phea()}, which itself defaults to \code{TRUE} if not provided.}
+
+\item{.board}{Optional. Local data frame. Provide this argument together with \code{board = NULL} to use local data
+directly, instead of \code{collect()}ing the \code{board}.}
 }
 \value{
 Plot created by \code{plotly::plot_ly()} within \code{plotly::subplot()}.
