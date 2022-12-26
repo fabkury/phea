@@ -61,8 +61,8 @@ If \code{input_source} is a record source, it is used.
 
 If \code{input_source} is a component, it is copied, and any other paremeter if provided overwrites the original one.
 
-If \code{input_source} is a lazy table, a record source is generated from it, and used. In this case, arguments .pid and
-.ts must also be provided.
+If \code{input_source} is a lazy table, a record source is generated from it, and used. In this case, arguments \code{pid}
+and \code{ts} (or \code{.pid}, \code{.ts}) must also be provided.
 }
 \examples{
 # This:

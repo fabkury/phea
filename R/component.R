@@ -15,8 +15,8 @@
 #' 
 #' If `input_source` is a component, it is copied, and any other paremeter if provided overwrites the original one.
 #' 
-#' If `input_source` is a lazy table, a record source is generated from it, and used. In this case, arguments .pid and
-#' .ts must also be provided.
+#' If `input_source` is a lazy table, a record source is generated from it, and used. In this case, arguments `pid`
+#' and `ts` (or `.pid`, `.ts`) must also be provided.
 #'
 #' @export
 #' @param input_source A record source from `make_record_source()`, a component from `make_component()`, or a lazy
