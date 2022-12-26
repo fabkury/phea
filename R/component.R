@@ -30,15 +30,15 @@
 #' @param window Character. Maximum time difference between phenotype date and the date of any component. Time interval
 #'  in SQL language (see argument `delay`). 
 #' 
-#' @param ts Quoted characters. If passing a lazy table to `input_source`, `ts` is passed to `make_record_source()` to 
+#' @param ts Character. If passing a lazy table to `input_source`, `ts` is passed to `make_record_source()` to 
 #' buid a record source. See \code{\link{make_record_source}}.
-#' @param pid Unquoted characters. If passing a lazy table to `input_source`, `pid` is passed to `make_record_source()`
+#' @param pid Character. If passing a lazy table to `input_source`, `pid` is passed to `make_record_source()`
 #' to buid a record source. See \code{\link{make_record_source}}.
 #'     
-#' @param .ts Unquoted characters. Use this argument to pass unquoted characters to the `ts` argument (see examples). If
-#'  `ts` is provided, `.ts` is ignored.
-#' @param .pid Unquoted characters. Use this argument to pass unquoted characters to the `pid` argument (see examples).
-#' If `pid` is provided, `.pid` is ignored.
+#' @param .ts Unquoted characters. Optional. Use this argument to pass unquoted characters to the `ts` argument (see
+#' examples). If `ts` is provided, `.ts` is ignored.
+#' @param .pid Unquoted characters. Optional. Use this argument to pass unquoted characters to the `pid` argument (see
+#' examples). If `pid` is provided, `.pid` is ignored.
 #'  
 #' @seealso [make_record_source()] to create a record source.
 #' @return Phea component object.
@@ -67,7 +67,6 @@
 #'     ts = 'condition_start_datetime') |>
 #'   make_component(
 #'     delay = "'6 months'::interval")
-#'  
 make_component <- function(input_source,
   line = NA, bound = NA,
   delay = NA, window = NA,

@@ -17,12 +17,18 @@ make_record_source(
 \arguments{
 \item{records}{Lazy table with records to be used.}
 
+\item{pid}{Character. Name of the colum in \code{records} that gives the person (patient) identifier.}
+
+\item{ts}{Character. Name of the colum in \code{records} that gives the timestamp.}
+
 \item{vars}{Character vector. Optional. Name of the colums to make available from \code{records}. If not supplied, all
 columns are used.}
 
-\item{.pid}{Unquoted characters. Name of the colum in \code{records} that gives the person (patient) identifier.}
+\item{.pid}{Unquoted characters. Optional. Use this argument to pass unquoted characters to the \code{pid} argument. If
+\code{pid} is provided, \code{.pid} is ignored. See examples.}
 
-\item{.ts}{Unquoted characters. Name of the colum in \code{records} that gives the timestamp.}
+\item{.ts}{Unquoted characters. Optional. Use this argument to pass unquoted characters to the \code{ts} argument. If \code{ts}
+is provided, \code{.ts} is ignored. See examples.}
 
 \item{rec_name}{Character. Optional. Record name.}
 }
@@ -34,6 +40,32 @@ Create a Phea record source.
 }
 \details{
 Creates a record source from a lazy table.
+}
+\examples{
+# This:
+diabetes_mellitus <- sqlt(condition_occurrence) |>
+  filter(condition_concept_id == 201820) |>
+  make_component(
+    .pid = person_id,
+    .ts = condition_start_datetime,
+    delay = "'6 months'::interval")
+    
+# Is the same as:
+diabetes_mellitus <- sqlt(condition_occurrence) |>
+  filter(condition_concept_id == 201820) |>
+  make_component(
+    pid = 'person_id',
+    ts = 'condition_start_datetime',
+    delay = "'6 months'::interval")
+    
+# Which is also the same as:
+diabetes_mellitus <- sqlt(condition_occurrence) |>
+  filter(condition_concept_id == 201820) |>
+  make_record_source(
+    pid = 'person_id',
+    ts = 'condition_start_datetime') |>
+  make_component(
+    delay = "'6 months'::interval")
 }
 \seealso{
 \code{\link[=make_component]{make_component()}} to create a component from a record source.

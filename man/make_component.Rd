@@ -36,17 +36,17 @@ language. Include any necessary type casting according to the SQL flavor of the 
 \item{window}{Character. Maximum time difference between phenotype date and the date of any component. Time interval
 in SQL language (see argument \code{delay}).}
 
-\item{pid}{Unquoted characters. If passing a lazy table to \code{input_source}, \code{pid} is passed to \code{make_record_source()}
+\item{pid}{Character. If passing a lazy table to \code{input_source}, \code{pid} is passed to \code{make_record_source()}
 to buid a record source. See \code{\link{make_record_source}}.}
 
-\item{ts}{Quoted characters. If passing a lazy table to \code{input_source}, \code{ts} is passed to \code{make_record_source()} to
+\item{ts}{Character. If passing a lazy table to \code{input_source}, \code{ts} is passed to \code{make_record_source()} to
 buid a record source. See \code{\link{make_record_source}}.}
 
-\item{.ts}{Unquoted characters. Use this argument to pass unquoted characters to the \code{ts} argument (see examples). If
-\code{ts} is provided, \code{.ts} is ignored.}
+\item{.ts}{Unquoted characters. Optional. Use this argument to pass unquoted characters to the \code{ts} argument (see
+examples). If \code{ts} is provided, \code{.ts} is ignored.}
 
-\item{.pid}{Unquoted characters. Use this argument to pass unquoted characters to the \code{pid} argument (see examples).
-If \code{pid} is provided, \code{.pid} is ignored.}
+\item{.pid}{Unquoted characters. Optional. Use this argument to pass unquoted characters to the \code{pid} argument (see
+examples). If \code{pid} is provided, \code{.pid} is ignored.}
 }
 \value{
 Phea component object.
@@ -89,7 +89,6 @@ diabetes_mellitus <- sqlt(condition_occurrence) |>
     ts = 'condition_start_datetime') |>
   make_component(
     delay = "'6 months'::interval")
- 
 }
 \seealso{
 \code{\link[=make_record_source]{make_record_source()}} to create a record source.
