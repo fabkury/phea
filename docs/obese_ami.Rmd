@@ -17,12 +17,13 @@ library(credx) # contains cred$pg
 ```
 ```{r setup, print = FALSE}
 suppressPackageStartupMessages(library(dplyr))
-library(phea)
+# library(phea)
+devtools::load_all()
 
 # Connect to SQL server.
 dbcon <- DBI::dbConnect(RPostgres::Postgres(),
-  host = 'localhost', port = 8765, dbname = 'fort',
-  user = cred$pg$user, password = cred$pg$pass)
+  host = fabcred$pg$host, port = fabcred$pg$port, dbname = fabcred$pg$database,
+  user = fabcred$pg$user, password = fabcred$pg$pass)
 
 # Call setup_phea so we can use sqlt() and sql0().
 setup_phea(dbcon, 'cdm_new_york3')
@@ -111,19 +112,21 @@ ami_obese <- calculate_formula(
     height = height_component,
     ami = ami_component),
   fml = list(
+    a = list(
+      height_in_meters = 'height_value_as_number / 100',
+      
+      bmi = 'weight_value_as_number / (height_in_meters * height_in_meters)',
     
-    height_in_meters = 'height_value_as_number / 100',
-    
-    bmi = 'weight_value_as_number / (height_in_meters * height_in_meters)',
+      has_ami = 'ami_condition_start_datetime is not null'
+    ),
     
     has_bmi = 'bmi is not null',
     
     is_obese = 'bmi > 30',
     
-    has_ami = 'ami_condition_start_datetime is not null',
-    
     ami_obese = 'has_ami and is_obese'
-    ))
+  )
+)
 ```
 ```{r filter ami}
 # Keep only patients who had AMI
@@ -153,7 +156,7 @@ Therefore, in each patient, for each AMI event, whichever row has the smallest `
 # Keep only the smallest window for each patient:
 ami_obese_f <- ami_obese |>
   filter(has_ami & has_bmi) |>
-  keep_row_by('window', c('pid', 'ami_condition_start_datetime'))
+  pick_row_by('window', c('pid', 'ami_condition_start_datetime'))
 
 head_shot(ami_obese_f) |>
   kable()
@@ -170,9 +173,10 @@ ami_obese_patients <- ami_obese |>
 random_patient <- sample(ami_obese_patients, 1)
 message('Sampled patient: ', random_patient)
 ```
-```{r plot, out.width="100%", out.height = 1200}
+```{r plot, out.width="100%", out.height = 900}
 ami_obese |>
   select(
+    -has_bmi,
     -height_value_as_number,
     -ami_condition_start_datetime) |>
   phea_plot(pid = random_patient)
