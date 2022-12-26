@@ -14,8 +14,7 @@ knitr::opts_chunk$set(
 )
 
 library(credx) # contains fabcred$pg
-# library(phea)
-devtools::load_all()
+library(phea)
 suppressPackageStartupMessages(library(dplyr))
 
 # Connect to SQL server.
@@ -116,7 +115,7 @@ At each point in time, the most recently available data is used, unless you spec
 component.  
 
 ## How to set up
-First you need to connect to your relational server. **While Phea is not restricted to PostgreSQL, so far it has only been tested on PostgreSQL version 15.**  
+First you need to connect to your relational server. **While Phea is not restricted to PostgreSQL, so far it has only been fully tested on PostgreSQL version 15.**  
 ```{r sql_connection}
 # library(phea)
 devtools::load_all()
@@ -323,8 +322,8 @@ phen <- calculate_formula(
 dplyr::collect(head(phen)) |> knitr::kable()
 ```
 
-As of now, `line` and `delay` **cannot** be used simultaneously in the same component. This is a planned feature. If
-both are provided, `line` is considered and `delay` is ignored. `delay` is only considered when `line = NA`.  
+`line` and `delay` **cannot** be used simultaneously in the same component. If both are provided, `line` is considered
+and `delay` is ignored. `delay` is only considered when `line = NA`.  
   
   
 ## Author contact

@@ -97,22 +97,16 @@ calculate_formula <- function(components, fml = NULL, window = NA, export = NULL
   # Build variable map ----------------------------------------------------------------------------------------------
   # Variable map has all valid combinations of components, record sources, and record source columns.
   var_map <- purrr::map2(names(components), components, \(comp_name, component) {
-    if(component$.passthrough || keep_names_unchanged) {
-      res <- dplyr::tibble(
-        component_name = comp_name,
-        rec_name = component$rec_source$rec_name,
-        column = component$columns,
-        composed_name = component$columns,
-        window_sql = component$window_sql)
-    } else {
-      res <- dplyr::tibble(
-        component_name = comp_name,
-        rec_name = component$rec_source$rec_name,
-        column = component$columns,
-        composed_name = paste0(comp_name, '_', component$columns),
-        window_sql = component$window_sql)
-    }
-    return(res)
+    if(component$.passthrough || keep_names_unchanged)
+      composed_named <- component$columns
+    else
+      composed_name <- paste0(comp_name, '_', component$columns)
+    return(dplyr::tibble(
+      component_name = comp_name,
+      rec_name = component$rec_source$rec_name,
+      column = component$columns,
+      composed_name = composed_name,
+      window_sql = component$window_sql))
   }) |>
     dplyr::bind_rows()
   

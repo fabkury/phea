@@ -86,9 +86,6 @@ make_component <- function(input_source,
   if(!is.null(ts) && ts == 'NULL')
     ts <- NULL
   
-  if(!is.null(delay) && !is.na(delay) && delay == "'6 years'::interval")
-    browser()
-  
 # Generate component according to the logic of parameter overload -------------------------------------------------
   component <- list()
   if(isTRUE(attr(input_source, 'phea') == 'component')) {
@@ -213,6 +210,7 @@ make_component <- function(input_source,
     use_fn <- rep(component$fn, length(component$columns))
     use_fn[component$columns == 'ts'] <- component$ts_fn
     
+    
     component$window_sql <- lapply(seq(component$columns), \(i) {
       sql_txt <- paste0(use_fn[i], '(', columns_sql[i], ')')
       dbplyr::win_over(
@@ -223,8 +221,10 @@ make_component <- function(input_source,
           ifelse(is.na(component$bound), -Inf, -component$bound),
           ifelse(is.na(component$line), 0, -component$line)),
         con = .pheaglobalenv$con)
-    }) |>
-      unlist(recursive = FALSE)
+    })
+    
+    # Unlist the SQL objects without accidentally converting to character.
+    component$window_sql <- do.call(c, component$window_sql)
     component_has_been_built <- TRUE
   }
   
@@ -274,6 +274,7 @@ make_component <- function(input_source,
         ifelse(is.na(component$up_to) || component$up_to == Inf, 'unbounded', component$up_to), ' following)')
     }
     
+    # Produce SQL objects from character
     component$window_sql <- sql(sql_txts)
     component_has_been_built <- TRUE
   }
