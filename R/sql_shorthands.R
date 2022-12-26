@@ -110,7 +110,7 @@ sql0 <- function(...) {
   # Remove the ending ';' if the user wrote it. tbl() can't take it.
   sql_txt <- sql_txt |>
     trimws() |>
-    str_replace(';$', '')
+    stringr::str_replace(';$', '')
   
   dplyr::tbl(.pheaglobalenv$con,
     dplyr::sql(sql_txt))

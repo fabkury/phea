@@ -17,15 +17,14 @@ library(credx) # contains cred$pg
 ```
 ```{r setup, print = FALSE}
 suppressPackageStartupMessages(library(dplyr))
-# library(phea)
-devtools::load_all()
+library(phea)
 
 # Connect to SQL server.
 dbcon <- DBI::dbConnect(RPostgres::Postgres(),
   host = fabcred$pg$host, port = fabcred$pg$port, dbname = fabcred$pg$database,
   user = fabcred$pg$user, password = fabcred$pg$pass)
 
-# Call setup_phea so we can use sqlt() and sql0().
+# Setup Phea
 setup_phea(dbcon, 'cdm_new_york3')
 ```
 

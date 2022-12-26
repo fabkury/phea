@@ -87,6 +87,9 @@ make_component <- function(input_source,
   if(!is.null(ts) && ts == 'NULL')
     ts <- NULL
   
+  if(!is.null(delay) && !is.na(delay) && delay == "'6 years'::interval")
+    browser()
+  
 # Generate component according to the logic of parameter overload -------------------------------------------------
   component <- list()
   if(isTRUE(attr(input_source, 'phea') == 'component')) {

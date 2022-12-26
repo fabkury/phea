@@ -10,19 +10,19 @@ calculate_formula(
   window = NA,
   export = NULL,
   add_components = NULL,
+  require_all = FALSE,
+  limit = NA,
+  dont_require = NULL,
+  filters = NULL,
+  cascaded = TRUE,
+  clip_sql = FALSE,
+  out_window = NULL,
+  dates = NULL,
+  kco = FALSE,
   .ts = NULL,
   .pid = NULL,
   .delay = NULL,
-  .line = NULL,
-  .require_all = FALSE,
-  .lim = NA,
-  .dont_require = NULL,
-  .filter = NULL,
-  .cascaded = TRUE,
-  .clip_sql = FALSE,
-  .out_window = NULL,
-  .dates = NULL,
-  .kco = FALSE
+  .line = NULL
 )
 }
 \arguments{
@@ -35,36 +35,36 @@ provided, a default component will be made from it.}
 
 \item{add_components}{Additional components. Used mostly in case components is not a list of components.}
 
-\item{.ts, .pid, .delay, .line}{If supplied, these will overwrite those of the given component.}
-
-\item{.require_all}{If \code{TRUE}, returns only rows where all components to have been found according to their
+\item{require_all}{If \code{TRUE}, returns only rows where all components to have been found according to their
 timestamps. If the timestamp is not null, the component is cosidered present even if its other values are null. If
-\code{.dont_require} is provided, \code{.require_all} is ignored.}
+\code{dont_require} is provided, \code{require_all} is ignored.}
 
-\item{.lim}{Maximum number of rows to return. This is imposed before the calculation of the formula.}
+\item{limit}{Maximum number of rows to return. This is imposed before the calculation of the formula.}
 
-\item{.dont_require}{If provided, causes formula to require all components (regardless of .require_all), except for
+\item{dont_require}{If provided, causes formula to require all components (regardless of require_all), except for
 those listed here.}
 
-\item{.filter}{Character vector. Logical conditions to satisfy. Only rows satisfying all conditions provided will be
+\item{filters}{Character vector. Logical conditions to satisfy. Only rows satisfying all conditions provided will be
 returned. These go into the SQL \code{WHERE} clause.}
 
-\item{.cascaded}{If \code{TRUE} (default), each formula is computed in a separate, nested SELECT statement. This allows
+\item{cascaded}{If \code{TRUE} (default), each formula is computed in a separate, nested SELECT statement. This allows
 the result of the prior formula to be used in the following, at the potential cost of longer computation times.}
 
-\item{.clip_sql}{If \code{TRUE}, instead of a lazy table the return value is the code of the SQL query, and also copies it
+\item{clip_sql}{If \code{TRUE}, instead of a lazy table the return value is the code of the SQL query, and also copies it
 to the clipboard.}
 
-\item{.out_window}{Character vector. Names of components to \emph{not} be included when calculating the window.}
+\item{out_window}{Character vector. Names of components to \emph{not} be included when calculating the window.}
 
-\item{.dates}{Tibble. Column names must be \code{pid} (person ID) and \code{ts} (timestamp). If provided, these dates (for each
+\item{dates}{Tibble. Column names must be \code{pid} (person ID) and \code{ts} (timestamp). If provided, these dates (for each
 person ID) are added to the board, so that the phenotype computation can be attempted at those times.}
 
-\item{.kco}{Logical. "Keep change of". This is a shorthand to call \code{keep_change_of()} after computing the phenotype.
+\item{kco}{Logical. "Keep change of". This is a shorthand to call \code{keep_change_of()} after computing the phenotype.
 If \code{TRUE} (default), output will include only rows where the result of any of the formulas change. If \code{FALSE},
 \code{keep_change_of()} is not called and therefore all dates from every component will be present. This argument can
 alternatively be a character vector of names of columns and/or SQL expressions, in which case \code{calculate_formula()}
 will return only rows where the value of those columns or expressions change.}
+
+\item{.ts, .pid, .delay, .line}{If supplied, these will overwrite those of the given component.}
 }
 \value{
 Lazy table with result of formula or formulas.

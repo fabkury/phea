@@ -20,30 +20,31 @@
 #' @param export List of additional variables to export.
 #' @param add_components Additional components. Used mostly in case components is not a list of components.
 #' @param .ts,.pid,.delay,.line If supplied, these will overwrite those of the given component.
-#' @param .require_all If `TRUE`, returns only rows where all components to have been found according to their
+#' @param require_all If `TRUE`, returns only rows where all components to have been found according to their
 #'   timestamps. If the timestamp is not null, the component is cosidered present even if its other values are null. If 
-#'   `.dont_require` is provided, `.require_all` is ignored.
-#' @param .lim Maximum number of rows to return. This is imposed before the calculation of the formula.
-#' @param .dont_require If provided, causes formula to require all components (regardless of .require_all), except for
+#'   `dont_require` is provided, `require_all` is ignored.
+#' @param limit Maximum number of rows to return. This is imposed before the calculation of the formula.
+#' @param dont_require If provided, causes formula to require all components (regardless of require_all), except for
 #'   those listed here.
-#' @param .cascaded If `TRUE` (default), each formula is computed in a separate, nested SELECT statement. This allows
+#' @param cascaded If `TRUE` (default), each formula is computed in a separate, nested SELECT statement. This allows
 #'   the result of the prior formula to be used in the following, at the potential cost of longer computation times.
-#' @param .clip_sql If `TRUE`, instead of a lazy table the return value is the code of the SQL query, and also copies it
+#' @param clip_sql If `TRUE`, instead of a lazy table the return value is the code of the SQL query, and also copies it
 #'   to the clipboard.  
-#' @param .filter Character vector. Logical conditions to satisfy. Only rows satisfying all conditions provided will be
+#' @param filters Character vector. Logical conditions to satisfy. Only rows satisfying all conditions provided will be
 #'   returned. These go into the SQL `WHERE` clause.   
-#' @param .out_window Character vector. Names of components to *not* be included when calculating the window.
-#' @param .dates Tibble. Column names must be `pid` (person ID) and `ts` (timestamp). If provided, these dates (for each
+#' @param out_window Character vector. Names of components to *not* be included when calculating the window.
+#' @param dates Tibble. Column names must be `pid` (person ID) and `ts` (timestamp). If provided, these dates (for each
 #' person ID) are added to the board, so that the phenotype computation can be attempted at those times.
-#' @param .kco Logical. "Keep change of". This is a shorthand to call `keep_change_of()` after computing the phenotype.
+#' @param kco Logical. "Keep change of". This is a shorthand to call `keep_change_of()` after computing the phenotype.
 #' If `TRUE` (default), output will include only rows where the result of any of the formulas change. If `FALSE`,
 #' `keep_change_of()` is not called and therefore all dates from every component will be present. This argument can
 #' alternatively be a character vector of names of columns and/or SQL expressions, in which case `calculate_formula()`
 #' will return only rows where the value of those columns or expressions change.
 #' @return Lazy table with result of formula or formulas.
 calculate_formula <- function(components, fml = NULL, window = NA, export = NULL, add_components = NULL,
-  .ts = NULL, .pid = NULL, .delay = NULL, .line = NULL, .require_all = FALSE, .lim = NA, .dont_require = NULL,
-  .filter = NULL, .cascaded = TRUE, .clip_sql = FALSE, .out_window = NULL, .dates = NULL, .kco = FALSE) {
+  require_all = FALSE, limit = NA, dont_require = NULL, filters = NULL, cascaded = TRUE, clip_sql = FALSE,
+  out_window = NULL, dates = NULL, kco = FALSE,
+  .ts = NULL, .pid = NULL, .delay = NULL, .line = NULL) {
   # Prepare ---------------------------------------------------------------------------------------------------------
   # TODO: Improve the logic regarding these two variables below.
   keep_names_unchanged <- FALSE
@@ -152,9 +153,9 @@ calculate_formula <- function(components, fml = NULL, window = NA, export = NULL
   }
   
   # Read input filter -----------------------------------------------------------------------------------------------
-  if(!is.null(.filter)) {
+  if(!is.null(filters)) {
     # Extract components from filters.
-    filter_vars <- unlist(.filter) |>
+    filter_vars <- unlist(filters) |>
       stringr::str_match_all('([A-z][A-z0-9_]+)') |>
       unlist() |> unique()
     
@@ -205,9 +206,9 @@ calculate_formula <- function(components, fml = NULL, window = NA, export = NULL
     purrr::reduce(dplyr::union_all)
   
   # Add extra dates -------------------------------------------------------------------------------------------------
-  if(!is.null(.dates)) {
-    message('Warning: .dates is yet to be properly tested.')
-    dates_table <- dbplyr::copy_inline(.pheaglobalenv$con, .dates)
+  if(!is.null(dates)) {
+    message('Warning: dates is yet to be properly tested.')
+    dates_table <- dbplyr::copy_inline(.pheaglobalenv$con, dates)
     board <- dplyr::union_all(board, dates_table)
   }
   
@@ -246,7 +247,7 @@ calculate_formula <- function(components, fml = NULL, window = NA, export = NULL
     arrange()
   
   # Compute window --------------------------------------------------------------------------------------------------
-  window_components <- setdiff(var_map$component_name, .out_window)
+  window_components <- setdiff(var_map$component_name, out_window)
   if(!input_is_phenotype && length(window_components) > 1) { # Window only makes sense if there is > 1 component.
     window_components_sql <- window_components |>
       unique() |>
@@ -281,10 +282,10 @@ calculate_formula <- function(components, fml = NULL, window = NA, export = NULL
   # Let us compact those three things into a single call to dplyr::filter(), in order to produce a single WHERE
   # statement, instead of three layers of SELECT ... WHERE.
   
-  if(.require_all || !is.null(.dont_require)) {
-    # If .dont_require is provided, then all components, except those specified, will be required, even if .require_all
+  if(require_all || !is.null(dont_require)) {
+    # If dont_require is provided, then all components, except those specified, will be required, even if require_all
     # is FALSE.
-    required_components <- setdiff(names(components), .dont_require)
+    required_components <- setdiff(names(components), dont_require)
     if(length(required_components) > 0) {
       sql_txt <- required_components |>
         paste0('_ts') |>
@@ -303,7 +304,7 @@ calculate_formula <- function(components, fml = NULL, window = NA, export = NULL
             window < local(window))
       }
     } else {
-      # No required components after all, because all were excluded by .dont_require. Let's just filter by the most
+      # No required components after all, because all were excluded by dont_require. Let's just filter by the most
       # complete computation.
       if(is.na(window)) {
         board <- dplyr::filter(board,
@@ -327,14 +328,14 @@ calculate_formula <- function(components, fml = NULL, window = NA, export = NULL
   }
   
   # Apply filters, if provided.
-  if(!is.null(.filter)) {
-    sql_txt <- paste0('(', paste0(.filter, collapse = ') AND ('), ')')
+  if(!is.null(filters)) {
+    sql_txt <- paste0('(', paste0(filters, collapse = ') AND ('), ')')
     board <- board |>
       filter(sql(sql_txt))
   }
   
   # Limit number of output rows, if requested.
-  if(!is.na(.lim))
+  if(!is.na(limit))
     board <- board |>
     head(n = lim)
   
@@ -346,7 +347,7 @@ calculate_formula <- function(components, fml = NULL, window = NA, export = NULL
   # Calculate the formulas, if any.
   res_vars <- NULL
   if(!is.null(fml)) {
-    if(.cascaded) {
+    if(cascaded) {
       # Compute one at a time, so that the prior result can be used in the next formula.
       for(i in seq(fml)) {
         cur_fml <- fml[[i]]
@@ -385,10 +386,10 @@ calculate_formula <- function(components, fml = NULL, window = NA, export = NULL
         }
       }
     } else {
-      # .cascaded is turned off.
-      # Let's check if any of the formulas is itself a list, which means .cascaded was supposed to be on.
+      # cascaded is turned off.
+      # Let's check if any of the formulas is itself a list, which means cascaded was supposed to be on.
       if(any(lapply(fml, class) == 'list'))
-        stop('Nested formulas require .cascaded = TRUE.')
+        stop('Nested formulas require cascaded = TRUE.')
       
       # Export the names to res_vars.
       res_vars <- c(res_vars, names(fml))
@@ -404,23 +405,23 @@ calculate_formula <- function(components, fml = NULL, window = NA, export = NULL
   
   # Collapse SQL and return -----------------------------------------------------------------------------------------
   # Keep change of, if requested.
-  # Parameter overload: .kco can be:
+  # Parameter overload: kco can be:
   # - logical: TRUE (apply kco over all result columns) or FALSE.
   # - character vector: Names of columns to apply kco.
-  if(class(.kco) == 'logical') {
-    if(length(.kco) > 1)
-      stop('If logical, .kco must be of length 1.')
+  if(class(kco) == 'logical') {
+    if(length(kco) > 1)
+      stop('If logical, kco must be of length 1.')
     
     # If no res_vars, keep_change_of would collapse to one row per partition.
-    if(.kco && !is.null(res_vars))
+    if(kco && !is.null(res_vars))
       board <- board |>
         keep_change_of(res_vars, partition = 'pid', order = 'ts')
   } else {
-    if(class(.kco) != 'character')
-      stop('.kco must be logical or character vector.')
+    if(class(kco) != 'character')
+      stop('kco must be logical or character vector.')
     
     board <- board |>
-      keep_change_of(.kco, partition = 'pid', order = 'ts')
+      keep_change_of(kco, partition = 'pid', order = 'ts')
   }
   
   # Calling collapse() is necessary to minimize the accumulation of "lazy table generating code". That accumulation
@@ -434,7 +435,7 @@ calculate_formula <- function(components, fml = NULL, window = NA, export = NULL
   attr(board, 'phea_res_vars') <- res_vars
   attr(board, 'phea_out_vars') <- g_vars
   
-  if(.clip_sql) {
+  if(clip_sql) {
     sql_txt <- dbplyr::sql_render(board)
     writeClipboard(sql_txt)
     return(invisible(sql_txt))

@@ -13,18 +13,15 @@ knitr::opts_chunk$set(
   comment = "#>"
 )
 
-library(credx) # contains cred$pg
-library(phea)
+library(credx) # contains fabcred$pg
+# library(phea)
+devtools::load_all()
 suppressPackageStartupMessages(library(dplyr))
+
 # Connect to SQL server.
-if(!exists('dbcon'))
-  dbcon <- DBI::dbConnect(
-    RPostgres::Postgres(),
-    host = 'localhost',
-    port = 8765,
-    dbname = 'fort',
-    user = cred$pg$user,
-    password = cred$pg$pass)
+dbcon <- DBI::dbConnect(RPostgres::Postgres(),
+  host = fabcred$pg$host, port = fabcred$pg$port, dbname = fabcred$pg$database,
+  user = fabcred$pg$user, password = fabcred$pg$pass)
 
 # Provide the connection to Phea so we can use the sqlt() and sql0() shorthands.
 setup_phea(dbcon, 'cdm_new_york3')
@@ -121,16 +118,14 @@ component.
 ## How to set up
 First you need to connect to your relational server. **While Phea is not restricted to PostgreSQL, so far it has only been tested on PostgreSQL version 15.**  
 ```{r sql_connection}
-library(phea)
+# library(phea)
+devtools::load_all()
 
 # Connect to SQL server
-dbcon <- DBI::dbConnect(
-    RPostgres::Postgres(),
-    host = 'localhost',
-    port = 8765,
-    dbname = 'fort',
-    user = cred$pg$user, # Credentials not declared in this file
-    password = cred$pg$pass) # Credentials not declared in this file
+# (fabcred credentials are not declared in this file)
+dbcon <- DBI::dbConnect(RPostgres::Postgres(),
+  host = fabcred$pg$host, port = fabcred$pg$port, dbname = fabcred$pg$database,
+  user = fabcred$pg$user, password = fabcred$pg$pass)
 ```
 
 Calling `setup_phea()` is optional, but it enables the use of convenience functions `sql0()` and `sqlt()`.  
@@ -170,8 +165,8 @@ hemoglobin_query <- sql0('
 
 hemoglobin_record_source <- make_record_source(
   records = hemoglobin_query,
-  ts = measurement_datetime,
-  pid = person_id)
+  ts = 'measurement_datetime',
+  pid = 'person_id')
 ```
 
 ### Components
@@ -222,27 +217,13 @@ code_shot(phen)
 ```
 Multiple formulas can be computed at once:  
 
-```{r multiple_formulas}
-phen <- calculate_formula(
-  components = list(
-    hemo_a1c = hemoglobin_component),
-  fml = list(
-    a1c_sqrt = 'sqrt(hemo_a1c_value_as_number)',
-    a1c_cubed = 'hemo_a1c_value_as_number * hemo_a1c_value_as_number * hemo_a1c_value_as_number'))
-
-dplyr::collect(head(phen)) |>
-  knitr::kable()
-```
-
-If you need to use the result of one formula in the next one, set `.cascaded = TRUE`:  
 ```{r cascaded}
 phen <- calculate_formula(
   components = list(
     hemo_a1c = hemoglobin_component),
   fml = list(
     a1c_sqrt = 'sqrt(hemo_a1c_value_as_number)',
-    a1c_half_sqrt = 'a1c_sqrt / 2'),
-  .cascaded = TRUE)
+    a1c_half_sqrt = 'a1c_sqrt / 2'))
 
 dplyr::collect(head(phen)) |> knitr::kable()
 ```
@@ -255,8 +236,8 @@ To obtain the patient's age, we can collect the date of birth from table `person
 ```{r patient_age}
 person_records <- make_record_source(
   records = sqlt(person),
-  ts = birth_datetime,
-  pid = person_id)
+  ts = 'birth_datetime',
+  pid = 'person_id')
 
 person_component <- make_component(person_records)
 
@@ -266,8 +247,7 @@ phen <- calculate_formula(
     person = person_component),
   fml = list(
     pat_age = 'age(hemo_a1c_measurement_datetime, person_birth_datetime)',
-    a1c_times_age = 'hemo_a1c_value_as_number * extract(year from pat_age)'),
-  .cascaded = TRUE)
+    a1c_times_age = 'hemo_a1c_value_as_number * extract(year from pat_age)'))
 
 dplyr::collect(head(phen)) |> knitr::kable()
 ```
@@ -282,7 +262,6 @@ phen <- calculate_formula(
   fml = list(
     pat_age = 'age(hemo_a1c_measurement_datetime, person_birth_datetime)',
     a1c_times_age = 'hemo_a1c_value_as_number * extract(year from pat_age)'),
-  .cascaded = TRUE,
   export = c(
     'hemo_a1c_provider_id',
     'hemo_a1c_visit_occurrence_id',
@@ -316,19 +295,20 @@ phen <- calculate_formula(
   export = c(
     'hemo_a1c_visit_occurrence_id',
     'prev_hemo_a1c_visit_occurrence_id'))
+
 dplyr::collect(head(phen)) |> knitr::kable()
 ```
 
 `delay` imposes a minimum time difference between the timestamp of the component and the timestamp of the phenotype.
-They are defined in SQL language. For example, `delay = '1 day'` gives the most recently available record that is at
-least 1 day older than the phenotype. If there are no such records, the value is empty.
+It is defined in SQL language. For example, `delay = "'1 day'::interval` gives the most recently available record that
+is at least 1 day older than the phenotype (in PostgreSQL). If there are no such records, the value is empty.
 ```{r delay}
 hemoglobin_component <- make_component(
   input_source = hemoglobin_record_source)
 
 old_hemoglobin_component <- make_component(
   input_source = hemoglobin_record_source,
-  delay = '6 years')
+  delay = "'6 years'::interval")
 
 phen <- calculate_formula(
   components = list(
@@ -339,6 +319,7 @@ phen <- calculate_formula(
   export = c(
     'hemo_a1c_visit_occurrence_id',
     'old_hemo_a1c_visit_occurrence_id'))
+
 dplyr::collect(head(phen)) |> knitr::kable()
 ```
 

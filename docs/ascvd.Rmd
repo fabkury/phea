@@ -11,7 +11,7 @@ vignette: >
 library(knitr)
 options(scipen = 5e5)
 knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
-library(credx) # contains cred$pg
+library(credx) # contains fabcred$pg
 library(wrap)
 
 usn <- function(n, decimals = 0) {
@@ -25,14 +25,14 @@ usn <- function(n, decimals = 0) {
 ```
 ```{r setup, message = FALSE}
 library(phea)
-library(dplyr)
+suppressPackageStartupMessages(library(dplyr))
 
 # Connect to SQL server.
 dbcon <- DBI::dbConnect(RPostgres::Postgres(),
-  host = 'localhost', port = 8765, dbname = 'fort',
-  user = cred$pg$user, password = cred$pg$pass)
+  host = fabcred$pg$host, port = fabcred$pg$port, dbname = fabcred$pg$database,
+  user = fabcred$pg$user, password = fabcred$pg$pass)
 
-# Call setup_phea so we can use sqlt() and sql0().
+# Setup Phea
 setup_phea(dbcon, 'cdm_new_york3')
 ```
 
