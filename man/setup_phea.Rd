@@ -14,7 +14,8 @@ setup_phea(connection, schema, verbose = TRUE, .fix_dbplyr_spark = FALSE)
 \item{verbose}{Logical. Optional. If TRUE (default), functions will print to console at times.}
 
 \item{.fix_dbplyr_spark}{Logical. Optional. Very niche functionality. Set to \code{TRUE} to attempt to fix the use of
-\verb{IGNORE NULLS} by the OBDC driver connected to a Spark SQL server/cluster.}
+\verb{IGNORE NULLS} by the OBDC driver connected to a Spark SQL server/cluster. This is the only situation where this
+argument should be used.}
 }
 \description{
 Configures Phea, in particular the SQL shorthands \code{sqlt()}, \code{sql0()} and \code{sqla()}.

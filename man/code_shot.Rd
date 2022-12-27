@@ -4,12 +4,15 @@
 \alias{code_shot}
 \title{Code shot}
 \usage{
-code_shot(lazy_tbl, clip = TRUE)
+code_shot(lazy_tbl, clip = TRUE, show = TRUE)
 }
 \arguments{
 \item{lazy_tbl}{Lazy table to look at.}
 
 \item{clip}{If \code{TRUE} (default), will write to clipboard.}
+
+\item{show}{If \code{FALSE} (default is \code{TRUE}), will use \code{\link[=invisible]{invisible()}} to avoid implicitly printing query to console.
+This is normally used in conjunction with \code{clip = TRUE}.}
 }
 \value{
 SQL object containing the query. Can be coerced to character by \code{as.character()}.

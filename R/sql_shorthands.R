@@ -41,16 +41,19 @@ head_shot <- function(lazy_tbl, nrows = 10, blind = FALSE, .title = NA) {
 #' @export
 #' @param lazy_tbl Lazy table to look at.
 #' @param clip If `TRUE` (default), will write to clipboard.
+#' @param show If `FALSE` (default is `TRUE`), will use [invisible()] to avoid implicitly printing query to console.
+#' This is normally used in conjunction with `clip = TRUE`.
 #' @return SQL object containing the query. Can be coerced to character by `as.character()`.
-code_shot <- function(lazy_tbl, clip = TRUE) {
-  # 2022-11-20 12:28
-  res <- lazy_tbl |>
-    dbplyr::sql_render()
+code_shot <- function(lazy_tbl, clip = TRUE, show = TRUE) {
+  res <- dbplyr::sql_render(lazy_tbl)
   
   if(clip)
     writeClipboard(res)
   
-  return(res)
+  if(show)
+    return(res)
+  else
+    return(invisible(res))
 }
 
 

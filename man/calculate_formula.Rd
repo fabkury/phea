@@ -15,7 +15,7 @@ calculate_formula(
   dont_require = NULL,
   filters = NULL,
   cascaded = TRUE,
-  clip_sql = FALSE,
+  get_sql = FALSE,
   out_window = NULL,
   dates = NULL,
   kco = FALSE,
@@ -50,9 +50,6 @@ returned. These go into the SQL \code{WHERE} clause.}
 \item{cascaded}{If \code{TRUE} (default), each formula is computed in a separate, nested SELECT statement. This allows
 the result of the prior formula to be used in the following, at the potential cost of longer computation times.}
 
-\item{clip_sql}{If \code{TRUE}, instead of a lazy table the return value is the code of the SQL query, and also copies it
-to the clipboard.}
-
 \item{out_window}{Character vector. Names of components to \emph{not} be included when calculating the window.}
 
 \item{dates}{Tibble. Column names must be \code{pid} (person ID) and \code{ts} (timestamp). If provided, these dates (for each
@@ -65,6 +62,9 @@ alternatively be a character vector of names of columns and/or SQL expressions, 
 will return only rows where the value of those columns or expressions change.}
 
 \item{.ts, .pid, .delay, .line}{If supplied, these will overwrite those of the given component.}
+
+\item{clip_sql}{If \code{TRUE}, instead of a lazy table the return value is the code of the SQL query, and also copies it
+to the clipboard.}
 }
 \value{
 Lazy table with result of formula or formulas.

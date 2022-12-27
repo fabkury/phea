@@ -42,7 +42,7 @@
 #' will return only rows where the value of those columns or expressions change.
 #' @return Lazy table with result of formula or formulas.
 calculate_formula <- function(components, fml = NULL, window = NA, export = NULL, add_components = NULL,
-  require_all = FALSE, limit = NA, dont_require = NULL, filters = NULL, cascaded = TRUE, clip_sql = FALSE,
+  require_all = FALSE, limit = NA, dont_require = NULL, filters = NULL, cascaded = TRUE, get_sql = FALSE,
   out_window = NULL, dates = NULL, kco = FALSE,
   .ts = NULL, .pid = NULL, .delay = NULL, .line = NULL) {
   # Prepare ---------------------------------------------------------------------------------------------------------
@@ -429,10 +429,8 @@ calculate_formula <- function(components, fml = NULL, window = NA, export = NULL
   attr(board, 'phea_res_vars') <- res_vars
   attr(board, 'phea_out_vars') <- g_vars
   
-  if(clip_sql) {
-    sql_txt <- dbplyr::sql_render(board)
-    writeClipboard(sql_txt)
-    return(invisible(sql_txt))
+  if(get_sql) {
+    return(dbplyr::sql_render(board))
   } else {
     return(board)
   }

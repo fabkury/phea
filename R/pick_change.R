@@ -25,6 +25,9 @@
 #' @param val Character or numeric. Literal value to compare to result of `.fn`.
 #' @return Lazy table with filtered rows.
 pick_row_by <- function(lazy_tbl, by, partition = NULL, pick_max = FALSE, fn = NULL, val = NULL) {
+  if(is.null(.pheaglobalenv$con))
+    stop('Connection must be setup previously with setup_phea().')
+  
   if(is.null(fn)) {
     # The default operation is done using `row_number() == 1`/`cume_dist() == 1`, as opposed to `max()`/`min()`, to
     # spare the need to create a new variable (column) to perform the computation, since window functions cannot go in
@@ -83,7 +86,7 @@ pick_row_by <- function(lazy_tbl, by, partition = NULL, pick_max = FALSE, fn = N
 #' @return Lazy table with only rows where `of` changes in comparison to the previous row.
 keep_change_of <- function(lazy_tbl, of, partition = NULL, order = NULL) {
   if(is.null(.pheaglobalenv$con))
-    stop('Connection must be provided or setup previously with setup_phea().')
+    stop('Connection must be setup previously with setup_phea().')
   con <- .pheaglobalenv$con
   
   if(!is.null(partition))
