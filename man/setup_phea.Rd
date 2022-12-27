@@ -4,14 +4,14 @@
 \alias{setup_phea}
 \title{Setup Phea}
 \usage{
-setup_phea(connection, schema, .verbose = TRUE, .fix_dbplyr_spark = FALSE)
+setup_phea(connection, schema, verbose = TRUE, .fix_dbplyr_spark = FALSE)
 }
 \arguments{
 \item{connection}{DBI-compatible SQL connection (e.g. produced by DBI::dbConnect).}
 
 \item{schema}{Schema to be used by default in \code{sqlt()}. If no schema, use \code{NA}.}
 
-\item{.verbose}{Logical. Optional. If TRUE (default), functions will print to console at times.}
+\item{verbose}{Logical. Optional. If TRUE (default), functions will print to console at times.}
 
 \item{.fix_dbplyr_spark}{Logical. Optional. Very niche functionality. Set to \code{TRUE} to attempt to fix the use of
 \verb{IGNORE NULLS} by the OBDC driver connected to a Spark SQL server/cluster.}

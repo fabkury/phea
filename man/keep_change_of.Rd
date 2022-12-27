@@ -4,7 +4,7 @@
 \alias{keep_change_of}
 \title{Keep change of \link{a column or SQL expression}}
 \usage{
-keep_change_of(lazy_tbl, of, partition = NULL, order = NULL, con = NULL)
+keep_change_of(lazy_tbl, of, partition = NULL, order = NULL)
 }
 \arguments{
 \item{lazy_tbl}{Lazy table to be filtered.}
@@ -25,7 +25,6 @@ Keeps only the rows where the value of \code{of} changes. \code{of} can be the n
 inside a \code{SELECT} statement.
 }
 \details{
-If \code{partition} is provided, changes are limited to within it. If \code{order} provided, rows
-are ordered (and change is detected) according to that column or columns. The first row (within a partition or not)
-is always kept.
+If \code{partition} is provided, changes are limited to within it. If \code{order} provided, rows are ordered and change is
+detected according to the specified column or columns. The first row (within a partition or not) is always kept.
 }

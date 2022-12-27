@@ -7,11 +7,10 @@
 pick_row_by(
   lazy_tbl,
   by,
-  partition,
+  partition = NULL,
   pick_max = FALSE,
-  .fn = NULL,
-  .fn_arg = NULL,
-  .val = NULL
+  fn = NULL,
+  val = NULL
 )
 }
 \arguments{
@@ -21,21 +20,23 @@ pick_row_by(
 
 \item{partition}{Character vector. Column name(s) to define the partition.}
 
-\item{pick_max}{Logical. If \code{TRUE}, will pick the last row, instead of first.}
+\item{pick_max}{Logical. If \code{TRUE}, will pick the row with largest \code{by}, instead of smallest.}
 
-\item{.fn}{Character. Name of the aggregate function to use, \emph{without parentheses}. E.g.: \code{max}, \code{cume_dist}.}
+\item{fn}{Character. Window function to use, with arguments if needed. E.g.: \code{row_number()},
+\code{perc_dist(0.5)}.}
 
-\item{.val}{Character or numeric. Literal value to compare to result of \code{.fn}.}
+\item{val}{Character or numeric. Literal value to compare to result of \code{.fn}.}
 }
 \value{
 Lazy table with filtered rows.
 }
 \description{
-Pick (keep) the row(s) that contain the group-wise aggregate value of \code{.fn} in each partition. If \code{.fn} is not
-provided, defaults to picking the rows where the value of \code{by} is minimum.
+Pick (keep) the row(s) that contain the frame-wise aggregate value of window function \code{fn}. If \code{fn} is not provided,
+defaults to picking the rows where the value of \code{by} is minimum (i.e. first row in ascending order). If \code{pick_max} is
+\code{TRUE}, defaults instead to rows where \code{by} is maximum (i.e. last row in ascending order).
 }
 \details{
-If \code{pick_min} is \code{TRUE}, defaults instead to rows where \code{by} is maximum.
+If \code{val} is provided, keeps the rows where the result of \code{fn(by)} is equal to \code{val} (if any).
 
-If \code{.val} is provided, keeps the rows where the result of \code{.fn(by)} is equal to \code{.val}.
+If \code{partition} is provided, it is used when calling the window function.
 }
