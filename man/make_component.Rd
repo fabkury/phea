@@ -6,20 +6,18 @@
 \usage{
 make_component(
   input_source,
-  line = NA,
-  bound = NA,
-  delay = NA,
-  window = NA,
-  ahead = NA,
-  up_to = NA,
-  rows = NULL,
-  range = NULL,
+  line = NULL,
+  bound = NULL,
+  delay = NULL,
+  window = NULL,
+  ahead = NULL,
+  up_to = NULL,
   pid = NULL,
   ts = NULL,
   .ts = NULL,
   .pid = NULL,
-  .fn = NA,
-  .ts_fn = NA,
+  .fn = NULL,
+  .ts_fn = NULL,
   .passthrough = FALSE
 )
 }

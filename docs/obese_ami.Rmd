@@ -111,24 +111,24 @@ ami_obese <- calculate_formula(
     height = height_component,
     ami = ami_component),
   fml = list(
-    a = list(
-      height_in_meters = 'height_value_as_number / 100',
-      
+    height_in_meters = 'height_value_as_number / 100',
+    
+    a = list( # the name 'a' doesn't matter
       bmi = 'weight_value_as_number / (height_in_meters * height_in_meters)',
     
-      has_ami = 'ami_condition_start_datetime is not null'
-    ),
+      has_ami = 'ami_condition_start_datetime is not null'),
     
-    has_bmi = 'bmi is not null',
+    b = list( # the name 'b' doesn't matter
+      has_bmi = 'bmi is not null',
     
-    is_obese = 'bmi > 30',
+      is_obese = 'bmi > 30'),
     
     ami_obese = 'has_ami and is_obese'
   )
 )
 ```
 ```{r filter ami}
-# Keep only patients who had AMI
+# Keep only *patients* (not rows) who had AMI
 ami_patients <- ami_obese |>
   filter(has_ami) |>
   select(pid) |>

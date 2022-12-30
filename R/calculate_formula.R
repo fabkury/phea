@@ -50,6 +50,10 @@ calculate_formula <- function(components, fml = NULL, window = NA, export = NULL
   keep_names_unchanged <- FALSE
   input_is_phenotype <- FALSE
   
+  # This is just to make code easier to read.
+  dbQuoteId <- function(x)
+    DBI::dbQuoteIdentifier(.pheaglobalenv$con, x)
+  
   # Parameter overload ----------------------------------------------------------------------------------------------
   if(isTRUE(attr(components, 'phea') == 'phenotype')) {
     keep_names_unchanged <- TRUE
@@ -106,7 +110,7 @@ calculate_formula <- function(components, fml = NULL, window = NA, export = NULL
       rec_name = component$rec_source$rec_name,
       column = component$columns,
       composed_name = composed_name,
-      window_sql = component$window_sql))
+      access_sql = component$access_sql))
   }) |>
     dplyr::bind_rows()
   
@@ -208,17 +212,18 @@ calculate_formula <- function(components, fml = NULL, window = NA, export = NULL
   
   # Apply components ------------------------------------------------------------------------------------------------
   # First, generate the commands.
-  commands <- purrr::map2(var_map$composed_name, var_map$window_sql,
+  commands <- purrr::map2(var_map$composed_name, var_map$access_sql,
     ~rlang::exprs(!!..1 := !!dplyr::sql(..2))) |>
     unique() |>
     unlist(recursive = FALSE)
   # The unique() above is just in case, but is it needed? Seems like the only way there could be duplicates is if the
   # same component gets added twice to the call to calculate_formula(). 
   
-  row_id_sql_txt <- paste0('row_number() over (order by ', DBI::dbQuoteIdentifier(.pheaglobalenv$con, 'pid'), ', ',
-    DBI::dbQuoteIdentifier(.pheaglobalenv$con, 'ts'), ')')
+  row_id_sql_txt <- paste0('row_number() over (order by ', dbQuoteId('pid'), ', ',
+    dbQuoteId('ts'), ')')
   
-  # Second, apply commands to the board all at once, so we only generate a single layer of "(SELECT ...)".
+  # Second, apply commands to the board all at once, so we only generate a
+  # single layer of "SELECT ... FROM (SELECT ...)".
   board <- dplyr::transmute(board,
     row_id = dplyr::sql(row_id_sql_txt),
     pid, ts,
@@ -255,16 +260,18 @@ calculate_formula <- function(components, fml = NULL, window = NA, export = NULL
   else {
     # TODO: Improve this a bit?
     # If there is only one component, window is zero. But if we just set window = 0, we mess with the data type.
-    sql_ts_least <- DBI::dbQuoteIdentifier(.pheaglobalenv$con, 'ts')
+    sql_ts_least <- dbQuoteId('ts')
     sql_ts_greatest <- sql_ts_least
   }
   
   # phea_ts_row is used to pick the best computation within each date. This is for the case when multiple data points
   # exist on the same date. The best computation for each date is the last row within that date.
+  sql_txt <- paste0('last_value(', dbQuoteId('row_id'), ') OVER (PARTITION BY ',
+    dbQuoteId('pid'), ', ', dbQuoteId('ts'), ')')
   board <- board |>
     dplyr::mutate(
       window = dplyr::sql(sql_ts_greatest) - dplyr::sql(sql_ts_least),
-      phea_ts_row = dplyr::sql('last_value(row_id) over (partition by pid, ts)'))
+      phea_ts_row = dplyr::sql(sql_txt))
   
   # Filter rows -----------------------------------------------------------------------------------------------------
   # The most complete computation is the last one in each timestamp. 'max(row_id) over (partition by "pid", "ts")' could

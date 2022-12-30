@@ -43,7 +43,7 @@ pick_row_by <- function(lazy_tbl, by, partition = NULL, pick_max = FALSE, fn = N
   
   # Produce the window function
   win_sql <- dbplyr::win_over(
-    expr = fn,
+    expr = sql(fn),
     partition = partition,
     order = by,
     con = .pheaglobalenv$con)
