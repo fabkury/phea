@@ -219,13 +219,13 @@ calculate_formula <- function(components, fml = NULL, window = NA, export = NULL
   # The unique() above is just in case, but is it needed? Seems like the only way there could be duplicates is if the
   # same component gets added twice to the call to calculate_formula(). 
   
-  row_id_sql_txt <- paste0('row_number() over (order by ', dbQuoteId('pid'), ', ',
+  phea_row_id_sql_txt <- paste0('row_number() over (order by ', dbQuoteId('pid'), ', ',
     dbQuoteId('ts'), ')')
   
   # Second, apply commands to the board all at once, so we only generate a
   # single layer of "SELECT ... FROM (SELECT ...)".
   board <- dplyr::transmute(board,
-    row_id = dplyr::sql(row_id_sql_txt),
+    phea_row_id = dplyr::sql(phea_row_id_sql_txt),
     pid, ts,
     !!!commands)
   
@@ -233,7 +233,7 @@ calculate_formula <- function(components, fml = NULL, window = NA, export = NULL
   board <- board |>
     dbplyr::window_order(pid, ts) |>
     dplyr::group_by(pid) |>
-    tidyr::fill(!c(row_id, pid, ts)) |>
+    tidyr::fill(!c(phea_row_id, pid, ts)) |>
     ungroup()
   
   # For some reason, apparently a bug in dbplyr's SQL translation, we need to "erase" an ORDER BY "pid", "ts" that is
@@ -266,17 +266,18 @@ calculate_formula <- function(components, fml = NULL, window = NA, export = NULL
   
   # phea_ts_row is used to pick the best computation within each date. This is for the case when multiple data points
   # exist on the same date. The best computation for each date is the last row within that date.
-  sql_txt <- paste0('last_value(', dbQuoteId('row_id'), ') OVER (PARTITION BY ',
+  # The most complete computation is the last one in each timestamp. 'max(phea_row_id) over (partition by "pid", "ts")'
+  # finds the row with the largest (most complete) phea_row_id in each timestamp. last_value() could give the same
+  # result, and could be potentially faster (wild assumption) due to optimizations, but that's just an idea.
+  sql_txt <- paste0('MAX(', dbQuoteId('phea_row_id'), ') OVER (PARTITION BY ',
     dbQuoteId('pid'), ', ', dbQuoteId('ts'), ')')
+  
   board <- board |>
     dplyr::mutate(
       window = dplyr::sql(sql_ts_greatest) - dplyr::sql(sql_ts_least),
       phea_ts_row = dplyr::sql(sql_txt))
   
   # Filter rows -----------------------------------------------------------------------------------------------------
-  # The most complete computation is the last one in each timestamp. 'max(row_id) over (partition by "pid", "ts")' could
-  # find the row with the largest (most complete) row_id in each timestamp, but last_value() in this context gives the
-  # same result, and I suspect is potentially faster due to optimizations inside the SQL server.
   # We also need to:
   #  - potentially require all fields be filled.
   #  - potentially impose the time window.
@@ -296,11 +297,11 @@ calculate_formula <- function(components, fml = NULL, window = NA, export = NULL
       
       if(is.na(window)) {
         board <- dplyr::filter(board,
-          row_id == phea_ts_row &&
+          phea_row_id == phea_ts_row &&
             dplyr::sql(sql_txt))
       } else {
         board <- dplyr::filter(board,
-          row_id == phea_ts_row &&
+          phea_row_id == phea_ts_row &&
             dplyr::sql(sql_txt) &&
             window < local(window))
       }
@@ -309,10 +310,10 @@ calculate_formula <- function(components, fml = NULL, window = NA, export = NULL
       # complete computation.
       if(is.na(window)) {
         board <- dplyr::filter(board,
-          row_id == phea_ts_row)
+          phea_row_id == phea_ts_row)
       } else {
         board <- dplyr::filter(board,
-          row_id == phea_ts_row &&
+          phea_row_id == phea_ts_row &&
             window < local(window))
       }
     }
@@ -320,10 +321,10 @@ calculate_formula <- function(components, fml = NULL, window = NA, export = NULL
     # No need to require all components. Let's just filter by the most complete computation.
     if(is.na(window)) {
       board <- board |>
-        dplyr::filter(row_id == phea_ts_row)
+        dplyr::filter(phea_row_id == phea_ts_row)
     } else {
       board <- board |>
-        dplyr::filter(row_id == phea_ts_row &&
+        dplyr::filter(phea_row_id == phea_ts_row &&
             window < local(window))
     }
   }
@@ -343,7 +344,7 @@ calculate_formula <- function(components, fml = NULL, window = NA, export = NULL
   # Calculate formula -----------------------------------------------------------------------------------------------
   # Remove the original columns of the record sources, leaving only those produced by the components.
   board <- board |>
-    dplyr::select(row_id, pid, ts, window, !!!g_vars)
+    dplyr::select(phea_row_id, pid, ts, window, !!!g_vars)
   
   # Calculate the formulas, if any.
   res_vars <- NULL

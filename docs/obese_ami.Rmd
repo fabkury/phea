@@ -127,20 +127,6 @@ ami_obese <- calculate_formula(
   )
 )
 ```
-```{r filter ami}
-# Keep only *patients* (not rows) who had AMI
-ami_patients <- ami_obese |>
-  filter(has_ami) |>
-  select(pid) |>
-  distinct() |>
-  pull()
-
-ami_obese <- ami_obese |>
-  filter(pid %in% local(ami_patients))
-
-head_shot(ami_obese) |>
-  kable()
-```
 ## Keep only the records closest to each other  
 Phea will compute `ami_obese` for all points in time in each patient. If a patient has a single AMI event, but had his body weight and height measured on 6 different dates, that is 7 computations of `ami_obese`, unless the date of the AMI coincides with one of the dates of the body measurements.  
 
@@ -150,9 +136,15 @@ Phea returns the `window` alongside each phenotype calculation. The `window` is 
 
 Therefore, in each patient, for each AMI event, whichever row has the smallest `window`, that row is using the body measurements that are closest possible, in time, to the AMI event.  
 
+```{r filter ami}
+# Pull the IDs of the patients who ever had an AMI
+ami_patients <- ami_obese |>
+  filter(has_ami) |>
+  select(pid) |>
+  distinct() |>
+  pull()
 
-```{r}
-# Keep only the smallest window for each patient:
+# Keep only the smallest window for each AMI event:
 ami_obese_f <- ami_obese |>
   filter(has_ami & has_bmi) |>
   pick_row_by('window', c('pid', 'ami_condition_start_datetime'))
