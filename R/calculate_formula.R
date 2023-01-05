@@ -339,7 +339,7 @@ calculate_formula <- function(components, fml = NULL, window = NA, export = NULL
   # Limit number of output rows, if requested.
   if(!is.na(limit))
     board <- board |>
-    head(n = lim)
+      head(n = lim)
   
   # Calculate formula -----------------------------------------------------------------------------------------------
   # Remove the original columns of the record sources, leaving only those produced by the components.
