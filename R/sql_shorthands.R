@@ -134,13 +134,14 @@ sql0 <- function(...) {
 #' list(a = sqlt(person), b = sqlt(procedure)) |>
 #'   sqla('select person_id fr', 'om a inner jo', 'in b on a.person_id = b.person_id')
 #' ```
-sqla <- function(args, ...) {
+sqla <- function(args, ..., no_check = FALSE) {
   # Produces a dbplyr tbl object from arbitrary SQL.
   # Usage example:
   # sqla(list(a = sqlt(person)), 'select person_id from a')
-  query <- paste0(...)
+  query <- trimws(paste0(...))
   
-  if(stringr::str_count(query, ";") > 1)
+  if(!no_check &&
+    stringr::str_count(query, ";") > 1)
     stop('Only a single SQL query is allowed. The ending ";" is optional.')
   
   # For some reason, we can't have the query end with ;, otherwise we get "Error: Failed to prepare query: ERROR: 

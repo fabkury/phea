@@ -19,8 +19,13 @@
 #' `.verbose` provided to `setup_phea()`, which itself defaults to `TRUE` if not provided.
 #' @param .board Optional. Local data frame. Provide this argument together with `board = NULL` to use local data
 #' directly, instead of `collect()`ing the `board`.
+#' @param titles Logical, or list of named characters. If `FALSE`, each chart won't have its individual title.
+#' Otherwise, pass named characters to override the titles. Example:
+#' `list(platelet_value_as_number = 'Platelet count')`.
+#' directly, instead of `collect()`ing the `board`.
 #' @return Plot created by `plotly::plot_ly()` within `plotly::subplot()`.
-phea_plot <- function(board, pid, plot_title = NULL, exclude = NULL, verbose = NULL, .board = NULL) {
+phea_plot <- function(board, pid, plot_title = NULL, exclude = NULL, verbose = NULL, .board = NULL,
+  titles = NULL, titles_font_size = 11) {
   # If not provided, use global default set by setup_phea().
   if(is.null(verbose))
     verbose <- .pheaglobalenv$verbose
@@ -40,13 +45,16 @@ phea_plot <- function(board, pid, plot_title = NULL, exclude = NULL, verbose = N
   
   # Plot all columns except some.
   chart_items <- colnames(board_data)
-  if(sum(c('row_id', 'pid', 'ts', 'window') %in% colnames(board_data)) > 3) {
+  
+  if(sum(c('phea_row_id', 'pid', 'ts', 'window') %in% colnames(board_data)) > 3) {
     # The board has the base columns of a phenotype result. Remove them.
-    chart_items <- setdiff(chart_items, c('row_id', 'pid', 'ts', 'window'))
+    chart_items <- setdiff(chart_items, c('phea_row_id', 'pid', 'ts', 'window'))
   }
   
   if(!is.null(exclude))
     chart_items <- setdiff(chart_items, exclude)
+  
+  chart_items <- sort(chart_items)
   
   make_chart <- function(chart_item) {
     chart_data <- board_data |>
@@ -57,6 +65,7 @@ phea_plot <- function(board, pid, plot_title = NULL, exclude = NULL, verbose = N
     else
       range <- NA
     
+    # browser()
     res_plot <- chart_data |>
       plotly::plot_ly(x = ~ts) |>
       plotly::add_lines(y = ~value,
@@ -64,8 +73,12 @@ phea_plot <- function(board, pid, plot_title = NULL, exclude = NULL, verbose = N
         line = list(shape = 'hv')) |>
       plotly::layout(
         dragmode = 'pan',
-        legend = list(orientation = 'h'),
+        # legend = list(orientation = 'h'),
+        showlegend = FALSE,
+        xaxis = list(
+          title = NA),
         yaxis = list(
+          # title = chart_item,
           range = range,
           fixedrange = TRUE))
     
@@ -76,10 +89,30 @@ phea_plot <- function(board, pid, plot_title = NULL, exclude = NULL, verbose = N
   
   subplot_args <- c(plots,
     nrows = length(plots),
-    shareX = TRUE,
-    titleX = FALSE)
+    shareX = TRUE)
   
-  res <- do.call(plotly::subplot, subplot_args)
+  res <- do.call(plotly::subplot, subplot_args)# |>
+    # plotly::layout(xaxis = list(vistible = FALSE))
+  
+  if(!isFALSE(titles)) {
+    # Prepare names
+    if(length(titles) > 0) {
+      if(is.null(names(titles)))
+        stop('titles must have names.')
+      for(i in 1:length(titles))
+        chart_items[chart_items == names(titles)[i]] <- titles[i]
+    }
+    
+    # Add titles on the subplots as annotations
+    y_positions <- seq(1 - 1/length(chart_items), 0, 0 - 1/length(chart_items)) + (1/length(chart_items))/2
+    annotations <- purrr::map2(y_positions, chart_items, \(y_pos, item) {
+      list(x = 1, y = y_pos, text = item, showarrow = F, xref='paper', yref='paper',
+        textangle = -90, xanchor="right", yanchor="middle", align="center", valign="center",
+        font = list(size = titles_font_size))
+    })
+    
+    res <- res |> plotly::layout(annotations = annotations)
+  }
   
   return(res)
 }

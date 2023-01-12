@@ -15,7 +15,7 @@ options(scipen = 5e5)
 knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
 library(wrap)
 
-cdm_schema <- 'cdm_new_york3' # 'cdm_california4'
+cdm_schema <- 'cdm_california4'
 
 usn <- function(n, decimals = 0) {
   sapply(n, function(e) {
@@ -272,7 +272,7 @@ make_results_table <- function(data) {
 ```
 Let's first run Test A with N = 1, that is, a single component.
 
-```{r test_b_1, results = 'hide', message = FALSE}
+```{r test_a_1, results = 'hide', message = FALSE}
 test_b_runs[[length(test_b_runs)+1]] <- run_test_b(1)
 ```
 
@@ -296,7 +296,7 @@ print_test_b_results()
 
 <!--  - **res. rows**: Total number of rows in the phenotype returned by `calculate_formula()`.   -->
 
-<!--  - **test_b_sum**: Sum of the result of the formula across all patients.   -->
+<!--  - **test_a_sum**: Sum of the result of the formula across all patients.   -->
 
 <!--  - **in. patients**: Number of patients in the record sources.     -->
 
@@ -324,7 +324,7 @@ With N = `r test_b_runs[[2]]$N` (number of components), Phea took `r test_b_runs
 
 Now that we have a grip on how Test B works, let's run it for N = 10 to 150, increasing 10 at a time.
 
-```{r test_b_10_150}
+```{r test_a_10_150}
 N <- 10
 N_max <- 150
 try({

@@ -4,6 +4,17 @@
 # fab at kury.dev.
 #
 
+
+# Random name -----------------------------------------------------------------------------------------------------
+random_name <- function(len) {
+  # Generate random rec_name, 6 characters long, case-insensitive, starting with a letter.
+  sample(letters, 1) |>
+    c(sample(c(letters, 0:9), len-1, replace = TRUE)) |>
+    as.list() |>
+    do.call(what = paste0)
+}
+
+
 # Make record source ----------------------------------------------------------------------------------------------
 #' Make record source
 #'
@@ -60,25 +71,21 @@ make_record_source <- function(records, pid = NULL, ts = NULL, vars = NULL, .pid
 
   rec_source$records <- records
   
-  if(is.null(rec_name)) {
-    # Generate random rec_name, 8 characters long, case-insensitive, starting with a letter.
-    name_len <- 6
-    rec_name <- c(sample(letters, 1), sample(c(letters, 0:9), name_len-1, replace = TRUE)) |>
-      as.list() |> do.call(what = paste0)
-  }
+  if(is.null(rec_name))
+    rec_name <- random_name(6)
 
   rec_source$rec_name <- rec_name
 
-  if(is.null(pid))
+  if(is.null(pid) || is.na(pid))
     pid <- deparse(substitute(.pid))
   rec_source$pid <- pid
 
-  if(is.null(ts))
+  if(is.null(ts) || is.na(ts))
     ts <- deparse(substitute(.ts))
   rec_source$ts <- ts
   
   if(is.null(vars))
-    vars <- setdiff(colnames(records), pid)
+    vars <- setdiff(colnames(records), pid) # Keep all columns but `pid`
   rec_source$vars <- vars
   
   attr(rec_source, 'phea') <- 'record_source'

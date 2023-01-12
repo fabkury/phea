@@ -7,7 +7,7 @@
 calculate_formula(
   components,
   fml = NULL,
-  window = NA,
+  window = NULL,
   export = NULL,
   add_components = NULL,
   require_all = FALSE,
@@ -19,10 +19,14 @@ calculate_formula(
   out_window = NULL,
   dates = NULL,
   kco = FALSE,
+  dates_from = NULL,
   .ts = NULL,
   .pid = NULL,
-  .delay = NULL,
-  .line = NULL
+  line = NULL,
+  delay = NULL,
+  component_window = NULL,
+  ahead = NULL,
+  up_to = NULL
 )
 }
 \arguments{
@@ -61,7 +65,7 @@ If \code{TRUE} (default), output will include only rows where the result of any 
 alternatively be a character vector of names of columns and/or SQL expressions, in which case \code{calculate_formula()}
 will return only rows where the value of those columns or expressions change.}
 
-\item{.ts, .pid, .delay, .line}{If supplied, these will overwrite those of the given component.}
+\item{.ts, .pid, delay, line}{If supplied, these will overwrite those of the given component.}
 
 \item{clip_sql}{If \code{TRUE}, instead of a lazy table the return value is the code of the SQL query, and also copies it
 to the clipboard.}

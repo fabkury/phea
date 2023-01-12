@@ -10,7 +10,9 @@ phea_plot(
   plot_title = NULL,
   exclude = NULL,
   verbose = NULL,
-  .board = NULL
+  .board = NULL,
+  titles = NULL,
+  titles_font_size = 11
 )
 }
 \arguments{
@@ -24,6 +26,11 @@ phea_plot(
 \code{.verbose} provided to \code{setup_phea()}, which itself defaults to \code{TRUE} if not provided.}
 
 \item{.board}{Optional. Local data frame. Provide this argument together with \code{board = NULL} to use local data
+directly, instead of \code{collect()}ing the \code{board}.}
+
+\item{titles}{Logical, or list of named characters. If \code{FALSE}, each chart won't have its individual title.
+Otherwise, pass named characters to override the titles. Example:
+\code{list(platelet_value_as_number = 'Platelet count')}.
 directly, instead of \code{collect()}ing the \code{board}.}
 }
 \value{

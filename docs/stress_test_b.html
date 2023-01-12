@@ -1,0 +1,867 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+
+<meta charset="utf-8" />
+<meta name="generator" content="pandoc" />
+<meta http-equiv="X-UA-Compatible" content="IE=EDGE" />
+
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+
+
+
+<title>Stress-testing Phea, test B</title>
+
+<script>// Pandoc 2.9 adds attributes on both header and div. We remove the former (to
+// be compatible with the behavior of Pandoc < 2.8).
+document.addEventListener('DOMContentLoaded', function(e) {
+  var hs = document.querySelectorAll("div.section[class*='level'] > :first-child");
+  var i, h, a;
+  for (i = 0; i < hs.length; i++) {
+    h = hs[i];
+    if (!/^h[1-6]$/i.test(h.tagName)) continue;  // it should be a header h1-h6
+    a = h.attributes;
+    while (a.length > 0) h.removeAttribute(a[0].name);
+  }
+});
+</script>
+
+<style type="text/css">
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+span.underline{text-decoration: underline;}
+div.column{display: inline-block; vertical-align: top; width: 50%;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+</style>
+
+
+
+<style type="text/css">
+code {
+white-space: pre;
+}
+.sourceCode {
+overflow: visible;
+}
+</style>
+<style type="text/css" data-origin="pandoc">
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+{ counter-reset: source-line 0; }
+pre.numberSource code > span
+{ position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+{ content: counter(source-line);
+position: relative; left: -1em; text-align: right; vertical-align: baseline;
+border: none; display: inline-block;
+-webkit-touch-callout: none; -webkit-user-select: none;
+-khtml-user-select: none; -moz-user-select: none;
+-ms-user-select: none; user-select: none;
+padding: 0 4px; width: 4em;
+color: #aaaaaa;
+}
+pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa; padding-left: 4px; }
+div.sourceCode
+{ }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+code span.al { color: #ff0000; font-weight: bold; } 
+code span.an { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.at { color: #7d9029; } 
+code span.bn { color: #40a070; } 
+code span.bu { color: #008000; } 
+code span.cf { color: #007020; font-weight: bold; } 
+code span.ch { color: #4070a0; } 
+code span.cn { color: #880000; } 
+code span.co { color: #60a0b0; font-style: italic; } 
+code span.cv { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.do { color: #ba2121; font-style: italic; } 
+code span.dt { color: #902000; } 
+code span.dv { color: #40a070; } 
+code span.er { color: #ff0000; font-weight: bold; } 
+code span.ex { } 
+code span.fl { color: #40a070; } 
+code span.fu { color: #06287e; } 
+code span.im { color: #008000; font-weight: bold; } 
+code span.in { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.kw { color: #007020; font-weight: bold; } 
+code span.op { color: #666666; } 
+code span.ot { color: #007020; } 
+code span.pp { color: #bc7a00; } 
+code span.sc { color: #4070a0; } 
+code span.ss { color: #bb6688; } 
+code span.st { color: #4070a0; } 
+code span.va { color: #19177c; } 
+code span.vs { color: #4070a0; } 
+code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } 
+</style>
+<script>
+// apply pandoc div.sourceCode style to pre.sourceCode instead
+(function() {
+  var sheets = document.styleSheets;
+  for (var i = 0; i < sheets.length; i++) {
+    if (sheets[i].ownerNode.dataset["origin"] !== "pandoc") continue;
+    try { var rules = sheets[i].cssRules; } catch (e) { continue; }
+    var j = 0;
+    while (j < rules.length) {
+      var rule = rules[j];
+      // check if there is a div.sourceCode rule
+      if (rule.type !== rule.STYLE_RULE || rule.selectorText !== "div.sourceCode") {
+        j++;
+        continue;
+      }
+      var style = rule.style.cssText;
+      // check if color or background-color is set
+      if (rule.style.color === '' && rule.style.backgroundColor === '') {
+        j++;
+        continue;
+      }
+      // replace div.sourceCode by a pre.sourceCode rule
+      sheets[i].deleteRule(j);
+      sheets[i].insertRule('pre.sourceCode{' + style + '}', j);
+    }
+  }
+})();
+</script>
+
+
+
+
+<style type="text/css">body {
+background-color: #fff;
+margin: 1em auto;
+max-width: 700px;
+overflow: visible;
+padding-left: 2em;
+padding-right: 2em;
+font-family: "Open Sans", "Helvetica Neue", Helvetica, Arial, sans-serif;
+font-size: 14px;
+line-height: 1.35;
+}
+#TOC {
+clear: both;
+margin: 0 0 10px 10px;
+padding: 4px;
+width: 400px;
+border: 1px solid #CCCCCC;
+border-radius: 5px;
+background-color: #f6f6f6;
+font-size: 13px;
+line-height: 1.3;
+}
+#TOC .toctitle {
+font-weight: bold;
+font-size: 15px;
+margin-left: 5px;
+}
+#TOC ul {
+padding-left: 40px;
+margin-left: -1.5em;
+margin-top: 5px;
+margin-bottom: 5px;
+}
+#TOC ul ul {
+margin-left: -2em;
+}
+#TOC li {
+line-height: 16px;
+}
+table {
+margin: 1em auto;
+border-width: 1px;
+border-color: #DDDDDD;
+border-style: outset;
+border-collapse: collapse;
+}
+table th {
+border-width: 2px;
+padding: 5px;
+border-style: inset;
+}
+table td {
+border-width: 1px;
+border-style: inset;
+line-height: 18px;
+padding: 5px 5px;
+}
+table, table th, table td {
+border-left-style: none;
+border-right-style: none;
+}
+table thead, table tr.even {
+background-color: #f7f7f7;
+}
+p {
+margin: 0.5em 0;
+}
+blockquote {
+background-color: #f6f6f6;
+padding: 0.25em 0.75em;
+}
+hr {
+border-style: solid;
+border: none;
+border-top: 1px solid #777;
+margin: 28px 0;
+}
+dl {
+margin-left: 0;
+}
+dl dd {
+margin-bottom: 13px;
+margin-left: 13px;
+}
+dl dt {
+font-weight: bold;
+}
+ul {
+margin-top: 0;
+}
+ul li {
+list-style: circle outside;
+}
+ul ul {
+margin-bottom: 0;
+}
+pre, code {
+background-color: #f7f7f7;
+border-radius: 3px;
+color: #333;
+white-space: pre-wrap; 
+}
+pre {
+border-radius: 3px;
+margin: 5px 0px 10px 0px;
+padding: 10px;
+}
+pre:not([class]) {
+background-color: #f7f7f7;
+}
+code {
+font-family: Consolas, Monaco, 'Courier New', monospace;
+font-size: 85%;
+}
+p > code, li > code {
+padding: 2px 0px;
+}
+div.figure {
+text-align: center;
+}
+img {
+background-color: #FFFFFF;
+padding: 2px;
+border: 1px solid #DDDDDD;
+border-radius: 3px;
+border: 1px solid #CCCCCC;
+margin: 0 5px;
+}
+h1 {
+margin-top: 0;
+font-size: 35px;
+line-height: 40px;
+}
+h2 {
+border-bottom: 4px solid #f7f7f7;
+padding-top: 10px;
+padding-bottom: 2px;
+font-size: 145%;
+}
+h3 {
+border-bottom: 2px solid #f7f7f7;
+padding-top: 10px;
+font-size: 120%;
+}
+h4 {
+border-bottom: 1px solid #f7f7f7;
+margin-left: 8px;
+font-size: 105%;
+}
+h5, h6 {
+border-bottom: 1px solid #ccc;
+font-size: 105%;
+}
+a {
+color: #0033dd;
+text-decoration: none;
+}
+a:hover {
+color: #6666ff; }
+a:visited {
+color: #800080; }
+a:visited:hover {
+color: #BB00BB; }
+a[href^="http:"] {
+text-decoration: underline; }
+a[href^="https:"] {
+text-decoration: underline; }
+
+code > span.kw { color: #555; font-weight: bold; } 
+code > span.dt { color: #902000; } 
+code > span.dv { color: #40a070; } 
+code > span.bn { color: #d14; } 
+code > span.fl { color: #d14; } 
+code > span.ch { color: #d14; } 
+code > span.st { color: #d14; } 
+code > span.co { color: #888888; font-style: italic; } 
+code > span.ot { color: #007020; } 
+code > span.al { color: #ff0000; font-weight: bold; } 
+code > span.fu { color: #900; font-weight: bold; } 
+code > span.er { color: #a61717; background-color: #e3d2d2; } 
+</style>
+
+
+
+
+</head>
+
+<body>
+
+
+
+
+<h1 class="title toc-ignore">Stress-testing Phea, test B</h1>
+
+
+
+<p><em>This vignette assumes a SQL server at <code>localhost</code> (we
+use PostgreSQL), with data in OMOP Common Data Model v5.4 format in
+schema <code>cdm_california4</code>. The patient records shown in this
+example are synthetic data from <a href="https://github.com/synthetichealth/synthea">Synthea</a></em><a href="https://github.com/synthetichealth/synthea"><sup>TM</sup> Patient
+Generator</a>.</p>
+<div class="sourceCode" id="cb1"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="cf">if</span>(<span class="sc">!</span><span class="fu">exists</span>(<span class="st">&#39;dbcon&#39;</span>)) {</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">library</span>(dplyr)</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a>  <span class="co"># library(phea)</span></span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a>  devtools<span class="sc">::</span><span class="fu">load_all</span>()</span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a>  dbcon <span class="ot">&lt;-</span> credx<span class="sc">::</span><span class="fu">dbConnectFort</span>() <span class="co"># credx is local library.</span></span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">setup_phea</span>(dbcon, <span class="st">&#39;cdm_california4&#39;</span>)</span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div>
+<p>How complex can a phenotype be in <a href="https://github.com/fabkury/phea">Phea</a>? And how does
+performance change as you increase the complexity? Do the queries ever
+become <strong>too complex</strong>?</p>
+<p>Especifically, we talk about two dimensions of complexity:</p>
+<blockquote>
+<p>A. How many components you can put into one formula.<br />
+B. How many <em>consecutive</em> times can you repeat this: compute a
+formula, use its results as a component inside another formula.</p>
+</blockquote>
+<p>In this vignette we stress-test Phea in dimension <em>B</em>. We are
+calling this <em>stress test B</em>:</p>
+<blockquote>
+<ol start="2" style="list-style-type: upper-alpha">
+<li>Compute a formula, use the result in a new formula, repeat 1 to 150
+times.</li>
+</ol>
+</blockquote>
+<p>The phenotype we compute here is not meaningful in a real-world
+sense. We just want to test Phea. At the end the results help us see
+what is going on at technical level.</p>
+<p><em>For brevity, many parts of the source code are hidden from this
+report. If you are interested, please download file
+<code>stress_test_b.Rmd</code> from (github.com/fabkury/phea/docs)[<a href="http://github.com/fabkury/phea/docs" class="uri">http://github.com/fabkury/phea/docs</a>].</em></p>
+<div id="tldr" class="section level2">
+<h2>TL;DR</h2>
+</div>
+<div id="the-dataset" class="section level2">
+<h2>The dataset</h2>
+<p>We use schema <code>cdm_california4</code>. It has data generated by
+<a href="https://github.com/synthetichealth/synthea">Synthea<sup>TM</sup>
+Patient Generator</a>, ETL’ed to OMOP Common Data Model version 5.4 by
+the grace of and credit to <a href="https://github.com/OHDSI/ETL-Synthea">ETL-Synthea</a>.</p>
+<p>For context, let us glance at the size of that CDM instance.</p>
+<p><em>Source code is hidden for brevity. Please see stress_test_b.Rmd
+if interested in the code.</em></p>
+<p>Table <code>PERSON</code> has <strong>4,568 person IDs.</strong></p>
+<p>Table <code>MEASUREMENT</code> has <strong>1,886,525 rows</strong>
+across <strong>4,568 patients</strong>.</p>
+<p>Below we show the top 6 rows of the <em>summary table</em>, that is,
+the top 6 most popular concepts in <code>MEASUREMENT</code> by number of
+rows.</p>
+<div class="sourceCode" id="cb2"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="fu">kable</span>(measurement_summary[<span class="dv">1</span><span class="sc">:</span><span class="dv">6</span>,])</span></code></pre></div>
+<table>
+<colgroup>
+<col width="23%" />
+<col width="8%" />
+<col width="7%" />
+<col width="62%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th align="right">measurement_concept_id</th>
+<th align="right">persons</th>
+<th align="right">rows</th>
+<th align="left">concept_name</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="right">43055141</td>
+<td align="right">4561</td>
+<td align="right">104924</td>
+<td align="left">Pain severity - 0-10 verbal numeric rating [Score] -
+Reported</td>
+</tr>
+<tr class="even">
+<td align="right">3012888</td>
+<td align="right">4559</td>
+<td align="right">97534</td>
+<td align="left">Diastolic blood pressure</td>
+</tr>
+<tr class="odd">
+<td align="right">3004249</td>
+<td align="right">4559</td>
+<td align="right">97534</td>
+<td align="left">Systolic blood pressure</td>
+</tr>
+<tr class="even">
+<td align="right">3025315</td>
+<td align="right">4559</td>
+<td align="right">93135</td>
+<td align="left">Body weight</td>
+</tr>
+<tr class="odd">
+<td align="right">3027018</td>
+<td align="right">4559</td>
+<td align="right">92023</td>
+<td align="left">Heart rate</td>
+</tr>
+<tr class="even">
+<td align="right">3024171</td>
+<td align="right">4559</td>
+<td align="right">92023</td>
+<td align="left">Respiratory rate</td>
+</tr>
+</tbody>
+</table>
+<p>That is the data we will use to benchmark Phea.</p>
+<p>Each component will be exactly this:</p>
+<div class="sourceCode" id="cb3"><pre class="sourceCode sql"><code class="sourceCode sql"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="kw">SELECT</span> <span class="op">*</span></span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a><span class="kw">FROM</span> cdm_california4.measurement</span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a><span class="kw">WHERE</span> measurement_concept_id <span class="op">=</span> [chosen concept]</span></code></pre></div>
+<p>In other words, each component uses a different
+<code>measurement_concept_id</code> from the <em>summary table</em> to
+<code>SELECT *</code> from table <code>MEASUREMENT</code>.</p>
+<p>We will be picking rows (concepts) from the <em>summary table</em> in
+descending order starting from the first. To reduce bias, let us shuffle
+that table, so it is no longer sorted by descending order of rows.</p>
+<div class="sourceCode" id="cb4"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="fu">set.seed</span>(<span class="dv">42</span>)</span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>measurement_summary <span class="ot">&lt;-</span> measurement_summary[<span class="fu">sample</span>(<span class="dv">1</span><span class="sc">:</span><span class="fu">nrow</span>(measurement_summary)),]</span></code></pre></div>
+</div>
+<div id="computer-used-to-run-this-test" class="section level2">
+<h2>Computer used to run this test</h2>
+<p>This was the machine used to execute this test:</p>
+<blockquote>
+<p>Processor Intel(R) Core(TM) i7-10750H CPU @ 2.60GHz 2.59 GHz<br />
+Installed RAM 64.0 GB (63.8 GB usable)<br />
+System type 64-bit operating system, x64-based processor</p>
+</blockquote>
+</div>
+<div id="formulas-used-for-testing" class="section level2">
+<h2>Formulas used for testing</h2>
+<p>In each iteration of test B, we want to take the result of the prior
+formula (prior iteration) and add a random number to it. On top of that,
+to improve realism, we will add the <code>value_as_number</code> of 4
+<em>new</em> components. Therefore our formula in each iteration is:</p>
+<blockquote>
+<p><strong>test_b</strong><sub>n</sub> = test_b<sub>n-1</sub> + random()
++ W + X + Y + Z</p>
+</blockquote>
+<p>That formula will be computed for all patients at all points in
+time.</p>
+<!-- By definition, the points in time are the union of all timestamps from every component ever included in the formula. This also means that the timestamps from a prior iteration carry over to the next. Therefore once a timestamp is in, it never leaves the results. Once all concepts from _summary table_ have been used, the timestamps will be effectively all timestamps present in table `MEASUREMENT`.   -->
+<p>Each iteration will use different W, X, Y and Z. They will be picked
+in descending order from the <em>summary table</em>, which has been
+shuffled.</p>
+<p>If we reach the end of <em>summary table</em> and still need more
+components, we just cycle back to the first row.</p>
+<p>The first iteration, test_b<sub>1</sub>, uses zero as result from
+prior run:</p>
+<blockquote>
+<p><strong>test_b</strong><sub>0</sub> = 0</p>
+</blockquote>
+<p>All persons extant in table <code>MEASUREMENT</code> will
+participate. Each person will be running its own random walk.</p>
+<p>We use library <code>tictoc</code> to measure the time spent in each
+iteration.</p>
+<div class="sourceCode" id="cb5"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(tictoc)</span></code></pre></div>
+</div>
+<div id="functions-used-for-the-test" class="section level2">
+<h2>Functions used for the test</h2>
+<p>Function <code>produce_N_components(N)</code> produces <code>N</code>
+components using the first <code>N</code> rows of
+<code>measurement_summary</code>.</p>
+<p>Function <code>run_test_b(N)</code> runs Test B <code>N</code>
+consecute times.</p>
+<p><em>For economy of space, these functions are not printed here. You
+can obtain them by downloading the <code>stress_test_b.Rmd</code> file
+at (github.com/fabkury/phea/docs)[<a href="http://github.com/fabkury/phea/docs" class="uri">http://github.com/fabkury/phea/docs</a>].</em></p>
+</div>
+<div id="run-n-1" class="section level2">
+<h2>Run N = 1</h2>
+<div class="sourceCode" id="cb6"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>test_b_runs <span class="ot">=</span> <span class="fu">list</span>()</span></code></pre></div>
+<p>Let’s first run Test A with N = 1, that is, a single component.</p>
+<div class="sourceCode" id="cb7"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>test_b_runs[[<span class="fu">length</span>(test_b_runs)<span class="sc">+</span><span class="dv">1</span>]] <span class="ot">&lt;-</span> <span class="fu">run_test_b</span>(<span class="dv">1</span>)</span></code></pre></div>
+<p>Done!</p>
+<p>How was the performance? Let’s see.</p>
+<div class="sourceCode" id="cb8"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="fu">print_test_b_results</span>()</span></code></pre></div>
+<table>
+<thead>
+<tr class="header">
+<th align="right">N</th>
+<th align="left">Rows</th>
+<th align="left">Patients</th>
+<th align="left">B sum (K)</th>
+<th align="left">Phea time (min)</th>
+<th align="left">Query time (min)</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="right">1</td>
+<td align="left">9,889</td>
+<td align="left">4,568</td>
+<td align="left">91.6</td>
+<td align="left">0.03</td>
+<td align="left">0.01</td>
+</tr>
+</tbody>
+</table>
+<!-- Here are the meanings of the columns:   -->
+<!--  - **N**: Number of components included in the run.   -->
+<!--  - **in. rows**: Total number of rows in the record sources provided to `calculate_formula()`.   -->
+<!--  - **res. rows**: Total number of rows in the phenotype returned by `calculate_formula()`.   -->
+<!--  - **test_a_sum**: Sum of the result of the formula across all patients.   -->
+<!--  - **in. patients**: Number of patients in the record sources.     -->
+<!--  - **res. patients**: Number of patients in the resulting phenotype.    -->
+<!--  - **Phea time**: Time spent by `calculate_formula()`, in seconds.   -->
+<!--  - **query time**: Time spent to run (`collect()`) the phenotype (aggregated), in seconds.    -->
+<!--  - **query pps**: Input patients processed per second of query time.   -->
+<!--  - **query rps**: Input rows processed per second of query time.   -->
+</div>
+<div id="run-n-5" class="section level2">
+<h2>Run N = 5</h2>
+<div class="sourceCode" id="cb9"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a>test_b_runs[[<span class="fu">length</span>(test_b_runs)<span class="sc">+</span><span class="dv">1</span>]] <span class="ot">&lt;-</span> <span class="fu">run_test_b</span>(<span class="dv">5</span>)</span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a><span class="fu">print_test_b_results</span>()</span></code></pre></div>
+<table>
+<thead>
+<tr class="header">
+<th align="right">N</th>
+<th align="left">Rows</th>
+<th align="left">Patients</th>
+<th align="left">B sum (K)</th>
+<th align="left">Phea time (min)</th>
+<th align="left">Query time (min)</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="right">1</td>
+<td align="left">9,889</td>
+<td align="left">4,568</td>
+<td align="left">91.6</td>
+<td align="left">0.03</td>
+<td align="left">0.01</td>
+</tr>
+<tr class="even">
+<td align="right">5</td>
+<td align="left">71,112</td>
+<td align="left">4,568</td>
+<td align="left">10,003.3</td>
+<td align="left">0.11</td>
+<td align="left">0.07</td>
+</tr>
+</tbody>
+</table>
+<p>With N = 5 (number of components), Phea took 6.71 sec to assemble the
+phenotype, and the SQL server took 4.01 sec to run the query.</p>
+</div>
+<div id="runs-n-10-to-n-150" class="section level2">
+<h2>Runs N = 10 to N = 150</h2>
+<p>Now that we have a grip on how Test B works, let’s run it for N = 10
+to 150, increasing 10 at a time.</p>
+<div class="sourceCode" id="cb10"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a>N <span class="ot">&lt;-</span> <span class="dv">10</span></span>
+<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a>N_max <span class="ot">&lt;-</span> <span class="dv">150</span></span>
+<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a><span class="fu">try</span>({</span>
+<span id="cb10-4"><a href="#cb10-4" aria-hidden="true" tabindex="-1"></a>  <span class="cf">while</span>(N <span class="sc">&lt;=</span> N_max) {</span>
+<span id="cb10-5"><a href="#cb10-5" aria-hidden="true" tabindex="-1"></a>    test_b_runs[[<span class="fu">length</span>(test_b_runs)<span class="sc">+</span><span class="dv">1</span>]] <span class="ot">&lt;-</span> <span class="fu">run_test_b</span>(N)</span>
+<span id="cb10-6"><a href="#cb10-6" aria-hidden="true" tabindex="-1"></a>    N <span class="ot">&lt;-</span> N <span class="sc">+</span> <span class="dv">5</span></span>
+<span id="cb10-7"><a href="#cb10-7" aria-hidden="true" tabindex="-1"></a>  }</span>
+<span id="cb10-8"><a href="#cb10-8" aria-hidden="true" tabindex="-1"></a>})</span>
+<span id="cb10-9"><a href="#cb10-9" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; Running run_test_b(10)</span></span>
+<span id="cb10-10"><a href="#cb10-10" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; Saving &#39;phea_test_b_c4_10&#39; to &#39;./rds/phea_test_b_c4_10.qs&#39;.</span></span>
+<span id="cb10-11"><a href="#cb10-11" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; Running run_test_b(15)</span></span>
+<span id="cb10-12"><a href="#cb10-12" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; Saving &#39;phea_test_b_c4_15&#39; to &#39;./rds/phea_test_b_c4_15.qs&#39;.</span></span>
+<span id="cb10-13"><a href="#cb10-13" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; Running run_test_b(20)</span></span>
+<span id="cb10-14"><a href="#cb10-14" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; Saving &#39;phea_test_b_c4_20&#39; to &#39;./rds/phea_test_b_c4_20.qs&#39;.</span></span>
+<span id="cb10-15"><a href="#cb10-15" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; Running run_test_b(25)</span></span>
+<span id="cb10-16"><a href="#cb10-16" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; Saving &#39;phea_test_b_c4_25&#39; to &#39;./rds/phea_test_b_c4_25.qs&#39;.</span></span>
+<span id="cb10-17"><a href="#cb10-17" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; Running run_test_b(30)</span></span>
+<span id="cb10-18"><a href="#cb10-18" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; Saving &#39;phea_test_b_c4_30&#39; to &#39;./rds/phea_test_b_c4_30.qs&#39;.</span></span>
+<span id="cb10-19"><a href="#cb10-19" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; Running run_test_b(35)</span></span>
+<span id="cb10-20"><a href="#cb10-20" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; Saving &#39;phea_test_b_c4_35&#39; to &#39;./rds/phea_test_b_c4_35.qs&#39;.</span></span>
+<span id="cb10-21"><a href="#cb10-21" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; Running run_test_b(40)</span></span>
+<span id="cb10-22"><a href="#cb10-22" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; Saving &#39;phea_test_b_c4_40&#39; to &#39;./rds/phea_test_b_c4_40.qs&#39;.</span></span>
+<span id="cb10-23"><a href="#cb10-23" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; Running run_test_b(45)</span></span>
+<span id="cb10-24"><a href="#cb10-24" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; Saving &#39;phea_test_b_c4_45&#39; to &#39;./rds/phea_test_b_c4_45.qs&#39;.</span></span>
+<span id="cb10-25"><a href="#cb10-25" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; Running run_test_b(50)</span></span>
+<span id="cb10-26"><a href="#cb10-26" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; Saving &#39;phea_test_b_c4_50&#39; to &#39;./rds/phea_test_b_c4_50.qs&#39;.</span></span>
+<span id="cb10-27"><a href="#cb10-27" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; Running run_test_b(55)</span></span>
+<span id="cb10-28"><a href="#cb10-28" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; Saving &#39;phea_test_b_c4_55&#39; to &#39;./rds/phea_test_b_c4_55.qs&#39;.</span></span>
+<span id="cb10-29"><a href="#cb10-29" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; Running run_test_b(60)</span></span>
+<span id="cb10-30"><a href="#cb10-30" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; Saving &#39;phea_test_b_c4_60&#39; to &#39;./rds/phea_test_b_c4_60.qs&#39;.</span></span>
+<span id="cb10-31"><a href="#cb10-31" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; Running run_test_b(65)</span></span>
+<span id="cb10-32"><a href="#cb10-32" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; Saving &#39;phea_test_b_c4_65&#39; to &#39;./rds/phea_test_b_c4_65.qs&#39;.</span></span>
+<span id="cb10-33"><a href="#cb10-33" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; Running run_test_b(70)</span></span>
+<span id="cb10-34"><a href="#cb10-34" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; Saving &#39;phea_test_b_c4_70&#39; to &#39;./rds/phea_test_b_c4_70.qs&#39;.</span></span>
+<span id="cb10-35"><a href="#cb10-35" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; Running run_test_b(75)</span></span>
+<span id="cb10-36"><a href="#cb10-36" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; Saving &#39;phea_test_b_c4_75&#39; to &#39;./rds/phea_test_b_c4_75.qs&#39;.</span></span>
+<span id="cb10-37"><a href="#cb10-37" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; Running run_test_b(80)</span></span>
+<span id="cb10-38"><a href="#cb10-38" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; Saving &#39;phea_test_b_c4_80&#39; to &#39;./rds/phea_test_b_c4_80.qs&#39;.</span></span>
+<span id="cb10-39"><a href="#cb10-39" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; Running run_test_b(85)</span></span>
+<span id="cb10-40"><a href="#cb10-40" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; Saving &#39;phea_test_b_c4_85&#39; to &#39;./rds/phea_test_b_c4_85.qs&#39;.</span></span>
+<span id="cb10-41"><a href="#cb10-41" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; Running run_test_b(90)</span></span>
+<span id="cb10-42"><a href="#cb10-42" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; Saving &#39;phea_test_b_c4_90&#39; to &#39;./rds/phea_test_b_c4_90.qs&#39;.</span></span>
+<span id="cb10-43"><a href="#cb10-43" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; Running run_test_b(95)</span></span>
+<span id="cb10-44"><a href="#cb10-44" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; Saving &#39;phea_test_b_c4_95&#39; to &#39;./rds/phea_test_b_c4_95.qs&#39;.</span></span>
+<span id="cb10-45"><a href="#cb10-45" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; Running run_test_b(100)</span></span>
+<span id="cb10-46"><a href="#cb10-46" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; Saving &#39;phea_test_b_c4_100&#39; to &#39;./rds/phea_test_b_c4_100.qs&#39;.</span></span>
+<span id="cb10-47"><a href="#cb10-47" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; Running run_test_b(105)</span></span>
+<span id="cb10-48"><a href="#cb10-48" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; Saving &#39;phea_test_b_c4_105&#39; to &#39;./rds/phea_test_b_c4_105.qs&#39;.</span></span>
+<span id="cb10-49"><a href="#cb10-49" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; Running run_test_b(110)</span></span>
+<span id="cb10-50"><a href="#cb10-50" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; Error : Failed to fetch row: ERROR:  stack depth limit exceeded</span></span>
+<span id="cb10-51"><a href="#cb10-51" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; HINT:  Increase the configuration parameter &quot;max_stack_depth&quot; (currently 2048kB), after ensuring the platform&#39;s stack depth limit is adequate.</span></span></code></pre></div>
+</div>
+<div id="test-b-results" class="section level2">
+<h2>Test B results</h2>
+<table>
+<thead>
+<tr class="header">
+<th align="right">N</th>
+<th align="left">Rows</th>
+<th align="left">Patients</th>
+<th align="left">B sum (K)</th>
+<th align="left">Phea time (min)</th>
+<th align="left">Query time (min)</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="right">1</td>
+<td align="left">9,889</td>
+<td align="left">4,568</td>
+<td align="left">91.6</td>
+<td align="left">0.03</td>
+<td align="left">0.01</td>
+</tr>
+<tr class="even">
+<td align="right">5</td>
+<td align="left">71,112</td>
+<td align="left">4,568</td>
+<td align="left">10,003.3</td>
+<td align="left">0.11</td>
+<td align="left">0.07</td>
+</tr>
+<tr class="odd">
+<td align="right">10</td>
+<td align="left">118,447</td>
+<td align="left">4,568</td>
+<td align="left">44,576.7</td>
+<td align="left">0.21</td>
+<td align="left">0.22</td>
+</tr>
+<tr class="even">
+<td align="right">15</td>
+<td align="left">121,687</td>
+<td align="left">4,568</td>
+<td align="left">67,490.4</td>
+<td align="left">0.37</td>
+<td align="left">0.39</td>
+</tr>
+<tr class="odd">
+<td align="right">20</td>
+<td align="left">129,364</td>
+<td align="left">4,568</td>
+<td align="left">71,914.1</td>
+<td align="left">0.40</td>
+<td align="left">0.50</td>
+</tr>
+<tr class="even">
+<td align="right">25</td>
+<td align="left">133,443</td>
+<td align="left">4,568</td>
+<td align="left">99,948.0</td>
+<td align="left">0.50</td>
+<td align="left">0.66</td>
+</tr>
+<tr class="odd">
+<td align="right">30</td>
+<td align="left">145,523</td>
+<td align="left">4,568</td>
+<td align="left">172,047.8</td>
+<td align="left">0.60</td>
+<td align="left">0.82</td>
+</tr>
+<tr class="even">
+<td align="right">35</td>
+<td align="left">145,922</td>
+<td align="left">4,568</td>
+<td align="left">193,490.0</td>
+<td align="left">0.71</td>
+<td align="left">0.98</td>
+</tr>
+<tr class="odd">
+<td align="right">40</td>
+<td align="left">146,171</td>
+<td align="left">4,568</td>
+<td align="left">196,169.7</td>
+<td align="left">0.81</td>
+<td align="left">1.13</td>
+</tr>
+<tr class="even">
+<td align="right">45</td>
+<td align="left">150,019</td>
+<td align="left">4,568</td>
+<td align="left">249,836.7</td>
+<td align="left">0.92</td>
+<td align="left">1.29</td>
+</tr>
+<tr class="odd">
+<td align="right">50</td>
+<td align="left">152,168</td>
+<td align="left">4,568</td>
+<td align="left">287,462.6</td>
+<td align="left">1.03</td>
+<td align="left">1.46</td>
+</tr>
+<tr class="even">
+<td align="right">55</td>
+<td align="left">152,247</td>
+<td align="left">4,568</td>
+<td align="left">323,947.0</td>
+<td align="left">1.14</td>
+<td align="left">1.64</td>
+</tr>
+<tr class="odd">
+<td align="right">60</td>
+<td align="left">152,247</td>
+<td align="left">4,568</td>
+<td align="left">377,328.0</td>
+<td align="left">1.27</td>
+<td align="left">1.82</td>
+</tr>
+<tr class="even">
+<td align="right">65</td>
+<td align="left">152,247</td>
+<td align="left">4,568</td>
+<td align="left">393,143.0</td>
+<td align="left">1.38</td>
+<td align="left">2.00</td>
+</tr>
+<tr class="odd">
+<td align="right">70</td>
+<td align="left">152,247</td>
+<td align="left">4,568</td>
+<td align="left">407,208.1</td>
+<td align="left">1.50</td>
+<td align="left">2.17</td>
+</tr>
+<tr class="even">
+<td align="right">75</td>
+<td align="left">152,247</td>
+<td align="left">4,568</td>
+<td align="left">434,579.7</td>
+<td align="left">1.60</td>
+<td align="left">2.32</td>
+</tr>
+<tr class="odd">
+<td align="right">80</td>
+<td align="left">152,247</td>
+<td align="left">4,568</td>
+<td align="left">484,644.6</td>
+<td align="left">1.77</td>
+<td align="left">2.50</td>
+</tr>
+<tr class="even">
+<td align="right">85</td>
+<td align="left">152,247</td>
+<td align="left">4,568</td>
+<td align="left">512,306.3</td>
+<td align="left">1.87</td>
+<td align="left">2.70</td>
+</tr>
+<tr class="odd">
+<td align="right">90</td>
+<td align="left">152,247</td>
+<td align="left">4,568</td>
+<td align="left">521,305.6</td>
+<td align="left">1.98</td>
+<td align="left">2.82</td>
+</tr>
+<tr class="even">
+<td align="right">95</td>
+<td align="left">152,247</td>
+<td align="left">4,568</td>
+<td align="left">528,004.0</td>
+<td align="left">2.10</td>
+<td align="left">3.04</td>
+</tr>
+<tr class="odd">
+<td align="right">100</td>
+<td align="left">152,247</td>
+<td align="left">4,568</td>
+<td align="left">579,457.1</td>
+<td align="left">2.24</td>
+<td align="left">3.16</td>
+</tr>
+<tr class="even">
+<td align="right">105</td>
+<td align="left">152,247</td>
+<td align="left">4,568</td>
+<td align="left">639,737.0</td>
+<td align="left">2.36</td>
+<td align="left">3.39</td>
+</tr>
+</tbody>
+</table>
+<div id="author-contact" class="section level3">
+<h3>Author contact</h3>
+<p>Fabrício Kury<br />
+2023/Jan/11<br />
+Be always welcome to reach me at <a href="mailto:fab@kury.dev" class="email">fab@kury.dev</a>.</p>
+</div>
+</div>
+
+
+
+<!-- code folding -->
+
+
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+  (function () {
+    var script = document.createElement("script");
+    script.type = "text/javascript";
+    script.src  = "https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML";
+    document.getElementsByTagName("head")[0].appendChild(script);
+  })();
+</script>
+
+</body>
+</html>

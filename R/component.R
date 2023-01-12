@@ -68,20 +68,39 @@
 #'   make_component(
 #'     delay = "'6 months'::interval")
 make_component <- function(input_source,
-  line = NULL, bound = NULL,
-  delay = NULL, window = NULL,
-  ahead = NULL, up_to = NULL,
-  # rows = NULL, range = NULL,
-  pid = NULL, ts = NULL,
-  .ts = NULL, .pid = NULL,
-  .fn = NULL, .ts_fn = NULL,
-  .passthrough = FALSE
+  line = NULL, bound = NULL, delay = NULL, window = NULL, ahead = NULL, up_to = NULL,
+  pid = NULL, .pid = NULL ,ts = NULL, .ts = NULL,
+  fn = NULL, ts_fn = NULL, arg = NULL, ts_arg = NULL, omit_value = NULL, ts_omit_value = NULL,
+  # pick_by = NULL,
+  passthrough = FALSE
   ) {
 # Prepare ---------------------------------------------------------------------------------------------------------
-  # This is just to make code easier to read.
-  dbQuoteId <- function(x)
+  dbQuoteId <- function(x) # This is just to make code easier to read.
     DBI::dbQuoteIdentifier(.pheaglobalenv$con, x)
   
+  component <- list()
+  
+  ## Overwrite with input parameters if they were provided
+  if(!is.null(line)) component$line <- line
+  if(!is.null(bound)) component$bound <- bound
+  if(!is.null(delay)) component$delay <- delay
+  if(!is.null(window)) component$window <- window
+  if(!is.null(ahead)) component$ahead <- ahead
+  if(!is.null(up_to)) component$up_to <- up_to
+  if(!is.null(fn)) component$fn <- fn
+  if(!is.null(arg)) component$arg <- arg
+  if(!is.null(ts_fn)) component$ts_fn <- ts_fn
+  if(!is.null(ts_arg)) component$ts_arg <- ts_arg
+  if(!is.null(omit_value)) component$omit_value <- omit_value
+  if(!is.null(ts_omit_value)) component$ts_omit_value <- ts_omit_value
+  # if(!is.null(pick_by)) component$pick_by <- pick_by
+  if(!is.null(passthrough)) component$passthrough <- passthrough
+
+  # passthrough defaults to FALSE
+  if(is.null(component$passthrough) || isTRUE(is.na(component$passthrough)))
+    component$passthrough <- FALSE
+  
+  # pid and ts must be processed before capturing input_source.
   if(is.null(pid) || is.na(pid)) {
     pid = deparse(substitute(.pid))
     if(pid == 'NULL')
@@ -94,10 +113,9 @@ make_component <- function(input_source,
       ts <- NULL
   }
   
-# Generate component, capture record source -----------------------------------------------------------------------
-  component <- list()
+# Capture input_source and create `component` according to argument overload --------------------------------------
   if(isTRUE(attr(input_source, 'phea') == 'component')) {
-    # Input is actually a component. Just copy it.
+    # Input is a component. Just copy it.
     component <- input_source
   } else {
     # Input is not a component, so we will build one.
@@ -105,83 +123,158 @@ make_component <- function(input_source,
       # Input is a record source. Use it.
       component$rec_source <- input_source
     } else {
-      if(is.null(pid) || is.null(ts))
-        stop('If providing a lazy table or phenotype to make_component(), must also provide pid or .pid and ts or .ts.')
-      
       if(isTRUE(attr(input_source, 'phea') == 'phenotype')) {
         # Input is a phenotype. Make a record source from it.
-        component$rec_source <- make_record_source(records = input_source, pid = pid, ts = ts)
+        # If the user didn't provide pid and ts, default to 'pid' and 'ts'.
+        # TODO: Move the recognizing of this default to make_record_source()?
+        if(is.null(pid))
+          pid <- 'pid'
+        if(is.null(ts))
+          ts <- 'ts'
       } else {
         if('tbl_lazy' %in% class(input_source)) {
           # Input is a lazy table. Make a record source from it.
-          component$rec_source <- make_record_source(records = input_source, pid = pid, ts = ts)
+          if(is.null(pid) || is.null(ts))
+            stop('If providing a lazy table to make_component(), must also provide pid or .pid and ts or .ts.')
         } else {
           stop('Unable to recognize input_source.')
         }
       }
+      
+      component$rec_source <- make_record_source(records = input_source, pid = pid, ts = ts)
     }
-
-#     component$line <- line
-#     component$bound <- bound
-#     component$delay <- delay
-#     component$window <- window
-#     component$ahead <- ahead
-#     component$up_to <- up_to
-#     component$fn <- .fn
-#     component$ts_fn <- .ts_fn
-#     component$.passthrough <- .passthrough
   }
-  
-# Overwrite with input parameters if they were provided -----------------------------------------------------------
-  # TODO: Not add these parameters to component since they're just needed to build access_sql.
-  if(!is.null(line))
-    component$line <- line
-  
-  if(!is.null(bound))
-    component$bound <- bound
-  
-  if(!is.null(delay))
-    component$delay <- delay
-  
-  if(!is.null(window))
-    component$window <- window
 
-  if(!is.null(.passthrough))
-    component$.passthrough <- .passthrough
-
-  if(!is.null(ahead))
-    component$ahead <- ahead
-  
-  if(!is.null(up_to))
-    component$up_to <- up_to
-
-  if(!is.null(.fn))
-    component$fn <- .fn
-  
-  if(!is.null(.ts_fn))
-    component$ts_fn <- .ts_fn
-  
-  # if(!is.null(rows) && !is.null(range))
-  #   stop(paste0('rows and range cannot be used simultaneously.'))
-  
-  # if((!is.null(component$delay) || !is.null(component$window)) && !is.null(component$line))
-  #   stop(paste0('line and delay/window cannot be used simultaneously.'))
-  
-# Build window function SQL ---------------------------------------------------------------------------------------
+  # TODO: Do I really need to copy component$rec_source$vars into component$columns?
   component$columns <- component$rec_source$vars
   
   # Add timestamp column
-  if(!component$.passthrough)
+  if(!component$passthrough)
     component$columns <- c(component$columns, 'ts')
   
-  # ts_fn defaults to last_value
-  if(is.null(component$ts_fn) || is.na(component$ts_fn))
-    component$ts_fn <- 'last_value' 
+# Prepare variables -----------------------------------------------------------------------------------------------
+  # Let's prepare some variables to make code easier to read, and also to contemplate the functionality where the user
+  # can erase a parameter by setting it to NA (while NULL means "don't change this").
+  # We do need to copy the variables from inside `component` because `component` may have come from a phenotype or
+  # another component, i.e. because of parameter overload.
+  line   <- component$line
+  bound  <- component$bound
+  delay  <- component$delay
+  window <- component$window
+  ahead  <- component$ahead
+  up_to  <- component$up_to
   
-  # .passthrough defaults to FALSE
-  if(is.null(component$.passthrough) || is.na(component$.passthrough))
-    component$.passthrough <- FALSE
+  if(isTRUE(is.na(line)))   line <- NULL
+  if(isTRUE(is.na(bound)))  bound <- NULL
+  if(isTRUE(is.na(delay)))  delay <- NULL
+  if(isTRUE(is.na(window))) window <- NULL
+  if(isTRUE(is.na(ahead)))  ahead <- NULL
+  if(isTRUE(is.na(up_to)))  up_to <- NULL
+  # `fn` and `ts_fn` are different just because we do want the defaults to be stored inside `component`.
   
+  if(is.null(component$fn) || isTRUE(is.na(component$fn)) || isTRUE(component$fn == ''))
+    component$fn <- 'last_value'
+  
+  if(is.null(component$ts_fn) || isTRUE(is.na(component$ts_fn)) || isTRUE(component$ts_fn == ''))
+    component$ts_fn <- 'last_value'
+  
+  if(is.null(component$arg) || isTRUE(is.na(component$arg)))
+    component$arg <- ''
+  
+  if(is.null(component$ts_arg) || isTRUE(is.na(component$ts_arg)))
+    component$ts_arg <- ''
+  
+  if(is.null(component$omit_value) || isTRUE(is.na(component$omit_value)))
+    component$omit_value <- FALSE
+  
+  if(is.null(component$ts_omit_value) || isTRUE(is.na(component$ts_omit_value)))
+    component$ts_omit_value <- FALSE
+
+# Capture named args fn/ts, arg/ts, omit_value/ts -----------------------------------------------------------------
+  capture_named_args <- function(args, def_arg, ts_arg, columns, passthrough, preprocess_fn = NULL) {
+    name_not_empty <- function(x) {
+      !is.na(names(x)) & nchar(names(x)) > 0 # Is any name not empty?
+    }
+    # Check if an unnamed fn was passed.
+    if(is.null(names(args))) {
+      default_arg <- args
+    } else {
+      names_mask <- name_not_empty(args)
+      
+      if(any(!names_mask)) # Is any name empty?
+        default_arg <- args[min(which(!names_mask))] # Use first empty name.
+      else
+        default_arg <- def_arg # 'last_value'
+    }
+    
+    if(!is.null(preprocess_fn))
+      default_arg <- preprocess_fn(default_arg)
+    
+    # Repeat args for each item in columns, with names.
+    use_arg <- sapply(columns, \(x) default_arg, simplify = FALSE, USE.NAMES = TRUE)
+    
+    # Apply declared functions for columns, in any.
+    names_mask <- name_not_empty(args)
+    if(any(names_mask))
+      for(cmp_name in names(args[names_mask])) {
+        use_arg[names(use_arg) == cmp_name] <- ifelse(!is.null(preprocess_fn),
+          preprocess_fn(args[names(args) == cmp_name]), args[names(args) == cmp_name])
+      }
+    
+    if(!passthrough)
+      use_arg[columns == 'ts'] <- ifelse(!is.null(preprocess_fn), preprocess_fn(ts_arg), ts_arg) # component$ts_fn
+      
+    use_arg
+  }
+  
+  # use_fn is a vector of window functions, one for each column.
+  use_fn <- capture_named_args(component$fn, 'last_value',
+    component$ts_fn, component$columns, component$passthrough)
+  
+  # use_arg is a vector of arguments to window functions, one for each column.
+  process_arg <- function(x) {
+    if(is.null(x) || length(x) == 0 || isTRUE(is.na(x)) || isTRUE(x == ''))
+      return('')
+    
+    classes <- lapply(x, class) |> unlist()
+    
+    mask <- classes == 'character'
+    if(any(mask))
+      x[mask] <- DBI::dbQuoteString(.pheaglobalenv$con, unlist(x[mask]))
+    
+    mask <- classes == 'Date'
+    if(any(mask)) # TODO: Test these date manipulations.
+      x[mask] <- DBI::dbQuoteString(.pheaglobalenv$con, sapply(x[mask], strftime, '%Y-%m-%d'))
+    
+    mask <- classes == 'numeric' | classes == 'integer'
+    if(any(mask))
+      x[mask] <- unlist(x[mask])
+
+    return(paste0(x, collapse = ', '))
+  }
+  
+  use_arg <- capture_named_args(component$arg, '',
+    component$ts_arg, component$columns, component$passthrough,
+    preprocess_fn = process_arg)
+  
+  # use_omit_value is a vector of Boolean, one for each column.
+  use_omit_value <- capture_named_args(component$omit_value, FALSE,
+    component$ts_omit_value, component$columns, component$passthrough)
+  
+# Default to line = 0 if needed -----------------------------------------------------------------------------------
+  # At this point, if any of the parameters line/bound/delay/window/ahead/up_to were NA, they are now NULL (or their
+  # appropriate default value). Notice that we didn't change the parameters themselves to NULL inside `component`,
+  # but just the local variables here -- except for `fn` and `ts_fn`.
+  
+  # In the absence of any parameter line/bound/delay/window/ahead/up_to, we default to line = 0. Notice we also store
+  # it in the `component`.
+  if(is.null(line) && is.null(bound) && is.null(delay) && is.null(window) && is.null(ahead) && is.null(up_to)) {
+    line <- 0
+    component$line <- 0
+  }
+  
+# Build window function SQL ---------------------------------------------------------------------------------------
+  # columns_sql is vectorized by the presence of `component$columns` 
   columns_sql <- paste0('case when ', dbQuoteId('name'), ' = ',
     DBI::dbQuoteString(.pheaglobalenv$con, component$rec_source$rec_name),
     ' then ', dbQuoteId(component$columns), ' else null end')
@@ -191,59 +284,24 @@ make_component <- function(input_source,
   # component_has_been_built is just to help us trim the code identation, as opposed to using nested if-else`s.
   component_has_been_built <- FALSE
   
-  # TODO:
-  # if(!is.null(rows)) {
-  #   component$access <- 'rows'
-  #   component_has_been_built <- TRUE
-  # }
-  
-  # TODO:
-  # if(!component_has_been_built && !is.null(range)) {
-  #   component$access <- 'range'
-  #   component_has_been_built <- TRUE
-  # }
-  
-  # In the absence of any parameter line/bound/delay/window/ahead/up_to, we default to line = 0.
-  if(( is.null(component$line)  ||  is.na(component$line)) &&
-      (is.null(component$bound) ||  is.na(component$bound)) &&
-      (is.null(component$delay) ||  is.na(component$delay)) && 
-      (is.null(component$window) || is.na(component$window)) &&
-      (is.null(component$ahead) ||  is.na(component$ahead)) &&
-      (is.null(component$up_to) ||  is.na(component$up_to))) {
-    component$line <- 0
+  make_params_sql <- function() {
+    purrr::pmap(list(columns_sql, use_arg, use_omit_value), function(x, y, z) {
+      if(z) return(y)
+      if(y == '') return(x)
+      else return(paste0(x, ', ', y))
+    })
   }
   
-  # Let's prepare some variables to make code easier to read, and also to contemplate the functionality where the user
-  # can erase a parameter by setting it to NA (while NULL means "don't change this").
-  # We do need to copy the variables from inside `component` because `component` may have come from a phenotype or
-  # another component, i.e. because of parameter overload.
-  line <-   component$line
-  bound <-  component$bound
-  delay <-  component$delay
-  window <- component$window
-  ahead <-  component$ahead
-  up_to <-  component$up_to
-  if(isTRUE(is.na(line)))   line <- NULL
-  if(isTRUE(is.na(bound)))  bound <- NULL
-  if(isTRUE(is.na(delay)))  delay <- NULL
-  if(isTRUE(is.na(window))) window <- NULL
-  if(isTRUE(is.na(ahead)))  ahead <- NULL
-  if(isTRUE(is.na(up_to)))  up_to <- NULL
-  
-  # At this point, if any of the parameters line/bound/delay/window/ahead/up_to were NA, they are now NULL.
-  # Notice that we *don't* change the parameter itself to NULL inside `component`, but just the local variables here.
-  
+  # Now we figure out the acess mode, and produce the window function calls.
   if(!component_has_been_built && (!is.null(line) || !is.null(bound))) {
     # Produce access via *line*.
+    # Line access is built differently, because we can use dbplyr::win_over(). dbplyr::win_over() does not support
+    # window functions' RANGE mode, forcing us to not use it when mode is not ROWS.
     component$access <- 'line'
     
-    if(is.null(component$fn) || is.na(component$fn))
-      component$fn <- 'last_value' # default to last_value
-    
-    use_fn <- rep(component$fn, length(component$columns))
-    use_fn[component$columns == 'ts'] <- component$ts_fn
-    
-    if(is.null(bound) && !is.null(line) && line == 0) {
+    # TODO: Revise below.
+    if(F &&
+        is.null(bound) && !is.null(line) && line == 0) {
       # Here is one optimization.
       # This is the "most default" case: the user just wants the most recent record of the component, without line/
       # bound/delay/window/ahead/up_to. In this case, we don't need a window function. We can just copy the column
@@ -251,18 +309,20 @@ make_component <- function(input_source,
       # the CASE WHEN ... statement that otherwise goes inside the window function call.
       component$access_sql <- sql(columns_sql)
     } else {
+      params_sql <- make_params_sql()
       component$access_sql <- lapply(seq(component$columns), \(i) {
-        sql_txt <- paste0(use_fn[i], '(', columns_sql[i], ')')
+        sql_txt <- paste0(use_fn[i], '(', params_sql[i], ')')
+        
         dbplyr::win_over(
           expr = sql(sql_txt),
           partition = c('pid', 'name'),
           order = 'ts',
           frame = c(
             ifelse(is.null(bound), -Inf, -bound),
-            ifelse(is.null(line), 0, -line)),
+            ifelse( is.null(line),    0, -line)),
           con = .pheaglobalenv$con)
       })
-      # Unlist the SQL objects without accidentally converting to character.
+      # Unlist the SQL objects without accidentally converting to character, which happens when we use unlist().
       component$access_sql <- do.call(c, component$access_sql)
     }
     
@@ -270,52 +330,40 @@ make_component <- function(input_source,
   }
   
   if(!component_has_been_built) {
+    # As commented above, for access other than *line* we need to write out the window function call by ourselves,
+    # because dbplyr::win_over() does not support RANGE mode.
+    params_sql <- make_params_sql()
+    sql_start <- paste0(use_fn, '(', params_sql, ') over (', over_clause, ' range between ')
+    
     if(!is.null(delay) || !is.null(window)) {
       # Produce access via *delay/window*.
       component$access <- 'delay'
       
-      if(is.null(component$fn) || is.na(component$fn))
-        component$fn <- 'last_value' # default to last_value
-      
-      use_fn <- rep(component$fn, length(component$columns))
-      use_fn[component$columns == 'ts'] <- component$ts_fn
-      
-      sql_start <- paste0(use_fn, '(', columns_sql, ') over (', over_clause, ' ')
-      
       if(is.null(up_to)) {
-        sql_txts <- paste0(sql_start, 'range between ',
-          ifelse(is.null(window) || window == Inf, 'unbounded',   window), ' preceding',
+        sql_txts <- paste0(sql_start,
+          ifelse(is.null(window) || window == Inf, 'unbounded',                        window), ' preceding',
           ' and ',
-          ifelse(is.null(delay)  || delay == 0   , 'current row', paste0(delay, ' preceding')),
+          ifelse(    is.null(delay) || delay == 0, 'current row', paste0(delay, ' preceding')),
           ')')
       } else {
         # In this branch, window is allowed to be == 0 (current row), because we have up_to.
-        sql_txts <- paste0(sql_start, 'range between ',
+        sql_txts <- paste0(sql_start,
           ifelse(is.null(window) || window == Inf, 'unbounded preceding',
             ifelse(window == 0, 'current row', paste0(window, ' preceding'))),
             ' and ',
-          ifelse(up_to == Inf                    , 'unbounded',
-            paste0(up_to, ' following')),
+          ifelse(                    up_to == Inf, 'unbounded',
+                                                paste0( up_to, ' following')),
           ')')
       }
     } else {
       # Produce access via *ahead/up_to*.
       component$access <- 'ahead'
       
-      if(is.null(ahead) && is.null(up_to))
-        stop('Unable to identify the component\'s type of access. All parameters are empty.')
-      
-      if(is.null(component$fn) || is.na(component$fn))
-        component$fn <- 'first_value' # default to first_value
-      
-      use_fn <- rep(component$fn, length(component$columns))
-      use_fn[component$columns == 'ts'] <- 'last_value' # default to last_value
-      
-      sql_start <- paste0(use_fn, '(', columns_sql, ') over (', over_clause, ' ')
-      sql_txts <- paste0(sql_start, 'range between ',
-        ifelse(is.na(ahead),                 'current row', paste0(ahead, ' following')),
+      sql_txts <- paste0(sql_start,
+        ifelse(                is.null(ahead), "'0 days'::interval following", paste0(ahead, ' following')),
         ' and ',
-        ifelse(is.na(up_to) || up_to == Inf, 'unbounded',   up_to), ' following)')
+        ifelse(is.null(up_to) || up_to == Inf,                    'unbounded',                       up_to),
+        ' following)')
     }
     
     # Produce SQL objects from character
@@ -324,10 +372,11 @@ make_component <- function(input_source,
   }
   
 # Finalize and return ---------------------------------------------------------------------------------------------
-  if(!component_has_been_built)
+  if(!component_has_been_built) # This is just a "sanity check." This if() should never be TRUE.
     warning('component_has_been_built is FALSE.')
   
   attr(component, 'phea') <- 'component'
+  
   component
 }
 

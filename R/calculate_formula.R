@@ -19,7 +19,7 @@
 #' @param fml Formula or list of formulas.
 #' @param export List of additional variables to export.
 #' @param add_components Additional components. Used mostly in case components is not a list of components.
-#' @param .ts,.pid,.delay,.line If supplied, these will overwrite those of the given component.
+#' @param .ts,.pid,delay,line If supplied, these will overwrite those of the given component.
 #' @param require_all If `TRUE`, returns only rows where all components to have been found according to their
 #'   timestamps. If the timestamp is not null, the component is cosidered present even if its other values are null. If 
 #'   `dont_require` is provided, `require_all` is ignored.
@@ -41,23 +41,29 @@
 #' alternatively be a character vector of names of columns and/or SQL expressions, in which case `calculate_formula()`
 #' will return only rows where the value of those columns or expressions change.
 #' @return Lazy table with result of formula or formulas.
-calculate_formula <- function(components, fml = NULL, window = NA, export = NULL, add_components = NULL,
+calculate_formula <- function(components, fml = NULL, window = NULL, export = NULL, add_components = NULL,
   require_all = FALSE, limit = NA, dont_require = NULL, filters = NULL, cascaded = TRUE, get_sql = FALSE,
-  out_window = NULL, dates = NULL, kco = FALSE,
-  .ts = NULL, .pid = NULL, .delay = NULL, .line = NULL) {
+  out_window = NULL, dates = NULL, kco = FALSE, dates_from = NULL,
+  .ts = NULL, .pid = NULL, line = NULL, delay = NULL, component_window = NULL, ahead = NULL, up_to = NULL) {
   # Prepare ---------------------------------------------------------------------------------------------------------
   # TODO: Improve the logic regarding these two variables below.
   keep_names_unchanged <- FALSE
   input_is_phenotype <- FALSE
+  #
+  
+  # If TRUE, will add extra column to filter dates.
+  filtering_dates <- !is.null(dates_from)
   
   # This is just to make code easier to read.
-  dbQuoteId <- function(x)
-    DBI::dbQuoteIdentifier(.pheaglobalenv$con, x)
+  dbQuoteId <- function(x) DBI::dbQuoteIdentifier(.pheaglobalenv$con, x)
+  dbQuoteStr <- function(x) DBI::dbQuoteString(.pheaglobalenv$con, x)
+  has_content <- function(x) isFALSE(is.na(x))
   
   # Parameter overload ----------------------------------------------------------------------------------------------
   if(isTRUE(attr(components, 'phea') == 'phenotype')) {
     keep_names_unchanged <- TRUE
     input_is_phenotype <- TRUE
+    
     res_vars <- attr(components, 'phea_res_vars')
     
     new_component <- make_component(
@@ -65,19 +71,21 @@ calculate_formula <- function(components, fml = NULL, window = NA, export = NULL
       .ts = ts,
       .pid = pid)
     
+    # Overwrite if provided.
     ts_name <- deparse(substitute(.ts))
     if(ts_name != 'NULL')
       new_component$rec_source$ts <- ts_name
     
     pid_name <- deparse(substitute(.pid))
     if(pid_name != 'NULL')
-      new_component$rec_source$ts <- pid_name
+      new_component$rec_source$pid <- pid_name
     
-    if(!is.null(.line))
-      new_component$line <- .line
-    
-    if(!is.null(.delay))
-      new_component$delay <- .delay
+    # TODO: Move this to make_component()
+    if(!is.null(line)) new_component$line <- line
+    if(!is.null(delay)) new_component$delay <- delay
+    if(!is.null(component_window)) new_component$window <- component_window
+    if(!is.null(ahead)) new_component$ahead <- ahead
+    if(!is.null(up_to)) new_component$up_to <- up_to
     
     # Create one component per result var.
     components <- sapply(res_vars, \(x) new_component, USE.NAMES = TRUE, simplify = FALSE)
@@ -101,16 +109,24 @@ calculate_formula <- function(components, fml = NULL, window = NA, export = NULL
   # Build variable map ----------------------------------------------------------------------------------------------
   # Variable map has all valid combinations of components, record sources, and record source columns.
   var_map <- purrr::map2(names(components), components, \(comp_name, component) {
-    if(component$.passthrough || keep_names_unchanged)
+    if(component$passthrough || keep_names_unchanged)
       composed_named <- component$columns
     else
       composed_name <- paste0(comp_name, '_', component$columns)
-    return(dplyr::tibble(
+    
+    res <- dplyr::tibble(
       component_name = comp_name,
       rec_name = component$rec_source$rec_name,
       column = component$columns,
       composed_name = composed_name,
-      access_sql = component$access_sql))
+      access_sql = component$access_sql)
+    # , pick = !(is.null(component$pick_by) || is.na(component$pick_by) || component$pick_by == '')
+    # , pick_by = component$pick_by)
+    
+    # if(filtering_dates)
+    #   res <- mutate(res, date_out = comp_name %in% dates_from)
+    
+    return(res)
   }) |>
     dplyr::bind_rows()
   
@@ -189,12 +205,25 @@ calculate_formula <- function(components, fml = NULL, window = NA, export = NULL
       dplyr::pull(column) |>
       unique()
     
-    export_records <- record_source$records |>
-      dplyr::transmute(
-        name = local(rec_name),
-        pid = !!rlang::sym(record_source$pid),
-        ts = !!rlang::sym(record_source$ts),
-        !!!rlang::syms(out_vars))
+    # if(filtering_dates) {
+    #   # Are the dates from this record source being exported?
+    #   date_out <- any(var_map[var_map$rec_name == rec_name,]$date_out)
+    #   
+    #   export_records <- record_source$records |>
+    #     dplyr::transmute(
+    #       name = local(rec_name),
+    #       pid = !!rlang::sym(record_source$pid),
+    #       ts = !!rlang::sym(record_source$ts),
+    #       phea_date_out = local(date_out),
+    #       !!!rlang::syms(out_vars))
+    # } else {
+      export_records <- record_source$records |>
+        dplyr::transmute(
+          name = local(rec_name),
+          pid = !!rlang::sym(record_source$pid),
+          ts = !!rlang::sym(record_source$ts),
+          !!!rlang::syms(out_vars))
+    # }
     
     return(export_records)
   }
@@ -211,7 +240,7 @@ calculate_formula <- function(components, fml = NULL, window = NA, export = NULL
   }
   
   # Apply components ------------------------------------------------------------------------------------------------
-  # First, generate the commands.
+  ## First, generate the commands.
   commands <- purrr::map2(var_map$composed_name, var_map$access_sql,
     ~rlang::exprs(!!..1 := !!dplyr::sql(..2))) |>
     unique() |>
@@ -219,21 +248,84 @@ calculate_formula <- function(components, fml = NULL, window = NA, export = NULL
   # The unique() above is just in case, but is it needed? Seems like the only way there could be duplicates is if the
   # same component gets added twice to the call to calculate_formula(). 
   
-  phea_row_id_sql_txt <- paste0('row_number() over (order by ', dbQuoteId('pid'), ', ',
-    dbQuoteId('ts'), ')')
+  ## Second, apply commands.
+  phea_row_id_sql_txt <- paste0('row_number() over (order by ', dbQuoteId('pid'), ', ', dbQuoteId('ts'), ')')
   
-  # Second, apply commands to the board all at once, so we only generate a
-  # single layer of "SELECT ... FROM (SELECT ...)".
-  board <- dplyr::transmute(board,
-    phea_row_id = dplyr::sql(phea_row_id_sql_txt),
-    pid, ts,
-    !!!commands)
+  if(F) {
+    # if(any(var_map$pick)) {
+    #   var_map_picks <- var_map[var_map$pick,]
+    #   
+    #   picks <- purrr::map(seq(nrow(var_map_picks)), \(i) {
+    #     phea_col_name <- var_map_picks$composed_name[i]
+    #     orig_col_name <- var_map_picks$column[i]
+    #     component_name <- var_map_picks$component_name[i]
+    #     rec_name <- var_map_picks$rec_name[i]
+    #     pick_by <- var_map_picks$pick_by[i]
+    #     sql_txt <- paste0('case when ',
+    #       dbQuoteId('name'), ' = ', dbQuoteStr(rec_name), ' and ',
+    #       dbQuoteId(pick_by), ' = ', dbQuoteId(paste0(component_name, '_', pick_by)),
+    #       ' then ', dbQuoteId(orig_col_name), ' else NULL end')
+    #     rlang::exprs(!!phea_col_name := !!dplyr::sql(sql_txt))
+    #   }) |>
+    #     unique() |>
+    #     unlist(recursive = FALSE)
+    # # }
+    # 
+    # # pick_sql <- list(
+    # #   x = components,
+    # #   y = names(components)) |>
+    # #   purrr::pmap(\(x, y) {
+    # #     if(x$pick) {
+    # #       browser()
+    # #       variables_to_hide <- 
+    # #       return(paste0('case when name != \'', x$rec_source$rec_name,
+    # #         '\' then true else ', y, '_', x$pick_by, ' = ', x$pick_by, ' end'))
+    # #     } else
+    # #       return(NULL)
+    # #   }) |>
+    # #   purrr::discard(is.null) |>
+    # #   paste0(collapse = ' and ')
+    # 
+    # # if(pick_sql != '') {
+    #   # Apply commands, filter, then drop unneded columns.
+    #   board <- dplyr::mutate(board,
+    #     phea_row_id = dplyr::sql(phea_row_id_sql_txt),
+    #     !!!commands)
+    #   
+    #   browser()
+    #   board <- filter(board, sql(pick_sql))
+    #   
+    #   commands_names <- names(commands)
+    #   if(filtering_dates) {
+    #     board <- dplyr::select(board,
+    #       phea_row_id, pid, ts, phea_date_out, all_of(commands_names))
+    #   } else {
+    #     board <- dplyr::transmute(board,
+    #       phea_row_id, pid, ts, all_of(commands_names))
+    #   }
+    # } else {
+  }
   
-  # Third and final, fill the blanks downward with the last non-blank value, within the patient.
+  # Apply commands to the board all at once, so we only generate a single layer of "SELECT ... FROM (SELECT ...)".
+  if(filtering_dates) {
+    board <- dplyr::transmute(board,
+      phea_row_id = dplyr::sql(phea_row_id_sql_txt),
+      pid, ts, name,
+      !!!commands)
+  } else {
+    board <- dplyr::transmute(board,
+      phea_row_id = dplyr::sql(phea_row_id_sql_txt),
+      pid, ts,
+      !!!commands)
+  }
+  # }
+  
+  # browser()
+  ## Third and final, fill the blanks downward with the last non-blank value, within the patient.
   board <- board |>
     dbplyr::window_order(pid, ts) |>
     dplyr::group_by(pid) |>
-    tidyr::fill(!c(phea_row_id, pid, ts)) |>
+    tidyr::fill(!any_of(c('phea_row_id', 'pid', 'ts', 'name'))) |>
     ungroup()
   
   # For some reason, apparently a bug in dbplyr's SQL translation, we need to "erase" an ORDER BY "pid", "ts" that is
@@ -244,6 +336,17 @@ calculate_formula <- function(components, fml = NULL, window = NA, export = NULL
   # tidyr::fill.lazy_tbl() above.
   board <- board |>
     arrange()
+  
+  # dates_from ------------------------------------------------------------------------------------------------------
+  if(filtering_dates) {
+    # Obtain `rec_name`s from the record sources of the target components.
+    rec_names <- unique(var_map[var_map$component_name %in% dates_from,]$rec_name)
+
+    sql_txt <- paste0(dbQuoteId('name'), ' in (', paste0(dbQuoteStr(rec_names), collapse = ', '), ')')
+    
+    board <- board |>
+      filter(sql(sql_txt))
+  }
   
   # Compute window --------------------------------------------------------------------------------------------------
   window_components <- setdiff(var_map$component_name, out_window)
@@ -295,49 +398,49 @@ calculate_formula <- function(components, fml = NULL, window = NA, export = NULL
         paste0(' is not null') |>
         paste(collapse = ' and ')
       
-      if(is.na(window)) {
-        board <- dplyr::filter(board,
-          phea_row_id == phea_ts_row &&
-            dplyr::sql(sql_txt))
-      } else {
+      if(has_content(window)) {
         board <- dplyr::filter(board,
           phea_row_id == phea_ts_row &&
             dplyr::sql(sql_txt) &&
             window < local(window))
+      } else {
+        board <- dplyr::filter(board,
+          phea_row_id == phea_ts_row &&
+            dplyr::sql(sql_txt))
       }
     } else {
       # No required components after all, because all were excluded by dont_require. Let's just filter by the most
       # complete computation.
-      if(is.na(window)) {
-        board <- dplyr::filter(board,
-          phea_row_id == phea_ts_row)
-      } else {
+      if(has_content(window)) {
         board <- dplyr::filter(board,
           phea_row_id == phea_ts_row &&
             window < local(window))
+      } else {
+        board <- dplyr::filter(board,
+          phea_row_id == phea_ts_row)
       }
     }
   } else {
     # No need to require all components. Let's just filter by the most complete computation.
-    if(is.na(window)) {
-      board <- board |>
-        dplyr::filter(phea_row_id == phea_ts_row)
-    } else {
+    if(has_content(window)) { # This covers case if `window` is NULL
       board <- board |>
         dplyr::filter(phea_row_id == phea_ts_row &&
             window < local(window))
+    } else {
+      board <- board |>
+        dplyr::filter(phea_row_id == phea_ts_row)
     }
   }
   
   # Apply filters, if provided.
-  if(!is.null(filters)) {
-    sql_txt <- paste0('(', paste0(filters, collapse = ') AND ('), ')')
+  if(!is.null(filters) && any(!is.na(filters))) {
+    sql_txt <- paste0('(', paste0(filters[!is.na(filters)], collapse = ') AND ('), ')')
     board <- board |>
       filter(sql(sql_txt))
   }
   
   # Limit number of output rows, if requested.
-  if(!is.na(limit))
+  if(isFALSE(is.na(limit))) # This covers case if limit = NULL
     board <- board |>
       head(n = lim)
   

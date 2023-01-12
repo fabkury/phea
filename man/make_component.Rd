@@ -13,12 +13,16 @@ make_component(
   ahead = NULL,
   up_to = NULL,
   pid = NULL,
+  .pid = NULL,
   ts = NULL,
   .ts = NULL,
-  .pid = NULL,
-  .fn = NULL,
-  .ts_fn = NULL,
-  .passthrough = FALSE
+  fn = NULL,
+  ts_fn = NULL,
+  arg = NULL,
+  ts_arg = NULL,
+  omit_value = NULL,
+  ts_omit_value = NULL,
+  passthrough = FALSE
 )
 }
 \arguments{
@@ -37,14 +41,14 @@ in SQL language (see argument \code{delay}).}
 \item{pid}{Character. If passing a lazy table to \code{input_source}, \code{pid} is passed to \code{make_record_source()}
 to buid a record source. See \code{\link{make_record_source}}.}
 
+\item{.pid}{Unquoted characters. Optional. Use this argument to pass unquoted characters to the \code{pid} argument (see
+examples). If \code{pid} is provided, \code{.pid} is ignored.}
+
 \item{ts}{Character. If passing a lazy table to \code{input_source}, \code{ts} is passed to \code{make_record_source()} to
 buid a record source. See \code{\link{make_record_source}}.}
 
 \item{.ts}{Unquoted characters. Optional. Use this argument to pass unquoted characters to the \code{ts} argument (see
 examples). If \code{ts} is provided, \code{.ts} is ignored.}
-
-\item{.pid}{Unquoted characters. Optional. Use this argument to pass unquoted characters to the \code{pid} argument (see
-examples). If \code{pid} is provided, \code{.pid} is ignored.}
 }
 \value{
 Phea component object.
