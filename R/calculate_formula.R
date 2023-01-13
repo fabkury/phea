@@ -322,11 +322,11 @@ calculate_formula <- function(components, fml = NULL, window = NULL, export = NU
   
   # browser()
   ## Third and final, fill the blanks downward with the last non-blank value, within the patient.
-  board <- board |>
-    dbplyr::window_order(pid, ts) |>
-    dplyr::group_by(pid) |>
-    tidyr::fill(!any_of(c('phea_row_id', 'pid', 'ts', 'name'))) |>
-    ungroup()
+  # board <- board |>
+  #   dbplyr::window_order(pid, ts) |>
+  #   dplyr::group_by(pid) |>
+  #   tidyr::fill(!any_of(c('phea_row_id', 'pid', 'ts', 'name'))) |>
+  #   ungroup()
   
   # For some reason, apparently a bug in dbplyr's SQL translation, we need to "erase" an ORDER BY "pid", "ts" that is
   # left over in the translated query. That ORDER BY persists even if you posteriorly do a dplyr::group_by() on the
@@ -334,8 +334,8 @@ calculate_formula <- function(components, fml = NULL, window = NULL, export = NU
   # saying that "ts" must also be part of the GROUP BY. This left over ORDER BY "pid", "ts" apparently comes from the
   # dbplyr::window_order() call that was necessary to guarantee the intended behavior of the call to
   # tidyr::fill.lazy_tbl() above.
-  board <- board |>
-    arrange()
+  # board <- board |>
+  #   arrange()
   
   # dates_from ------------------------------------------------------------------------------------------------------
   if(filtering_dates) {

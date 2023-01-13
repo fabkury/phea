@@ -78,28 +78,6 @@ make_component <- function(input_source,
   dbQuoteId <- function(x) # This is just to make code easier to read.
     DBI::dbQuoteIdentifier(.pheaglobalenv$con, x)
   
-  component <- list()
-  
-  ## Overwrite with input parameters if they were provided
-  if(!is.null(line)) component$line <- line
-  if(!is.null(bound)) component$bound <- bound
-  if(!is.null(delay)) component$delay <- delay
-  if(!is.null(window)) component$window <- window
-  if(!is.null(ahead)) component$ahead <- ahead
-  if(!is.null(up_to)) component$up_to <- up_to
-  if(!is.null(fn)) component$fn <- fn
-  if(!is.null(arg)) component$arg <- arg
-  if(!is.null(ts_fn)) component$ts_fn <- ts_fn
-  if(!is.null(ts_arg)) component$ts_arg <- ts_arg
-  if(!is.null(omit_value)) component$omit_value <- omit_value
-  if(!is.null(ts_omit_value)) component$ts_omit_value <- ts_omit_value
-  # if(!is.null(pick_by)) component$pick_by <- pick_by
-  if(!is.null(passthrough)) component$passthrough <- passthrough
-
-  # passthrough defaults to FALSE
-  if(is.null(component$passthrough) || isTRUE(is.na(component$passthrough)))
-    component$passthrough <- FALSE
-  
   # pid and ts must be processed before capturing input_source.
   if(is.null(pid) || is.na(pid)) {
     pid = deparse(substitute(.pid))
@@ -114,6 +92,8 @@ make_component <- function(input_source,
   }
   
 # Capture input_source and create `component` according to argument overload --------------------------------------
+  component <- list()
+  
   if(isTRUE(attr(input_source, 'phea') == 'component')) {
     # Input is a component. Just copy it.
     component <- input_source
@@ -147,6 +127,26 @@ make_component <- function(input_source,
 
   # TODO: Do I really need to copy component$rec_source$vars into component$columns?
   component$columns <- component$rec_source$vars
+  
+  ## Overwrite with input parameters if they were provided
+  if(!is.null(line)) component$line <- line
+  if(!is.null(bound)) component$bound <- bound
+  if(!is.null(delay)) component$delay <- delay
+  if(!is.null(window)) component$window <- window
+  if(!is.null(ahead)) component$ahead <- ahead
+  if(!is.null(up_to)) component$up_to <- up_to
+  if(!is.null(fn)) component$fn <- fn
+  if(!is.null(arg)) component$arg <- arg
+  if(!is.null(ts_fn)) component$ts_fn <- ts_fn
+  if(!is.null(ts_arg)) component$ts_arg <- ts_arg
+  if(!is.null(omit_value)) component$omit_value <- omit_value
+  if(!is.null(ts_omit_value)) component$ts_omit_value <- ts_omit_value
+  # if(!is.null(pick_by)) component$pick_by <- pick_by
+  if(!is.null(passthrough)) component$passthrough <- passthrough
+  
+  # passthrough defaults to FALSE
+  if(is.null(component$passthrough) || isTRUE(is.na(component$passthrough)))
+    component$passthrough <- FALSE
   
   # Add timestamp column
   if(!component$passthrough)
@@ -231,6 +231,13 @@ make_component <- function(input_source,
   use_fn <- capture_named_args(component$fn, 'last_value',
     component$ts_fn, component$columns, component$passthrough)
   
+  # Replace with custom aggregate if needed
+  if(exists('custom_aggregate', envir = .pheaglobalenv)) {
+    mask <- grepl('last_value', use_fn, ignore.case = TRUE)
+    if(any(mask))
+      use_fn[mask] <- .pheaglobalenv$custom_aggregate
+  }
+  
   # use_arg is a vector of arguments to window functions, one for each column.
   process_arg <- function(x) {
     if(is.null(x) || length(x) == 0 || isTRUE(is.na(x)) || isTRUE(x == ''))
@@ -279,11 +286,16 @@ make_component <- function(input_source,
     DBI::dbQuoteString(.pheaglobalenv$con, component$rec_source$rec_name),
     ' then ', dbQuoteId(component$columns), ' else null end')
   
-  over_clause <- paste0('partition by ', dbQuoteId('pid'), ', ', dbQuoteId('name'), ' order by ', dbQuoteId('ts'))
+  component$placement_sql <- columns_sql
+  
+  over_clause <- paste0(
+    'partition by ', dbQuoteId('pid'),
+    # ', ', dbQuoteId('name'),
+    ' order by ', 
+    dbQuoteId('ts'))
   
   # component_has_been_built is just to help us trim the code identation, as opposed to using nested if-else`s.
   component_has_been_built <- FALSE
-  
   make_params_sql <- function() {
     purrr::pmap(list(columns_sql, use_arg, use_omit_value), function(x, y, z) {
       if(z) return(y)
@@ -293,6 +305,9 @@ make_component <- function(input_source,
   }
   
   # Now we figure out the acess mode, and produce the window function calls.
+  if(isTRUE(is.na(line)))
+    line <- NULL
+  
   if(!component_has_been_built && (!is.null(line) || !is.null(bound))) {
     # Produce access via *line*.
     # Line access is built differently, because we can use dbplyr::win_over(). dbplyr::win_over() does not support
@@ -315,7 +330,7 @@ make_component <- function(input_source,
         
         dbplyr::win_over(
           expr = sql(sql_txt),
-          partition = c('pid', 'name'),
+          partition = c('pid'), #, 'name'),
           order = 'ts',
           frame = c(
             ifelse(is.null(bound), -Inf, -bound),
