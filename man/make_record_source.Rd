@@ -24,13 +24,10 @@ make_record_source(
 \item{vars}{Character vector. Optional. Name of the colums to make available from \code{records}. If not supplied, all
 columns are used.}
 
-\item{.pid}{Unquoted characters. Optional. Use this argument to pass unquoted characters to the \code{pid} argument. If
-\code{pid} is provided, \code{.pid} is ignored. See examples.}
+\item{.pid, .ts}{Unquoted characters. Use these argument to pass unquoted characters to the \code{pid} or \code{ts} arguments.
+If \code{pid}/\code{ts} is provided, \code{.pid}/\code{.ts} is ignored. See examples.}
 
-\item{.ts}{Unquoted characters. Optional. Use this argument to pass unquoted characters to the \code{ts} argument. If \code{ts}
-is provided, \code{.ts} is ignored. See examples.}
-
-\item{rec_name}{Character. Optional. Record name.}
+\item{rec_name}{Integer. Optional. Number to use as record name. If not provided, a random one will be generated.}
 }
 \value{
 Phea record source object.

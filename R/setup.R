@@ -84,22 +84,23 @@ setup_phea <- function(connection, schema, verbose = TRUE, engine = NULL, compat
   assign('engine_code', engine_code, envir = .pheaglobalenv)
   assign('compatibility_mode', compatibility_mode, envir = .pheaglobalenv)
   
-  if(engine == 'postgres') {
+  if(engine == 'postgres' && !compatibility_mode) {
     sql_function_exists <- function(name) {
       function_check <- DBI::dbGetQuery(.pheaglobalenv$con,
         paste0('select * from
           pg_proc p
-          join pg_namespace n
+          inner join pg_namespace n
           on p.pronamespace = n.oid
           where proname =\'', name, '\';')) |>
         nrow()
       return(function_check == 1)
     }
     
-    need_to_install <- c('phea_coalesce_r_sfunc', 'phea_coalesce_nr_sfunc',
+    already_installed <- c('phea_coalesce_r_sfunc', 'phea_coalesce_nr_sfunc',
       'phea_last_value_ignore_nulls', 'phea_first_value_ignore_nulls') |>
       sapply(sql_function_exists, USE.NAMES = TRUE)
-    need_to_install <- !need_to_install
+    
+    need_to_install <- !already_installed
     
     if(any(need_to_install) && verbose)
       message('Engine configured to PostgreSQL.')

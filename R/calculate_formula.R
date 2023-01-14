@@ -250,18 +250,33 @@ calculate_formula <- function(components, fml = NULL, window = NULL, export = NU
   prid <- dbplyr::win_over(con = .pheaglobalenv$con,
     expr = dplyr::sql('row_number()'), order = c('pid', 'ts'))
   
-  # Apply commands to the board all at once, so we only generate a single layer of "SELECT ... FROM (SELECT ...)".
+  # dates_from ------------------------------------------------------------------------------------------------------
   if(filtering_dates) {
-    board <- dplyr::transmute(board,
-      phea_row_id = prid,
-      pid, ts, name,
-      !!!commands)
-  } else {
+    # Obtain `rec_name`s from the record sources of the target components.
+    rec_names <- unique(var_map[var_map$component_name %in% dates_from,]$rec_name)
+    
+    dates_filter_sql <- paste0(dbQuoteId('name'), ' in (', paste0(rec_names, collapse = ', '), ')')
+    
+    if(!.pheaglobalenv$compatibility_mode) {
+      # Apply the filter now.
+      # Keep only the rows coming from those `rec_name`s.    
+      board <- board |>
+        dplyr::filter(dplyr::sql(dates_filter_sql))
+    }
+  }
+  
+  # Apply commands to the board all at once, so we only generate a single layer of "SELECT ... FROM (SELECT ...)".
+  # if(filtering_dates) {
+  #   board <- dplyr::transmute(board,
+  #     phea_row_id = prid,
+  #     pid, ts, name,
+  #     !!!commands)
+  # } else {
     board <- dplyr::transmute(board,
       phea_row_id = prid,
       pid, ts,
       !!!commands)
-  }
+  # }
   
   if(.pheaglobalenv$compatibility_mode) {
     ## Fill the blanks downward with the last non-blank value, within the patient.
@@ -279,18 +294,12 @@ calculate_formula <- function(components, fml = NULL, window = NULL, export = NU
     # tidyr::fill.lazy_tbl() above.
     board <- board |>
       arrange()
-  }
-  
-  # dates_from ------------------------------------------------------------------------------------------------------
-  if(filtering_dates) {
-    # Obtain `rec_name`s from the record sources of the target components.
-    rec_names <- unique(var_map[var_map$component_name %in% dates_from,]$rec_name)
-
-    sql_txt <- paste0(dbQuoteId('name'), ' in (', paste0(rec_names, collapse = ', '), ')')
-
-    # Keep only the rows coming from those `rec_name`s.    
-    board <- board |>
-      dplyr::filter(dplyr::sql(sql_txt))
+    
+    if(filtering_dates) {
+      # Keep only the rows coming from those `rec_name`s.    
+      board <- board |>
+        dplyr::filter(dplyr::sql(dates_filter_sql))
+    }
   }
   
   # Compute window --------------------------------------------------------------------------------------------------

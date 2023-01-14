@@ -4,19 +4,31 @@
 \alias{setup_phea}
 \title{Setup Phea}
 \usage{
-setup_phea(connection, schema, verbose = TRUE, .fix_dbplyr_spark = FALSE)
+setup_phea(
+  connection,
+  schema,
+  verbose = TRUE,
+  engine = NULL,
+  compatibility_mode = FALSE,
+  custom_aggregate = NULL
+)
 }
 \arguments{
 \item{connection}{DBI-compatible SQL connection (e.g. produced by DBI::dbConnect).}
 
-\item{schema}{Schema to be used by default in \code{sqlt()}. If no schema, use \code{NA}.}
+\item{schema}{Schema to be used by default \%in\% \code{sqlt()}. If no schema, use \code{NA}.}
 
-\item{verbose}{Logical. Optional. If TRUE (default), functions will print to console at times.}
+\item{verbose}{Logical. If TRUE (default), functions will print to console at times.}
 
-\item{.fix_dbplyr_spark}{Logical. Optional. Very niche functionality. Set to \code{TRUE} to attempt to fix the use of
-\verb{IGNORE NULLS} by the OBDC driver connected to a Spark SQL server/cluster. This is the only situation where this
-argument should be used.}
+\item{engine}{Character. What is the flavor of your SQL server. If not provided, \code{setup_phea()} will try to detect it
+from \code{dbplyr::db_connection_describe()}. Options are: \code{postgres}, \code{mysql}, \code{redshift}, \code{spark}, \code{oracle},
+\code{bigquery}, \code{sqlserver}. Names are case-insensitive but must otherwise match exactly. If \code{engine} is not provided and
+it can't be detected, an error is raised.}
+
+\item{compatibility_mode}{Logical. If \code{TRUE} (default is \code{FALSE}), all component features besides \code{window} are
+deactivated, and all components become strictly \emph{"most recently available record}" on all columns. Turning this
+feature on may help make Phea work on SQL flavors it where it wasn't tested.}
 }
 \description{
-Configures Phea, in particular the SQL shorthands \code{sqlt()}, \code{sql0()} and \code{sqla()}.
+Configures Phea, \%in\% particular the SQL shorthands \code{sqlt()}, \code{sql0()} and \code{sqla()}.
 }
