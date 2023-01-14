@@ -46,7 +46,7 @@ phea_plot <- function(board, pid, plot_title = NULL, exclude = NULL, verbose = N
   # Plot all columns except some.
   chart_items <- colnames(board_data)
   
-  if(sum(c('phea_row_id', 'pid', 'ts', 'window') %in% colnames(board_data)) > 3) {
+  if(sum(c('phea_row_id', 'pid', 'ts', 'window') %in% colnames(board_data)) > 2) {
     # The board has the base columns of a phenotype result. Remove them.
     chart_items <- setdiff(chart_items, c('phea_row_id', 'pid', 'ts', 'window'))
   }

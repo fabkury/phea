@@ -1,10 +1,10 @@
 Package: phea
 Title: Phenotyping Algebra
-Version: 0.6.4.0000
+Version: 0.7.0.0000
 Authors@R: 
     person("Fabrício", "Kury", , "github@kury.dev", role = c("aut", "cre"),
            comment = c(ORCID = "YOUR-ORCID-ID"))
-Description: Provides a formula-based framework for identifying patients in time-stamped data in SQL databases.
+Description: SQL query builder (based on dbplyr) that creates queries that calculate formulas using patient data as variables.
 License: MIT + file LICENSE
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
@@ -16,9 +16,9 @@ Imports:
 	stringr,
 	purrr,
 	rlang,
-	tidyr,
-	plotly
+	tidyr
 Suggests: 
     knitr,
-    rmarkdown
+    rmarkdown,
+    plotly
 VignetteBuilder: knitr

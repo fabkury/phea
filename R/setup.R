@@ -13,47 +13,103 @@ if(!exists('.pheaglobalenv'))
 # Setup Phea ------------------------------------------------------------------------------------------------------
 #' Setup Phea
 #'
-#' Configures Phea, in particular the SQL shorthands `sqlt()`, `sql0()` and `sqla()`.
+#' Configures Phea, %in% particular the SQL shorthands `sqlt()`, `sql0()` and `sqla()`.
 #'
 #' @export
 #' @param connection DBI-compatible SQL connection (e.g. produced by DBI::dbConnect).
-#' @param schema Schema to be used by default in `sqlt()`. If no schema, use `NA`.
-#' @param verbose Logical. Optional. If TRUE (default), functions will print to console at times.
-#' @param .fix_dbplyr_spark Logical. Optional. Very niche functionality. Set to `TRUE` to attempt to fix the use of
-#' `IGNORE NULLS` by the OBDC driver connected to a Spark SQL server/cluster. This is the only situation where this
-#' argument should be used.
-setup_phea <- function(connection, schema, verbose = TRUE, .fix_dbplyr_spark = FALSE) {
+#' @param schema Schema to be used by default %in% `sqlt()`. If no schema, use `NA`.
+#' @param verbose Logical. If TRUE (default), functions will print to console at times.
+#' @param engine Character. What is the flavor of your SQL server. If not provided, `setup_phea()` will try to detect it
+#' from `dbplyr::db_connection_describe()`. Options are: `postgres`, `mysql`, `redshift`, `spark`, `oracle`,
+#' `bigquery`, `sqlserver`. Names are case-insensitive but must otherwise match exactly. If `engine` is not provided and
+#' it can't be detected, an error is raised.
+#' @param compatibility_mode Logical. If `TRUE` (default is `FALSE`), all component features besides `window` are
+#' deactivated, and all components become strictly _"most recently available record_" on all columns. Turning this
+#' feature on may help make Phea work on SQL flavors it where it wasn't tested.
+setup_phea <- function(connection, schema, verbose = TRUE, engine = NULL, compatibility_mode = FALSE,
+  custom_aggregate = NULL) {
   assign('con', connection, envir = .pheaglobalenv)
   assign('schema', schema, envir = .pheaglobalenv)
   assign('verbose', verbose, envir = .pheaglobalenv)
   
-  postgres_exists <- function() {
-    db_engine <- dbplyr::db_connection_describe(.pheaglobalenv$con)
-    return(grepl('postgres', db_engine, ignore.case = TRUE))
-  }
-  
-  sql_function_exists <- function(name) {
-    function_check <- DBI::dbGetQuery(.pheaglobalenv$con,
-      paste0('select * from
-        pg_proc p
-        join pg_namespace n
-        on p.pronamespace = n.oid
-        where proname =\'', name, '\';')) |>
-      nrow()
-    return(function_check == 1)
-  }
-  
-  if(postgres_exists()) {
+  if(is.null(engine)) {
+    db_desc <- dbplyr::db_connection_describe(.pheaglobalenv$con)
     
-    if(!sql_function_exists('phea_coalesce_r_sfunc')) {
-      if(verbose)
-        message('PostgreSQL detected in "', dbplyr::db_connection_describe(.pheaglobalenv$con), '".')
-      
+    if(is.null(engine) && grepl('postgres', db_desc, ignore.case = TRUE))
+      engine <- 'postgres'
+    
+    if(is.null(engine) && grepl('mysql', db_desc, ignore.case = TRUE))
+      engine <- 'mysql'
+    
+    if(is.null(engine) && grepl('redshift', db_desc, ignore.case = TRUE))
+      engine <- 'redshift'
+    
+    if(is.null(engine) && (grepl('spark', db_desc, ignore.case = TRUE)
+      || isTRUE(try(connection@info$dbms.name == "Spark SQL"))))
+      engine <- 'spark'
+    
+    if(is.null(engine) && grepl('bigquery', db_desc, ignore.case = TRUE))
+      engine <- 'bigquery'
+    
+    if(is.null(engine))
+      stop(paste0("Unable to detect SQL engine. Please provide `engine` argument. Options are: postgres, mysql, ",
+        "redshift, spark,  oracle, bigquery, sqlserver. If your engine is not on the list, you can try another one ", 
+        "with similar SQL syntax."))
+  } else {
+    # Normalize to lower case
+    engine <- tolower(engine)
+  }
+  
+  assign('engine', engine, envir = .pheaglobalenv)
+  
+  engine_code <- NULL
+  
+  if(is.null(engine_code) && engine %in% c('mysql')) {
+    engine_code <- 0
+    compatibility_mode <- TRUE
+  }
+  
+  if(is.null(engine_code) && engine %in% c('postgres'))
+    engine_code <- 1
+  
+  if(is.null(engine_code) && engine %in% c('redshift', 'oracle', 'bigquery'))
+    engine_code <- 2
+  
+  if(is.null(engine_code) && engine %in% c('spark'))
+    engine_code <- 3
+  
+  if(is.null(engine_code) && engine %in% c('sqlserver'))
+    engine_code <- 4
+  
+  assign('engine_code', engine_code, envir = .pheaglobalenv)
+  assign('compatibility_mode', compatibility_mode, envir = .pheaglobalenv)
+  
+  if(engine == 'postgres') {
+    sql_function_exists <- function(name) {
+      function_check <- DBI::dbGetQuery(.pheaglobalenv$con,
+        paste0('select * from
+          pg_proc p
+          join pg_namespace n
+          on p.pronamespace = n.oid
+          where proname =\'', name, '\';')) |>
+        nrow()
+      return(function_check == 1)
+    }
+    
+    need_to_install <- c('phea_coalesce_r_sfunc', 'phea_coalesce_nr_sfunc',
+      'phea_last_value_ignore_nulls', 'phea_first_value_ignore_nulls') |>
+      sapply(sql_function_exists, USE.NAMES = TRUE)
+    need_to_install <- !need_to_install
+    
+    if(any(need_to_install) && verbose)
+      message('Engine configured to PostgreSQL.')
+    
+    if(need_to_install[['phea_coalesce_r_sfunc']]) {
       if(verbose)
         message('Installing phea_coalesce_r_sfunc.')
       
       DBI::dbExecute(.pheaglobalenv$con,
-        "create function phea_coalesce_r_sfunc(state anyelement, value anyelement)
+        "create or replace function phea_coalesce_r_sfunc(state anyelement, value anyelement)
         returns anyelement
         immutable parallel safe
         as
@@ -62,27 +118,60 @@ setup_phea <- function(connection, schema, verbose = TRUE, .fix_dbplyr_spark = F
         $$ language sql;")
     }
     
-    if(!sql_function_exists('phea_last_value_ignore_nulls')) {
+    if(need_to_install[['phea_coalesce_nr_sfunc']]) {
+      if(verbose) {
+        message('Installing phea_coalesce_nr_sfunc.')
+      }
+      
+      DBI::dbExecute(.pheaglobalenv$con,
+        "create or replace function phea_coalesce_nr_sfunc(state anyelement, value anyelement)
+        returns anyelement
+        immutable parallel safe
+        as
+        $$
+          select coalesce(state, value);
+        $$ language sql;")
+    }
+    
+    if(need_to_install[['phea_last_value_ignore_nulls']]) {
       if(verbose)
         message('Installing phea_last_value_ignore_nulls.')
       
       DBI::dbExecute(.pheaglobalenv$con,
-        "create aggregate phea_last_value_ignore_nulls(anyelement) (
+        "create or replace aggregate phea_last_value_ignore_nulls(anyelement) (
           sfunc = phea_coalesce_r_sfunc,
           stype = anyelement
         );")
     }
     
-    assign('custom_aggregate', 'phea_last_value_ignore_nulls', envir = .pheaglobalenv)
+    if(need_to_install[['phea_first_value_ignore_nulls']]) {
+      if(verbose)
+        message('Installing phea_first_value_ignore_nulls.')
+      
+      DBI::dbExecute(.pheaglobalenv$con,
+        "create or replace aggregate phea_first_value_ignore_nulls(anyelement) (
+          sfunc = phea_coalesce_nr_sfunc,
+          stype = anyelement
+        );")
+    }
+    
+    custom_aggregate <- list(
+      last_value = 'phea_last_value_ignore_nulls',
+      first_value = 'phea_first_value_ignore_nulls')
   }
   
-  if(.fix_dbplyr_spark) {
-    if(connection@info$dbms.name == "Spark SQL") {
-      # Fix dbplyr's last_value() implementation.
-      `last_value_sql.Spark SQL` <<- function(con, x) {
-        dbplyr:::build_sql("LAST_VALUE(", ident(as.character(x)), ", true)", con = con)
-      }
+  if(engine == 'spark') {
+    # Insert _nulls treatment_ into dbplyr's last_value() and first_value() implementation.
+    `last_value_sql.Spark SQL` <<- function(con, x) {
+      dbplyr:::build_sql("LAST_VALUE(", ident(as.character(x)), ", true)", con = con)
+    }
+    
+    `first_value_sql.Spark SQL` <<- function(con, x) {
+      dbplyr:::build_sql("FIRST_VALUE(", ident(as.character(x)), ", true)", con = con)
     }
   }
+  
+  if(!is.null(custom_aggregate))
+    assign('custom_aggregate', custom_aggregate, envir = .pheaglobalenv)
 }
 

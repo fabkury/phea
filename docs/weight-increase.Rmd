@@ -13,17 +13,15 @@ knitr::opts_chunk$set(
   comment = "#>"
 )
 
-library(credx) # contains cred$pg
 ```
 ```{r setup}
 library(knitr)
-library(phea)
+library(credx) # local package, contains dbConnectFort
+# library(phea)
+devtools::load_all()
 suppressPackageStartupMessages(library(dplyr))
 
-# Connect to SQL server.
-dbcon <- DBI::dbConnect(RPostgres::Postgres(),
-    host = 'localhost', port = 8765,
-    dbname = 'fort', user = cred$pg$user, password = cred$pg$pass)
+dbcon <- dbConnectFort()
 
 # Provide the connection to Phea so we can use the sqlt() and sql0() shorthands.
 setup_phea(dbcon, 'cdm_new_york3')
@@ -43,16 +41,16 @@ While the _record source_ is the same as `weight_current`, the _component_ is di
 weight_record_source = sqlt(measurement) |>
   filter(measurement_concept_id == 3025315) |>
   make_record_source(
-    ts = measurement_datetime,
-    pid = person_id)
+    ts = 'measurement_datetime',
+    pid = 'person_id')
 
 # Most recent weight count record
 weight_current = make_component(weight_record_source)
 
 # weight count record at least 24 hours older than phenotype date, up to limit of 48 hours
 weight_previous = make_component(weight_record_source,
-  delay = '2 year',
-  window = '3 years')
+  delay = "'2 years'::interval",
+  window = "'3 years'::interval")
 ```
 
 _`delay` picks the most recent record that is **at least as old** as the specified amount of time._  
@@ -68,8 +66,8 @@ To facilitate interpretation of our phenotype, let us add the age of the patient
 ```{r, age}
 age_component <- sqlt(person) |>
   make_component(
-    .ts = birth_datetime,
-    .pid = person_id)
+    ts = 'birth_datetime',
+    pid = 'person_id')
 ```
 When you supply a lazy table to `make_component()`, it silently creates a record source from it, then uses that record source to create a component. You must provide varibales `.ts` e `.pid` for that.  
 
@@ -150,7 +148,8 @@ phen |>
     -weight_current_measurement_datetime,
     -weight_previous_measurement_datetime,
     -person_birth_datetime) |>
-  phea_plot(pid = sample_patient)
+  phea_plot(pid = sample_patient,
+    titles_font_size = 8)
 ```
 Notice that the chart for `weight_previous_value_as_number` tracks `weight_current_measurement_datetime`, but 2-3 years behind.  
 

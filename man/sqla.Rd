@@ -4,7 +4,7 @@
 \alias{sqla}
 \title{SQL query with arguments}
 \usage{
-sqla(args, ...)
+sqla(args, ..., no_check = FALSE)
 }
 \arguments{
 \item{args}{}

@@ -11,7 +11,7 @@ vignette: >
 library(knitr)
 options(scipen = 5e5)
 knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
-library(credx) # contains cred$pg
+library(credx) # contains fabcred$pg
 library(wrap)
 ```
 ```{r setup, message = FALSE}
@@ -20,10 +20,10 @@ library(dplyr)
 
 # Connect to SQL server.
 dbcon <- DBI::dbConnect(RPostgres::Postgres(),
-  host = 'localhost', port = 8765, dbname = 'fort',
-  user = cred$pg$user, password = cred$pg$pass)
+  host = fabcred$pg$host, port = fabcred$pg$port, dbname = fabcred$pg$database,
+  user = fabcred$pg$user, password = fabcred$pg$pass)
 
-# Call setup_phea so we can use sqlt() and sql0().
+# Setup Phea
 setup_phea(dbcon, 'cdm_new_york3')
 ```
 
@@ -75,8 +75,8 @@ scr_records <- union_all(scr_records_a, scr_records_b)
 
 # Make a record source.
 scr_record_source <- make_record_source(scr_records,
-  ts = measurement_datetime,
-  pid = person_id)
+  ts = 'measurement_datetime',
+  pid = 'person_id')
 ```
 
 ### Glomerular filtration rate  
@@ -89,8 +89,8 @@ gfr_records <- sqlt(measurement) |>
   filter(measurement_concept_id == 46236952)
 
 gfr_record_source <- make_record_source(gfr_records,
-    ts = measurement_datetime,
-    pid = person_id)
+    ts = 'measurement_datetime',
+    pid = 'person_id')
 ```
 
 ## Calculate the phenotype  
@@ -105,18 +105,22 @@ scr_change <- calculate_formula(
     
     # Minimum value within 48-hour window
     scr_48h_min = make_component(scr_record_source,
-      window = '48 days', .fn = 'min'),
+      window = "'48 days'::interval",
+      fn = list(value_as_number = 'min')),
     
     # Minimum value within 7-day window
     scr_7d_min = make_component(scr_record_source,
-      window = '7 months', .fn = 'min'),
+      window = "'7 months'::interval",
+      fn = list(value_as_number = 'min')),
     
     # Current glomerular filtration rate (GFR)
     gfr = make_component(gfr_record_source),
     
     # Glomerular filtration rate 3 to 5 months older than phenotype date
     gfr_prior = make_component(gfr_record_source,
-      delay = '3 months', window = '5 months', .fn = 'min')),
+      delay = "'3 months'::interval",
+      window = "'5 months'::interval",
+      fn = list(value_as_number = 'min'))),
     
   fml = list(
     scr_case_a = 'scr_value_as_number - scr_48h_min_value_as_number >= 0.3',
@@ -132,7 +136,7 @@ scr_change <- calculate_formula(
     'gfr_measurement_datetime',
     'gfr_prior_measurement_datetime'),
   
-  .cascaded = FALSE, # Because we don't need to use results of prior formulas inside other formulas.
+  cascaded = FALSE, # Because we don't need to use results of prior formulas inside other formulas.
 )
 
 ```

@@ -6,12 +6,15 @@
 
 
 # Random name -----------------------------------------------------------------------------------------------------
-random_name <- function(len) {
-  # Generate random rec_name, 6 characters long, case-insensitive, starting with a letter.
-  sample(letters, 1) |>
-    c(sample(c(letters, 0:9), len-1, replace = TRUE)) |>
-    as.list() |>
-    do.call(what = paste0)
+# random_rec_name <- function(len) {
+# }
+random_rec_name <- function(len) {
+  # random rec_name, integer, 0 to `len` digits long
+  return(as.integer(runif(1) * 10^len))
+  
+  # random rec_name, `len` characters long, case-insensitive, starting with a letter
+  # c(sample(letters, 1), sample(c(letters, 0:9), len-1, replace = TRUE)) |>
+  #   as.list() |> do.call(what = paste0)
 }
 
 
@@ -28,12 +31,11 @@ random_name <- function(len) {
 #' 
 #' @param pid Character. Name of the colum in `records` that gives the person (patient) identifier.
 #' @param ts Character. Name of the colum in `records` that gives the timestamp.
-#' @param .pid Unquoted characters. Optional. Use this argument to pass unquoted characters to the `pid` argument. If
-#' `pid` is provided, `.pid` is ignored. See examples.
-#' @param .ts Unquoted characters. Optional. Use this argument to pass unquoted characters to the `ts` argument. If `ts`
-#'  is provided, `.ts` is ignored. See examples.
+#' @param .pid,.ts Unquoted characters. Use these argument to pass unquoted characters to the `pid` or `ts` arguments.
+#' If `pid`/`ts` is provided, `.pid`/`.ts` is ignored. See examples.
 #'  
-#' @param rec_name Character. Optional. Record name.
+#' @param rec_name Integer. Optional. Number to use as record name. If not provided, a random one will be generated.
+#' 
 #' @param vars Character vector. Optional. Name of the colums to make available from `records`. If not supplied, all
 #' columns are used.
 #' 
@@ -69,25 +71,39 @@ random_name <- function(len) {
 make_record_source <- function(records, pid = NULL, ts = NULL, vars = NULL, .pid = NULL, .ts = NULL, rec_name = NULL) {
   rec_source <- list()
 
+  # records
   rec_source$records <- records
   
-  if(is.null(rec_name))
-    rec_name <- random_name(6)
-
-  rec_source$rec_name <- rec_name
-
+  # pid
   if(is.null(pid) || is.na(pid))
     pid <- deparse(substitute(.pid))
   rec_source$pid <- pid
 
+  # ts
   if(is.null(ts) || is.na(ts))
     ts <- deparse(substitute(.ts))
   rec_source$ts <- ts
   
+  # rec_name
+  if(is.null(rec_name)) {
+    rec_name <- random_rec_name(6)
+  } else {
+    if(is.numeric(rec_name))
+      rec_name <- as.integer(rec_name)
+    
+    if(!is.integer(rec_name))
+      stop('rec_name must be integer or numeric, or NULL.')
+  }
+  
+  rec_source$rec_name <- rec_name
+  
+  # vars
   if(is.null(vars))
     vars <- setdiff(colnames(records), pid) # Keep all columns but `pid`
+  
   rec_source$vars <- vars
   
+  # finalize
   attr(rec_source, 'phea') <- 'record_source'
 
   rec_source

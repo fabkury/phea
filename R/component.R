@@ -115,7 +115,7 @@ make_component <- function(input_source,
         if('tbl_lazy' %in% class(input_source)) {
           # Input is a lazy table. Make a record source from it.
           if(is.null(pid) || is.null(ts))
-            stop('If providing a lazy table to make_component(), must also provide pid or .pid and ts or .ts.')
+            stop('If providing a lazy table to make_component(), must also provide `pid` or `.pid` and `ts` or `.ts`.')
         } else {
           stop('Unable to recognize input_source.')
         }
@@ -204,7 +204,7 @@ make_component <- function(input_source,
       if(any(!names_mask)) # Is any name empty?
         default_arg <- args[min(which(!names_mask))] # Use first empty name.
       else
-        default_arg <- def_arg # 'last_value'
+        default_arg <- def_arg
     }
     
     if(!is.null(preprocess_fn))
@@ -231,11 +231,15 @@ make_component <- function(input_source,
   use_fn <- capture_named_args(component$fn, 'last_value',
     component$ts_fn, component$columns, component$passthrough)
   
-  # Replace with custom aggregate if needed
+  # Use custom aggregates if needed
   if(exists('custom_aggregate', envir = .pheaglobalenv)) {
-    mask <- grepl('last_value', use_fn, ignore.case = TRUE)
-    if(any(mask))
-      use_fn[mask] <- .pheaglobalenv$custom_aggregate
+    for(i in 1:length(.pheaglobalenv$custom_aggregate)) {
+      fn_name_out <- names(.pheaglobalenv$custom_aggregate)[i]
+      fn_name_in <- .pheaglobalenv$custom_aggregate[[i]]
+      mask <- grepl(fn_name_out, use_fn, ignore.case = TRUE)
+      if(any(mask))
+        use_fn[mask] <- fn_name_in
+    }
   }
   
   # use_arg is a vector of arguments to window functions, one for each column.
@@ -267,6 +271,16 @@ make_component <- function(input_source,
   # use_omit_value is a vector of Boolean, one for each column.
   use_omit_value <- capture_named_args(component$omit_value, FALSE,
     component$ts_omit_value, component$columns, component$passthrough)
+
+# Default nulls treatment -----------------------------------------------------------------------------------------
+  if(.pheaglobalenv$engine_code == 3) {
+    # TODO: Test this on DataBricks.
+    nulls_treatment_mask <- sapply(use_fn, grepl, pattern = 'last_value|first_value', ignore.case = TRUE)
+    if(any(nulls_treatment_mask)) {
+      use_arg[nulls_treatment_mask] <- ', TRUE'
+      use_omit_value[nulls_treatment_mask] <- FALSE
+    }
+  }
   
 # Default to line = 0 if needed -----------------------------------------------------------------------------------
   # At this point, if any of the parameters line/bound/delay/window/ahead/up_to were NA, they are now NULL (or their
@@ -282,8 +296,7 @@ make_component <- function(input_source,
   
 # Build window function SQL ---------------------------------------------------------------------------------------
   # columns_sql is vectorized by the presence of `component$columns` 
-  columns_sql <- paste0('case when ', dbQuoteId('name'), ' = ',
-    DBI::dbQuoteString(.pheaglobalenv$con, component$rec_source$rec_name),
+  columns_sql <- paste0('case when ', dbQuoteId('name'), ' = ', component$rec_source$rec_name,
     ' then ', dbQuoteId(component$columns), ' else null end')
   
   component$placement_sql <- columns_sql
@@ -308,39 +321,39 @@ make_component <- function(input_source,
   if(isTRUE(is.na(line)))
     line <- NULL
   
+  if(.pheaglobalenv$compatibility_mode) {
+    # This is the "most default" case: the user just wants the most recent record of the component, without line/
+    # bound/delay/window/ahead/up_to. In this case, we don't need a window function. We can just copy the column
+    # whenever the line comes from the correct record source, then use tidyr::fill() to fill NULLs downward.
+    # In other words, the SQL to access the value is merely the CASE WHEN ... statement that otherwise goes inside the
+    # window function call.
+    component$access <- 'line'
+    
+    component$access_sql <- dplyr::sql(columns_sql)
+    component_has_been_built <- TRUE
+  }
+  
   if(!component_has_been_built && (!is.null(line) || !is.null(bound))) {
     # Produce access via *line*.
     # Line access is built differently, because we can use dbplyr::win_over(). dbplyr::win_over() does not support
     # window functions' RANGE mode, forcing us to not use it when mode is not ROWS.
     component$access <- 'line'
     
-    # TODO: Revise below.
-    if(F &&
-        is.null(bound) && !is.null(line) && line == 0) {
-      # Here is one optimization.
-      # This is the "most default" case: the user just wants the most recent record of the component, without line/
-      # bound/delay/window/ahead/up_to. In this case, we don't need a window function. We can just copy the column
-      # whenever the line comes from the correct record source. In other words, the SQL to access the value is merely
-      # the CASE WHEN ... statement that otherwise goes inside the window function call.
-      component$access_sql <- sql(columns_sql)
-    } else {
-      params_sql <- make_params_sql()
-      component$access_sql <- lapply(seq(component$columns), \(i) {
-        sql_txt <- paste0(use_fn[i], '(', params_sql[i], ')')
-        
-        dbplyr::win_over(
-          expr = sql(sql_txt),
-          partition = c('pid'), #, 'name'),
-          order = 'ts',
-          frame = c(
-            ifelse(is.null(bound), -Inf, -bound),
-            ifelse( is.null(line),    0, -line)),
-          con = .pheaglobalenv$con)
-      })
-      # Unlist the SQL objects without accidentally converting to character, which happens when we use unlist().
-      component$access_sql <- do.call(c, component$access_sql)
-    }
+    params_sql <- make_params_sql()
     
+    component$access_sql <- lapply(seq(component$columns), \(i) {
+      sql_txt <- paste0(use_fn[i], '(', params_sql[i], ')')
+      dbplyr::win_over(con = .pheaglobalenv$con,
+        expr = dplyr::sql(sql_txt),
+        partition = 'pid',
+        order = 'ts',
+        frame = c(
+          ifelse(is.null(bound), -Inf, -bound),
+          ifelse( is.null(line),    0, -line)))
+    })
+    
+    # Unlist the SQL objects without accidentally converting to character, which happens when we use unlist().
+    component$access_sql <- do.call(c, component$access_sql)
     component_has_been_built <- TRUE
   }
   
@@ -348,7 +361,10 @@ make_component <- function(input_source,
     # As commented above, for access other than *line* we need to write out the window function call by ourselves,
     # because dbplyr::win_over() does not support RANGE mode.
     params_sql <- make_params_sql()
-    sql_start <- paste0(use_fn, '(', params_sql, ') over (', over_clause, ' range between ')
+    
+    sql_start <- paste0(use_fn, '(', params_sql, ') over (', over_clause, ' range between ') # 1
+    # switch(.pheaglobalenv$engine_code,
+      # paste0(use_fn, '(', params_sql, ') over (', over_clause, ' range between ')) # 1
     
     if(!is.null(delay) || !is.null(window)) {
       # Produce access via *delay/window*.
@@ -375,14 +391,14 @@ make_component <- function(input_source,
       component$access <- 'ahead'
       
       sql_txts <- paste0(sql_start,
-        ifelse(                is.null(ahead), "'0 days'::interval following", paste0(ahead, ' following')),
+        ifelse(                is.null(ahead), 'current row', paste0(ahead, ' following')),
         ' and ',
-        ifelse(is.null(up_to) || up_to == Inf,                    'unbounded',                       up_to),
+        ifelse(is.null(up_to) || up_to == Inf,   'unbounded',                       up_to),
         ' following)')
     }
     
     # Produce SQL objects from character
-    component$access_sql <- sql(sql_txts)
+    component$access_sql <- dplyr::sql(sql_txts)
     component_has_been_built <- TRUE
   }
   
