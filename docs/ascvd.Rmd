@@ -446,9 +446,9 @@ ascvd = calculate_formula(
     estimated_risk = 'least(0.3, greatest(0.01, calculated_risk))'
     ),
   
-  .dont_require = c('smoker', 'htt', 'diabetes'),
+  dont_require = c('smoker', 'htt', 'diabetes'),
   
-  .out_window = c('person', 'diabetes'))
+  out_window = c('person', 'diabetes'))
 
 ```
 
