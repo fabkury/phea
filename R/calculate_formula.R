@@ -245,11 +245,6 @@ calculate_formula <- function(components, fml = NULL, window = NULL, export = NU
     # The unique() above is just in case, but is it needed? Seems like the only way there could be duplicates is if the
     # same component gets added twice to the call to calculate_formula(). 
   
-  ## Second, apply commands.
-  # Make phea_row_id
-  prid <- dbplyr::win_over(con = .pheaglobalenv$con,
-    expr = dplyr::sql('row_number()'), order = c('pid', 'ts'))
-  
   # dates_from ------------------------------------------------------------------------------------------------------
   if(filtering_dates) {
     # Obtain `rec_name`s from the record sources of the target components.
@@ -265,25 +260,23 @@ calculate_formula <- function(components, fml = NULL, window = NULL, export = NU
     }
   }
   
+  ## Second, apply commands.
+  # Make phea_row_id
+  prid <- dbplyr::win_over(con = .pheaglobalenv$con,
+    expr = dplyr::sql('row_number()'), order = c('pid', 'ts'))
+  
   # Apply commands to the board all at once, so we only generate a single layer of "SELECT ... FROM (SELECT ...)".
-  # if(filtering_dates) {
-  #   board <- dplyr::transmute(board,
-  #     phea_row_id = prid,
-  #     pid, ts, name,
-  #     !!!commands)
-  # } else {
-    board <- dplyr::transmute(board,
-      phea_row_id = prid,
-      pid, ts,
-      !!!commands)
-  # }
+  board <- dplyr::transmute(board,
+    phea_row_id = prid,
+    pid, ts,
+    !!!commands)
   
   if(.pheaglobalenv$compatibility_mode) {
     ## Fill the blanks downward with the last non-blank value, within the patient.
     board <- board |>
       dbplyr::window_order(pid, ts) |>
       dplyr::group_by(pid) |>
-      tidyr::fill(!any_of(c('phea_row_id', 'pid', 'ts', 'name'))) |>
+      tidyr::fill(!any_of(c('phea_row_id', 'pid', 'ts'))) |>
       ungroup()
   
     # For some reason, apparently a bug in dbplyr's SQL translation, we need to "erase" an ORDER BY "pid", "ts" that is
