@@ -123,6 +123,9 @@ make_component <- function(input_source,
       component$rec_source <- make_record_source(records = input_source, pid = pid, ts = ts)
     }
   }
+  
+  if(!isTRUE(attr(component$rec_source, 'phea') == 'record_source'))
+    stop('input_source ', deparse(substitute(input_source)), ' did not resolve into a Phea record source.')
 
   # TODO: Do I really need to copy component$rec_source$vars into component$columns?
   component$columns <- component$rec_source$vars

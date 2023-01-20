@@ -109,6 +109,9 @@ calculate_formula <- function(components, fml = NULL, window = NULL, export = NU
   # Build variable map ----------------------------------------------------------------------------------------------
   # Variable map has all valid combinations of components, record sources, and record source columns.
   var_map <- purrr::map2(names(components), components, \(comp_name, component) {
+    if(!isTRUE(attr(component, 'phea') == 'component'))
+      stop('Component ', comp_name, ' is not a Phea component object.')
+    
     if(component$passthrough || keep_names_unchanged)
       composed_named <- component$columns
     else
@@ -246,6 +249,24 @@ calculate_formula <- function(components, fml = NULL, window = NULL, export = NU
     # same component gets added twice to the call to calculate_formula(). 
   
   # dates_from ------------------------------------------------------------------------------------------------------
+  ## Second, apply commands.
+  # Make phea_row_id
+  prid <- dbplyr::win_over(con = .pheaglobalenv$con,
+    expr = dplyr::sql('row_number()'), order = c('pid', 'ts'))
+  
+  # Apply commands to the board all at once, so we only generate a single layer of "SELECT ... FROM (SELECT ...)".
+  if(filtering_dates) {
+    board <- dplyr::transmute(board,
+      phea_row_id = prid,
+      pid, ts, name,
+      !!!commands)
+  } else {
+    board <- dplyr::transmute(board,
+      phea_row_id = prid,
+      pid, ts,
+      !!!commands)
+  }
+  
   if(filtering_dates) {
     # Obtain `rec_name`s from the record sources of the target components.
     rec_names <- unique(var_map[var_map$component_name %in% dates_from,]$rec_name)
@@ -259,17 +280,6 @@ calculate_formula <- function(components, fml = NULL, window = NULL, export = NU
         dplyr::filter(dplyr::sql(dates_filter_sql))
     }
   }
-  
-  ## Second, apply commands.
-  # Make phea_row_id
-  prid <- dbplyr::win_over(con = .pheaglobalenv$con,
-    expr = dplyr::sql('row_number()'), order = c('pid', 'ts'))
-  
-  # Apply commands to the board all at once, so we only generate a single layer of "SELECT ... FROM (SELECT ...)".
-  board <- dplyr::transmute(board,
-    phea_row_id = prid,
-    pid, ts,
-    !!!commands)
   
   if(.pheaglobalenv$compatibility_mode) {
     ## Fill the blanks downward with the last non-blank value, within the patient.
@@ -352,7 +362,7 @@ calculate_formula <- function(components, fml = NULL, window = NULL, export = NU
       
       if(has_content(window)) {
         board <- dplyr::filter(board,
-          window < local(window) &&
+          window < dplyr::sql(!!window) &&
             dplyr::sql(sql_txt))
       } else {
         board <- dplyr::filter(board,
@@ -363,14 +373,14 @@ calculate_formula <- function(components, fml = NULL, window = NULL, export = NU
       # complete computation.
       if(has_content(window)) {
         board <- dplyr::filter(board,
-          window < local(window))
+          window < dplyr::sql(!!window))
       }
     }
   } else {
-    # No need to require all components. Let's just filter by the most complete computation.
+    # No need to require all components.
     if(has_content(window)) { # This covers case if `window` is NULL
       board <- board |>
-        dplyr::filter(window < local(window))
+        dplyr::filter(window < dplyr::sql(!!window))
     }
   }
   

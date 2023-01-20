@@ -77,11 +77,16 @@ make_record_source <- function(records, pid = NULL, ts = NULL, vars = NULL, .pid
   # pid
   if(is.null(pid) || is.na(pid))
     pid <- deparse(substitute(.pid))
+  source_colums <- colnames(records)
+  if(! pid %in% source_colums)
+    stop('pid \'', pid, '\' not found in input data.')
   rec_source$pid <- pid
 
   # ts
   if(is.null(ts) || is.na(ts))
     ts <- deparse(substitute(.ts))
+  if(! ts %in% source_colums)
+    stop('ts \'', ts, '\' not found in input data.')
   rec_source$ts <- ts
   
   # rec_name

@@ -25,7 +25,7 @@
 #' directly, instead of `collect()`ing the `board`.
 #' @return Plot created by `plotly::plot_ly()` within `plotly::subplot()`.
 phea_plot <- function(board, pid, plot_title = NULL, exclude = NULL, verbose = NULL, .board = NULL,
-  titles = NULL, titles_font_size = 11) {
+  titles = NULL, titles_font_size = 11, modes = NULL) {
   # If not provided, use global default set by setup_phea().
   if(is.null(verbose))
     verbose <- .pheaglobalenv$verbose
@@ -56,7 +56,7 @@ phea_plot <- function(board, pid, plot_title = NULL, exclude = NULL, verbose = N
   
   chart_items <- sort(chart_items)
   
-  make_chart <- function(chart_item) {
+  make_chart <- function(chart_item, chart_mode) {
     chart_data <- board_data |>
       select(ts, value = !!sym(chart_item))
     
@@ -67,10 +67,22 @@ phea_plot <- function(board, pid, plot_title = NULL, exclude = NULL, verbose = N
     
     # browser()
     res_plot <- chart_data |>
-      plotly::plot_ly(x = ~ts) |>
-      plotly::add_lines(y = ~value,
-        name = chart_item,
-        line = list(shape = 'hv')) |>
+      plotly::plot_ly(x = ~ts)
+    
+    if(grepl('lines', chart_mode)) {
+      res_plot <- res_plot |>
+        plotly::add_lines(y = ~value,
+          name = chart_item,
+          line = list(shape = 'hv'))
+    } else {
+      res_plot <- res_plot |>
+        plotly::add_trace(y = ~value,
+          mode = chart_mode,
+          name = chart_item,
+          type = 'scatter')
+    }
+    
+    res_plot <- res_plot |>
       plotly::layout(
         dragmode = 'pan',
         # legend = list(orientation = 'h'),
@@ -79,20 +91,26 @@ phea_plot <- function(board, pid, plot_title = NULL, exclude = NULL, verbose = N
           title = NA),
         yaxis = list(
           # title = chart_item,
-          range = range,
-          fixedrange = TRUE))
+          range = range
+          # , fixedrange = TRUE
+          ))
     
     return(res_plot)
   }
   
-  plots <- sapply(chart_items, make_chart, simplify = FALSE, USE.NAMES = TRUE)
+  use_modes <- sapply(chart_items, \(x) 'lines', USE.NAMES = TRUE)
+  
+  if(!is.null(modes))
+    for(i in seq(length(modes)))
+      use_modes[names(use_modes) == names(modes)[i]] <- modes[i]
+  
+  plots <- purrr::map2(chart_items, use_modes, make_chart)
   
   subplot_args <- c(plots,
     nrows = length(plots),
     shareX = TRUE)
   
-  res <- do.call(plotly::subplot, subplot_args)# |>
-    # plotly::layout(xaxis = list(vistible = FALSE))
+  res <- do.call(plotly::subplot, subplot_args)
   
   if(!isFALSE(titles)) {
     # Prepare names
@@ -106,8 +124,8 @@ phea_plot <- function(board, pid, plot_title = NULL, exclude = NULL, verbose = N
     # Add titles on the subplots as annotations
     y_positions <- seq(1 - 1/length(chart_items), 0, 0 - 1/length(chart_items)) + (1/length(chart_items))/2
     annotations <- purrr::map2(y_positions, chart_items, \(y_pos, item) {
-      list(x = 1, y = y_pos, text = item, showarrow = F, xref='paper', yref='paper',
-        textangle = -90, xanchor="right", yanchor="middle", align="center", valign="center",
+      list(x = 1, y = y_pos, text = item, showarrow = F, xref = 'paper', yref = 'paper',
+        textangle = -90, xanchor = "right", yanchor = "middle", align = "center", valign = "center",
         font = list(size = titles_font_size))
     })
     

@@ -12,7 +12,8 @@ phea_plot(
   verbose = NULL,
   .board = NULL,
   titles = NULL,
-  titles_font_size = 11
+  titles_font_size = 11,
+  modes = NULL
 )
 }
 \arguments{
