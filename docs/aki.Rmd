@@ -153,15 +153,19 @@ For demonstration purposes, let us pick an "interesting" patient. By "interestin
 # Find an "interesting" case to plot: patients with each criteria at times TRUE, at times FALSE
 patients <- scr_change |>
   group_by(pid) |>
-  summarise(
-    n_03 = n_distinct(scr_case_a),
-    n_15 = n_distinct(scr_case_b),
-    n_gfr = n_distinct(gfr_case_c)) |>
-  mutate(sort_variable = n_03 + n_15 + n_gfr) |>
+  summarise(.groups = 'drop',
+    n_a = n_distinct(scr_case_a),
+    n_b = n_distinct(scr_case_b),
+    n_c = n_distinct(gfr_case_c)) |>
+  mutate(sort_variable = n_a + n_b + n_c) |>
+  select(pid, sort_variable) |>
+  collect()
+
+patients <- patients |>
   arrange(desc(sort_variable)) |>
-  head(20) |>
-  select(pid) |>
-  pull()
+  pull('pid')
+
+patients <- patients[1:20]
 
 random_patient <- sample(patients, 1)
 

@@ -11,21 +11,23 @@
 #' Receives a list of components, and a formula (or list of formulas) in SQL language, and computes the result by 
 #' gathering records according to their timestamps.
 #'
-#' The data type of the columns from the components (only those that are actually used or exported) cannot be Boolean.
+#' In compatibility mode, the data type of the columns from the components (those that are actually used or exported)
+#' cannot be Boolean. In that case, to a work around you can convert the values to 0 and 1 before creating the record
+#' source.
 #'
 #' @export
 #' @param components A list of components, a record source, or a lazy table. If a record source or lazy table is 
 #'   provided, a default component will be made from it.
 #' @param fml Formula or list of formulas.
 #' @param export List of additional variables to export.
-#' @param add_components Additional components. Used mostly in case components is not a list of components.
 #' @param .ts,.pid,delay,line If supplied, these will overwrite those of the given component.
-#' @param require_all If `TRUE`, returns only rows where all components to have been found according to their
-#'   timestamps. If the timestamp is not null, the component is cosidered present even if its other values are null. If 
-#'   `dont_require` is provided, `require_all` is ignored.
 #' @param limit Maximum number of rows to return. This is imposed before the calculation of the formula.
-#' @param dont_require If provided, causes formula to require all components (regardless of require_all), except for
-#'   those listed here.
+#' @param require_all If `TRUE`, returns only rows where all components are present. If the component's timestamp is not
+#'  `NULL`, the component is cosidered present even if its other values are `NULL`. If `require_all` is provided,
+#'  `require` is ignored. If `dont_require` is provided, `require_all` and `require` are ignored.
+#' @param require,dont_require List of names of components. If `require` is provided, the listed components will be 
+#' required to be present. If `dont_require` is provided, causes formula to require all components (regardless of
+#' `require_all` or `require`) except for those listed.
 #' @param cascaded If `TRUE` (default), each formula is computed in a separate, nested SELECT statement. This allows
 #'   the result of the prior formula to be used in the following, at the potential cost of longer computation times.
 #' @param clip_sql If `TRUE`, instead of a lazy table the return value is the code of the SQL query, and also copies it
@@ -41,8 +43,8 @@
 #' alternatively be a character vector of names of columns and/or SQL expressions, in which case `calculate_formula()`
 #' will return only rows where the value of those columns or expressions change.
 #' @return Lazy table with result of formula or formulas.
-calculate_formula <- function(components, fml = NULL, window = NULL, export = NULL, add_components = NULL,
-  require_all = FALSE, limit = NA, dont_require = NULL, filters = NULL, cascaded = TRUE, get_sql = FALSE,
+calculate_formula <- function(components, fml = NULL, window = NULL, export = NULL, limit = NA,
+  require_all = FALSE, dont_require = NULL, require = NULL, filters = NULL, cascaded = TRUE, get_sql = FALSE,
   out_window = NULL, dates = NULL, kco = FALSE, dates_from = NULL,
   .ts = NULL, .pid = NULL, line = NULL, delay = NULL, component_window = NULL, ahead = NULL, up_to = NULL) {
   # Prepare ---------------------------------------------------------------------------------------------------------
@@ -91,9 +93,6 @@ calculate_formula <- function(components, fml = NULL, window = NULL, export = NU
     components <- sapply(res_vars, \(x) new_component, USE.NAMES = TRUE, simplify = FALSE)
   }
   
-  if(!is.null(add_components))
-    components <- c(components, add_components)
-  
   if(isTRUE(attr(components, 'phea') == 'component'))
     components <- list(components)
   
@@ -122,9 +121,8 @@ calculate_formula <- function(components, fml = NULL, window = NULL, export = NU
       rec_name = component$rec_source$rec_name,
       column = component$columns,
       composed_name = composed_name,
-      access_sql = component$access_sql)
-    # , pick = !(is.null(component$pick_by) || is.na(component$pick_by) || component$pick_by == '')
-    # , pick_by = component$pick_by)
+      access_sql = component$access_sql,
+      use_fn = component$use_fn)
     
     return(res)
   }) |>
@@ -158,26 +156,26 @@ calculate_formula <- function(components, fml = NULL, window = NULL, export = NU
       stringr::str_match_all('([A-z][A-z0-9_]+)') |>
       unlist() |> unique()
     
-    # Filter bogus matches (eg. SQL keywords in the formula) by keeping only the composed_names that can possibly come from
-    # the given combination of record sources and components.
+    # Filter bogus matches (eg. SQL keywords in the formula) by keeping only the composed names that can possibly come
+    # from a combination of record sources and components.
     g_vars <- g_vars[g_vars %in% var_map$composed_name]
   } else {
     # If no formula, no composed_names to export from it.
     g_vars <- NULL
   }
   
-  # Read input filter -----------------------------------------------------------------------------------------------
+  # Read input filter(s) --------------------------------------------------------------------------------------------
   if(!is.null(filters)) {
     # Extract components from filters.
     filter_vars <- unlist(filters) |>
       stringr::str_match_all('([A-z][A-z0-9_]+)') |>
       unlist() |> unique()
     
-    # Filter bogus matches (eg. SQL keywords in the formula) by keeping only the composed_names that can possibly come
-    # from the given combination of record sources and components.
+    # Filter bogus matches (eg. SQL keywords in the formula) by keeping only the composed names that can possibly come
+    # from a combination of record sources and components.
     filter_vars <- filter_vars[filter_vars %in% var_map$composed_name]
   } else {
-    # If no filter, no composed_names to export from it.
+    # If no filter, no composed names to export from it.
     filter_vars <- NULL
   }
   
@@ -205,25 +203,12 @@ calculate_formula <- function(components, fml = NULL, window = NULL, export = NU
       dplyr::pull(column) |>
       unique()
     
-    # if(filtering_dates) {
-    #   # Are the dates from this record source being exported?
-    #   date_out <- any(var_map[var_map$rec_name == rec_name,]$date_out)
-    #   
-    #   export_records <- record_source$records |>
-    #     dplyr::transmute(
-    #       name = local(rec_name),
-    #       pid = !!rlang::sym(record_source$pid),
-    #       ts = !!rlang::sym(record_source$ts),
-    #       phea_date_out = local(date_out),
-    #       !!!rlang::syms(out_vars))
-    # } else {
-      export_records <- record_source$records |>
-        dplyr::transmute(
-          name = local(rec_name),
-          pid = !!rlang::sym(record_source$pid),
-          ts = !!rlang::sym(record_source$ts),
-          !!!rlang::syms(out_vars))
-    # }
+    export_records <- record_source$records |>
+      dplyr::transmute(
+        name = local(rec_name),
+        pid = !!rlang::sym(record_source$pid),
+        ts = !!rlang::sym(record_source$ts),
+        !!!rlang::syms(out_vars))
     
     return(export_records)
   }
@@ -234,7 +219,10 @@ calculate_formula <- function(components, fml = NULL, window = NULL, export = NU
   
   # Add extra dates -------------------------------------------------------------------------------------------------
   if(!is.null(dates)) {
-    message('Warning: `dates` is yet to be properly tested.')
+    .pheaglobalenv$warns$extra_dates <- 1 + ifelse(is.null(.pheaglobalenv$warns$extra_dates), 0,
+      .pheaglobalenv$warns$extra_dates)
+    if(.pheaglobalenv$warns$extra_dates == 1)
+      message('Warning: `dates` is yet to be properly tested.')
     dates_table <- dbplyr::copy_inline(.pheaglobalenv$con, dates)
     board <- dplyr::union_all(board, dates_table)
   }
@@ -283,10 +271,17 @@ calculate_formula <- function(components, fml = NULL, window = NULL, export = NU
   
   if(.pheaglobalenv$compatibility_mode) {
     ## Fill the blanks downward with the last non-blank value, within the patient.
+    
+    # Exclude from the fill the window functions that already ignore nulls. Those are the "immune vars." Immune to the
+    # NULLs treatment problem.
+    immune_vars <- var_map |>
+      filter(!use_fn %in% c('last_value', 'first_value', 'nth_value')) |>
+      pull('composed_name')
+    
     board <- board |>
       dbplyr::window_order(pid, ts) |>
       dplyr::group_by(pid) |>
-      tidyr::fill(!any_of(c('phea_row_id', 'pid', 'ts'))) |>
+      tidyr::fill(!any_of(c('phea_row_id', 'pid', 'ts', immune_vars))) |>
       ungroup()
   
     # For some reason, apparently a bug in dbplyr's SQL translation, we need to "erase" an ORDER BY "pid", "ts" that is
@@ -351,10 +346,31 @@ calculate_formula <- function(components, fml = NULL, window = NULL, export = NU
   # Let us compact those three things into a single call to dplyr::filter(), in order to produce a single WHERE
   # statement, instead of three layers of SELECT ... WHERE.
   
-  if(require_all || !is.null(dont_require)) {
-    # If dont_require is provided, then all components, except those specified, will be required, even if require_all
-    # is FALSE.
-    required_components <- setdiff(names(components), dont_require)
+  if(require_all || !is.null(dont_require) || !is.null(require)) {
+    if(!is.null(require)) {
+      mask <- ! require %in% names(components)
+      if(any(mask))
+        for(i in which(mask)) { # Will stop at the first non-maching name.
+          stop(paste0('In `require`, item \'', names(components)[i],
+            '\' does not match the name of any component'))
+        }
+    }
+    
+    if(!is.null(dont_require)) {
+      mask <- ! dont_require %in% names(components)
+      if(any(mask))
+        for(i in which(mask)) { # Will stop at the first non-maching name.
+          stop(paste0('In `dont_require`, item \'', names(components)[i],
+            '\' does not match the name of any component'))
+        }
+    }
+    # If dont_require is provided, then all components, except those specified, will be required, regardless of
+    # `require_all` or `require`.
+    if(require_all || !is.null(dont_require))
+        required_components <- setdiff(names(components), dont_require)
+    else
+      required_components <- require
+    
     if(length(required_components) > 0) {
       sql_txt <- paste0(required_components, '_ts') |>
         DBI::dbQuoteIdentifier(conn = .pheaglobalenv$con) |>

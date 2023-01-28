@@ -39,8 +39,18 @@ phea_plot <- function(board, pid, plot_title = NULL, exclude = NULL, verbose = N
     board_data <- board |>
       dplyr::filter(pid == local(pid)) |>
       dplyr::collect()
-    if(verbose)
-      cat('done. (turn this message off with `verbose` or `.verbose` in setup_phea())\n')
+    
+    number_of_rows <- nrow(board_data)
+    if(verbose) {
+      .pheaglobalenv$warns$collecting_lazy <- 1 + ifelse(is.null(.pheaglobalenv$warns$collecting_lazy), 0,
+        .pheaglobalenv$warns$collecting_lazy)
+      if(.pheaglobalenv$warns$collecting_lazy == 1)
+        ending <- paste0('done (', number_of_rows, ' rows downloaded). ',
+          '(turn this message off with `verbose` or `.verbose` in setup_phea())\n')
+      else
+        ending <- paste0('done (', number_of_rows, ' rows downloaded).\n')
+      cat(ending)
+    }
   }
   
   # Plot all columns except some.
@@ -98,8 +108,17 @@ phea_plot <- function(board, pid, plot_title = NULL, exclude = NULL, verbose = N
     return(res_plot)
   }
   
+  # Make column types -- default is 'lines'
   use_modes <- sapply(chart_items, \(x) 'lines', USE.NAMES = TRUE)
   
+  # But any colum that is character, becomes 'markers'
+  markers_columns <- lapply(board_data, typeof) # Get the type of all columns
+  markers_columns <- markers_columns[markers_columns == 'character'] # Keep only the character ones
+  markers_columns <- markers_columns[names(markers_columns) %in% names(use_modes)] # Subset to those used in the plot
+  if(length(markers_columns) > 0) # If any are left
+    use_modes[names(use_modes) %in% names(markers_columns)] <- 'markers' # Set their type to 'markers'
+  
+  # Apply the modes supplied by the user.
   if(!is.null(modes))
     for(i in seq(length(modes)))
       use_modes[names(use_modes) == names(modes)[i]] <- modes[i]

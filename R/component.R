@@ -232,6 +232,7 @@ make_component <- function(input_source,
   # use_fn is a vector of window functions, one for each column.
   use_fn <- capture_named_args(component$fn, 'last_value',
     component$ts_fn, component$columns, component$passthrough)
+  component$use_fn <- unname(unlist(use_fn))
   
   # Use custom aggregates if needed
   if(exists('custom_aggregate', envir = .pheaglobalenv)) {
@@ -300,6 +301,9 @@ make_component <- function(input_source,
     list(use_fn, columns_sql, use_arg, use_omit_value) |>
       purrr::pmap(function(fn, col_acc, arg, omit_value) {
         if(fn %in% c('last_value', 'first_value')) {
+          if(.pheaglobalenv$compatibility_mode)
+            return('')
+          
           # NULLs treatment
           return(
             switch(.pheaglobalenv$engine_code,
@@ -321,26 +325,27 @@ make_component <- function(input_source,
       })
   }
   
-  if(.pheaglobalenv$compatibility_mode) {
-    # This is the "most default" case: the user just wants the most recent record of the component, without line/
-    # bound/delay/window/ahead/up_to. In this case, we don't need a window function. We can just copy the column
-    # whenever the line comes from the correct record source, then use tidyr::fill() to fill NULLs downward.
-    # In other words, the SQL to access the value is merely the CASE WHEN ... statement that otherwise goes inside the
-    # window function call.
-    component$access <- 'line'
-    component$access_sql <- dplyr::sql(columns_sql)
-    component_has_been_built <- TRUE
-  }
-  
   if(!component_has_been_built && (!is.null(line) || !is.null(bound))) {
     # Produce access via *line*.
     # Line access is built differently, because we can use dbplyr::win_over(). dbplyr::win_over() does not support
     # window functions' RANGE mode, forcing us to not use it when mode is not ROWS.
     component$access <- 'line'
     
+    
     winfn_call_expr <- make_window_fn_call_expr(use_fn, columns_sql, use_arg, use_omit_value)
     
     component$access_sql <- lapply(seq(component$columns), \(i) {
+      if(.pheaglobalenv$compatibility_mode
+        && (use_fn[i]  == 'last_value' || isTRUE(.pheaglobalenv$custom_aggregate == use_fn[i]))) {
+        # This is the "most default" case: the user just wants the most recent record of the component, without line/
+        # bound/delay/window/ahead/up_to. In this case, we don't need a window function. We can just copy the column
+        # whenever the line comes from the correct record source, then use tidyr::fill() to fill NULLs downward.
+        # In other words, the SQL to access the value is merely the CASE WHEN ... statement that otherwise goes inside the
+        # window function call.
+        sql_txt <- columns_sql[i]
+        return(dplyr::sql(sql_txt))
+      }
+      
       sql_txt <- winfn_call_expr[[i]]
       
       dbplyr::win_over(con = .pheaglobalenv$con,

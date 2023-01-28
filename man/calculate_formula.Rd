@@ -9,10 +9,10 @@ calculate_formula(
   fml = NULL,
   window = NULL,
   export = NULL,
-  add_components = NULL,
-  require_all = FALSE,
   limit = NA,
+  require_all = FALSE,
   dont_require = NULL,
+  require = NULL,
   filters = NULL,
   cascaded = TRUE,
   get_sql = FALSE,
@@ -37,16 +37,15 @@ provided, a default component will be made from it.}
 
 \item{export}{List of additional variables to export.}
 
-\item{add_components}{Additional components. Used mostly in case components is not a list of components.}
-
-\item{require_all}{If \code{TRUE}, returns only rows where all components to have been found according to their
-timestamps. If the timestamp is not null, the component is cosidered present even if its other values are null. If
-\code{dont_require} is provided, \code{require_all} is ignored.}
-
 \item{limit}{Maximum number of rows to return. This is imposed before the calculation of the formula.}
 
-\item{dont_require}{If provided, causes formula to require all components (regardless of require_all), except for
-those listed here.}
+\item{require_all}{If \code{TRUE}, returns only rows where all components are present. If the component's timestamp is not
+\code{NULL}, the component is cosidered present even if its other values are \code{NULL}. If \code{require_all} is provided,
+\code{require} is ignored. If \code{dont_require} is provided, \code{require_all} and \code{require} are ignored.}
+
+\item{require, dont_require}{List of names of components. If \code{require} is provided, the listed components will be
+required to be present. If \code{dont_require} is provided, causes formula to require all components (regardless of
+\code{require_all} or \code{require}) except for those listed.}
 
 \item{filters}{Character vector. Logical conditions to satisfy. Only rows satisfying all conditions provided will be
 returned. These go into the SQL \code{WHERE} clause.}
@@ -78,5 +77,7 @@ Receives a list of components, and a formula (or list of formulas) in SQL langua
 gathering records according to their timestamps.
 }
 \details{
-The data type of the columns from the components (only those that are actually used or exported) cannot be Boolean.
+In compatibility mode, the data type of the columns from the components (those that are actually used or exported)
+cannot be Boolean. In that case, to a work around you can convert the values to 0 and 1 before creating the record
+source.
 }

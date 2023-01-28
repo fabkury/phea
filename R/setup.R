@@ -82,7 +82,6 @@ setup_phea <- function(connection, schema, verbose = TRUE, engine = NULL, compat
     engine_code <- 4
   
   assign('engine_code', engine_code, envir = .pheaglobalenv)
-  assign('compatibility_mode', compatibility_mode, envir = .pheaglobalenv)
   
   if(engine == 'postgres' && !compatibility_mode) {
     sql_function_exists <- function(name) {
@@ -96,6 +95,12 @@ setup_phea <- function(connection, schema, verbose = TRUE, engine = NULL, compat
       return(function_check == 1)
     }
     
+    install_sql_function <- function(name, code) {
+      if(verbose)
+        message('Installing ', name, '.')
+      DBI::dbExecute(.pheaglobalenv$con, code)
+    }
+    
     already_installed <- c('phea_coalesce_r_sfunc', 'phea_coalesce_nr_sfunc',
       'phea_last_value_ignore_nulls', 'phea_first_value_ignore_nulls') |>
       sapply(sql_function_exists, USE.NAMES = TRUE)
@@ -105,74 +110,71 @@ setup_phea <- function(connection, schema, verbose = TRUE, engine = NULL, compat
     if(any(need_to_install) && verbose)
       message('Engine configured to PostgreSQL.')
     
-    if(need_to_install[['phea_coalesce_r_sfunc']]) {
-      if(verbose)
-        message('Installing phea_coalesce_r_sfunc.')
-      
-      DBI::dbExecute(.pheaglobalenv$con,
-        "create or replace function phea_coalesce_r_sfunc(state anyelement, value anyelement)
-        returns anyelement
-        immutable parallel safe
-        as
-        $$
-          select coalesce(value, state);
-        $$ language sql;")
-    }
-    
-    if(need_to_install[['phea_coalesce_nr_sfunc']]) {
-      if(verbose) {
-        message('Installing phea_coalesce_nr_sfunc.')
+    tryCatch({
+      if(need_to_install[['phea_coalesce_r_sfunc']]) {
+        install_sql_function('phea_coalesce_r_sfunc',
+          "create or replace function phea_coalesce_r_sfunc(state anyelement, value anyelement)
+          returns anyelement
+          immutable parallel safe
+          as
+          $$
+            select coalesce(value, state);
+          $$ language sql;")
       }
       
-      DBI::dbExecute(.pheaglobalenv$con,
-        "create or replace function phea_coalesce_nr_sfunc(state anyelement, value anyelement)
-        returns anyelement
-        immutable parallel safe
-        as
-        $$
-          select coalesce(state, value);
-        $$ language sql;")
-    }
-    
-    if(need_to_install[['phea_last_value_ignore_nulls']]) {
-      if(verbose)
-        message('Installing phea_last_value_ignore_nulls.')
+      if(need_to_install[['phea_coalesce_nr_sfunc']]) {
+        install_sql_function('phea_coalesce_nr_sfunc',
+          "create or replace function phea_coalesce_nr_sfunc(state anyelement, value anyelement)
+          returns anyelement
+          immutable parallel safe
+          as
+          $$
+            select coalesce(state, value);
+          $$ language sql;")
+      }
       
-      DBI::dbExecute(.pheaglobalenv$con,
-        "create or replace aggregate phea_last_value_ignore_nulls(anyelement) (
-          sfunc = phea_coalesce_r_sfunc,
-          stype = anyelement
-        );")
-    }
-    
-    if(need_to_install[['phea_first_value_ignore_nulls']]) {
-      if(verbose)
-        message('Installing phea_first_value_ignore_nulls.')
+      if(need_to_install[['phea_last_value_ignore_nulls']]) {
+        install_sql_function('phea_last_value_ignore_nulls',
+          "create or replace aggregate phea_last_value_ignore_nulls(anyelement) (
+            sfunc = phea_coalesce_r_sfunc,
+            stype = anyelement
+          );")
+      }
       
-      DBI::dbExecute(.pheaglobalenv$con,
-        "create or replace aggregate phea_first_value_ignore_nulls(anyelement) (
-          sfunc = phea_coalesce_nr_sfunc,
-          stype = anyelement
-        );")
-    }
-    
-    custom_aggregate <- list(
-      last_value = 'phea_last_value_ignore_nulls',
-      first_value = 'phea_first_value_ignore_nulls')
+      if(need_to_install[['phea_first_value_ignore_nulls']]) {
+        install_sql_function('phea_first_value_ignore_nulls',
+          "create or replace aggregate phea_first_value_ignore_nulls(anyelement) (
+            sfunc = phea_coalesce_nr_sfunc,
+            stype = anyelement
+          );")
+      }
+      
+      custom_aggregate <- list(
+        last_value = 'phea_last_value_ignore_nulls',
+        first_value = 'phea_first_value_ignore_nulls')
+    },
+      error = \(e) {
+        warning('Unable to install custom aggregates. `last_value` and `first_value` will require compatibility mode.')
+        compatibility_mode <<- TRUE
+    })
   }
-  
+    
   if(engine == 'spark') {
     # Insert _nulls treatment_ into dbplyr's last_value() and first_value() implementation.
     `last_value_sql.Spark SQL` <<- function(con, x) {
-      dbplyr:::build_sql("LAST_VALUE(", ident(as.character(x)), ", true)", con = con)
+      dbplyr:::build_sql("last_value(", ident(as.character(x)), ", true)", con = con)
     }
     
     `first_value_sql.Spark SQL` <<- function(con, x) {
-      dbplyr:::build_sql("FIRST_VALUE(", ident(as.character(x)), ", true)", con = con)
+      dbplyr:::build_sql("first_value(", ident(as.character(x)), ", true)", con = con)
     }
   }
   
+  assign('compatibility_mode', compatibility_mode, envir = .pheaglobalenv)
+  
   if(!is.null(custom_aggregate))
     assign('custom_aggregate', custom_aggregate, envir = .pheaglobalenv)
+  
+  assign('warns', list(), envir = .pheaglobalenv)
 }
 

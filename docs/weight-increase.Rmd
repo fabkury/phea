@@ -137,7 +137,7 @@ kable(head(summary_per_patient, 6))
 As you can see, very young patients (kids) exhibit pairs of body weight measurements 2 to 3 years apart showing an increase of 50% or more.  
 
 Let us pick a patient at random and plot their results:  
-```{r random_patient_plot, out.width="100%", out.height = 500}
+```{r random_patient_plot, out.width="100%", out.height = 800}
 # Sample one patient at random, from among those with ≥50% weight increase at least once in their history.
 sample_patient <- sample(summary_per_patient$pid, 1)
 message('Sampled patient: ', sample_patient)
