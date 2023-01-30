@@ -11,6 +11,7 @@ Install with devtools:
   
 To learn how to use, please see:  
 
+ - https://www.youtube.com/watch?v=10GFtQREC0A: 30-minute video presentation (slides + voice) of Phea to the OHDSI Phenotype Development & Evaluation Working Group on January 27th, 2023. Explains what Phea is, shows examples, and teaches how to use.
  - [Computing body mass index](https://fabkury.github.io/phea/computing_bmi.html): A very brief look at how Phea works.   
  - [Getting started with Phea](https://fabkury.github.io/phea/): A little bit more explanations about the intuition behind Phea.   
  - [Calculate increase in body weight over the past 2-3 years](https://fabkury.github.io/phea/weight-increase.html): Calculating change in values over time.  
