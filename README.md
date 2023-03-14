@@ -9,7 +9,8 @@ Install with devtools:
 `devtools::install_github('fabkury/phea')`  
 `library(phea)`  
   
-To learn how to use, please see:  
+### Learn how to use
+The materials below are meant to showcase Phea and teach how to use it.
 
  - https://www.youtube.com/watch?v=10GFtQREC0A: 30-minute video presentation (slides + voice) of Phea to the OHDSI Phenotype Development & Evaluation Working Group on January 27th, 2023. Explains what Phea is, shows examples, and teaches how to use.
  - [Computing body mass index](https://fabkury.github.io/phea/computing_bmi.html): A very brief look at how Phea works.   
@@ -19,6 +20,19 @@ To learn how to use, please see:
  - [Find increase in serum creatinine or low glomerular filtration rate](https://fabkury.github.io/phea/aki.html): Finding laboratory manifestations of kidney injury.  
  - [Stress-testing Phea, test A](https://fabkury.github.io/phea/stress_test_a.html): Compute formulas with up to 150 variables, each coming from a different SQL query.  
  - [Calculating the ASCVD Risk Estimator Plus score](https://fabkury.github.io/phea/ascvd.html): Compute a clinical risk score involving exponentiation and separate formulas for each of 4 subgroups of patients.  
+  
+  
+### Compatibility with SQL dialects
+ Phea leverages the `dbplyr` framework in R, but also extends it in some parts. Its SQL generation engine offers two modes: compatibility mode, and regular mode. Compatibility mode has less features, but works on more SQL dialects. Regular mode has more features and produces more performant queries. The table below gives the current compatibility statuses.  
+ | Engine                   | Current status | Expected final status | Notes                                                                                                                                                                                                                                                                                                                                            |
+|--------------------------|----------------|-----------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| postgres                 | regular        |                 | Phea was developed using Postgres 15. Regular mode requires access rights to install user-defined functions (UDFs), which are already implemented.                                                                                                                                                                                       |
+| mysql                    | compatibility  | regular         |  Regular mode requires access rights to install user-defined functions, which have *not* yet been implemented.                                                                                                                                                                                                                                 |
+| redshift                 | compatibility  | compatibility   |  Regular mode won't be possible until Redshift implements RANGE mode for window functions.                                                                                                                                                                                                                                                     |
+| databricks   (spark SQL) | regular        |                 |                                                                                                                                                                                                                                                                                                                                                  |
+| oracle                   | _not tested_     | regular         |                                                                                                                                                                                                                                                                                                                                                  |
+| bigquery                 | _not tested_     | regular         |                                                                                                                                                                                                                                                                                                                                                  |
+| sqlserver                | _not tested_     | _unknown_         | Testing could show that regular mode is not possible: "Depending on the ranking, aggregate, or analytic function   used with the OVER clause, <ORDER BY clause> and/or the <ROWS and   RANGE clause> may not be supported." (link: https://learn.microsoft.com/en-us/sql/t-sql/queries/select-over-clause-transact-sql?view=sql-server-ver16) |
   
 By Fabrício Kury  
 Author contact: github@kury.dev
