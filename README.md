@@ -10,7 +10,7 @@ Install with devtools:
 `library(phea)`  
   
 ### Learn how to use
-The materials below are meant to showcase Phea and teach how to use it.
+The materials below showcase Phea's features and teach how to use. Not all features are depicted. Some features are only explained in the help pages within R (use the `?function_name` command). 
 
  - https://www.youtube.com/watch?v=10GFtQREC0A: 30-minute video presentation (slides + voice) of Phea to the OHDSI Phenotype Development & Evaluation Working Group on January 27th, 2023. Explains what Phea is, shows examples, and teaches how to use.
  - [Computing body mass index](https://fabkury.github.io/phea/computing_bmi.html): A very brief look at how Phea works.   
